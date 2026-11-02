@@ -394,13 +394,20 @@ app.whenReady().then(async () => {
     try {
       await win.loadURL('app://g/__blank').catch(() => {});   // тот же источник: рендерер не сменится при переходе на игру
       dbg.attach('1.3');
+      if(ADMISSION_SETTINGS?.mode==='settled'){
+        const {admissionViewportMetrics,checkedAdmissionViewport}=require('./startup-admission.cjs');
+        const metrics=admissionViewportMetrics('settled',W,H);
+        await dbg.sendCommand('Emulation.setDeviceMetricsOverride',metrics);
+        const actual=await js('({width:innerWidth,height:innerHeight,devicePixelRatio})');
+        STARTUP_HOST.viewport=checkedAdmissionViewport(metrics,actual,win.getContentSize());
+      }
       if (has('bootcpu') && +arg('cpu', 1) > 1) await dbg.sendCommand('Emulation.setCPUThrottlingRate', { rate: +arg('cpu') });
       if (rnd || MEM || INIT_SCRIPT !== null || STARTUP_BENCH) await dbg.sendCommand('Page.enable');
       if (rnd) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: rnd });
       if (INIT_SCRIPT !== null) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: INIT_SCRIPT });
       if (MEM) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: GLMEM });   // видеопамять — с первого вызова WebGL
       if (arg('cpuprofile')) { await dbg.sendCommand('Profiler.enable'); await dbg.sendCommand('Profiler.setSamplingInterval', { interval: 250 }); await dbg.sendCommand('Profiler.start'); }
-    } catch (e) { if (INIT_SCRIPT !== null) throw new Error('probe: init-script не установлен: ' + e.message); err('probe: отладчик загрузки:', e.message); }
+    } catch (e) { if(ADMISSION_SETTINGS?.mode==='settled')throw new Error('probe: settled admission debugger setup failed: '+e.message); if (INIT_SCRIPT !== null) throw new Error('probe: init-script не установлен: ' + e.message); err('probe: отладчик загрузки:', e.message); }
   }
   /* --mem: пик памяти процессов за весь запуск (раз в 200 мс) — загрузка и поздняя сборка дают пики, которых нет в метках */
   const PEAK = { page: 0, gpu: 0, pageT: 0, gpuT: 0, n: 0 };

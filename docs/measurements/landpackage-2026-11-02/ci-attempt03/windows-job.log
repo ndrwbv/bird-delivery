@@ -1,0 +1,356 @@
+﻿2026-11-01T23:58:54.3209556Z Current runner version: '2.338.2'
+2026-11-01T23:58:54.3411316Z ##[group]Runner Image Provisioner
+2026-11-01T23:58:54.3412616Z Hosted Compute Agent
+2026-11-01T23:58:54.3413937Z Version: 20261021.618
+2026-11-01T23:58:54.3414946Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+2026-11-01T23:58:54.3416075Z Build Date: 2026-10-21T00:45:21Z
+2026-11-01T23:58:54.3417117Z Worker ID: {f4129bcf-a88e-4e09-8a79-6955c436ed90}
+2026-11-01T23:58:54.3418210Z Region: northcentralus
+2026-11-01T23:58:54.3419025Z Cloud: Azure
+2026-11-01T23:58:54.3419815Z ##[endgroup]
+2026-11-01T23:58:54.3421944Z ##[group]Operating System
+2026-11-01T23:58:54.3422911Z Microsoft Windows Server 2025
+2026-11-01T23:58:54.3423843Z 10.0.26100
+2026-11-01T23:58:54.3424635Z Datacenter
+2026-11-01T23:58:54.3426132Z ##[endgroup]
+2026-11-01T23:58:54.3427112Z ##[group]Runner Image
+2026-11-01T23:58:54.3428032Z Image: windows-2025-vs2026
+2026-11-01T23:58:54.3428923Z Version: 20261021.278.1
+2026-11-01T23:58:54.3431350Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20261021.278/images/windows/Windows2025-VS2026-Readme.md
+2026-11-01T23:58:54.3434112Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20261021.278
+2026-11-01T23:58:54.3435764Z ##[endgroup]
+2026-11-01T23:58:54.3437464Z ##[group]GITHUB_TOKEN Permissions
+2026-11-01T23:58:54.3440004Z Contents: write
+2026-11-01T23:58:54.3440911Z Metadata: read
+2026-11-01T23:58:54.3441704Z ##[endgroup]
+2026-11-01T23:58:54.3444535Z Secret source: Actions
+2026-11-01T23:58:54.3446240Z Cache mode: write
+2026-11-01T23:58:54.3447393Z Prepare workflow directory
+2026-11-01T23:58:54.4958435Z Prepare all required actions
+2026-11-01T23:58:54.5007741Z Getting action download info
+2026-11-01T23:58:54.7515660Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-01T23:58:54.9340107Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-01T23:58:55.1707365Z Download action repository 'actions/download-artifact@v4' (SHA:d3f86a106a0bac45b974a628896c90dbdf5c8093)
+2026-11-01T23:58:55.6633869Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-01T23:58:57.0764626Z Complete job name: build (windows-latest, win)
+2026-11-01T23:58:58.2049900Z ##[group]Run actions/checkout@v4
+2026-11-01T23:58:58.2052007Z with:
+2026-11-01T23:58:58.2053390Z   repository: ndrwbv/bird-delivery
+2026-11-01T23:58:58.2066973Z   token: ***
+2026-11-01T23:58:58.2068204Z   ssh-strict: true
+2026-11-01T23:58:58.2069460Z   ssh-user: git
+2026-11-01T23:58:58.2070731Z   persist-credentials: true
+2026-11-01T23:58:58.2072133Z   clean: true
+2026-11-01T23:58:58.2073428Z   sparse-checkout-cone-mode: true
+2026-11-01T23:58:58.2074959Z   fetch-depth: 1
+2026-11-01T23:58:58.2076191Z   fetch-tags: false
+2026-11-01T23:58:58.2077718Z   show-progress: true
+2026-11-01T23:58:58.2079094Z   lfs: false
+2026-11-01T23:58:58.2080378Z   submodules: false
+2026-11-01T23:58:58.2081722Z   set-safe-directory: true
+2026-11-01T23:58:58.2083234Z   allow-unsafe-pr-checkout: false
+2026-11-01T23:58:58.2085121Z ##[endgroup]
+2026-11-01T23:58:58.3843499Z Syncing repository: ndrwbv/bird-delivery
+2026-11-01T23:58:58.3846086Z ##[group]Getting Git version info
+2026-11-01T23:58:58.3847413Z Working directory is 'D:\a\bird-delivery\bird-delivery'
+2026-11-01T23:58:58.5212832Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-11-01T23:58:59.1856937Z git version 2.56.0.windows.2
+2026-11-01T23:58:59.1911147Z ##[endgroup]
+2026-11-01T23:58:59.1932520Z Temporarily overriding HOME='D:\a\_temp\4769d90d-40b7-4b24-b9ec-64c5acf38261' before making global git config changes
+2026-11-01T23:58:59.1933386Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-01T23:58:59.1946845Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\bird-delivery\bird-delivery
+2026-11-01T23:58:59.2701372Z Deleting the contents of 'D:\a\bird-delivery\bird-delivery'
+2026-11-01T23:58:59.2709977Z ##[group]Initializing the repository
+2026-11-01T23:58:59.2721503Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\bird-delivery\bird-delivery
+2026-11-01T23:58:59.4782895Z Initialized empty Git repository in D:/a/bird-delivery/bird-delivery/.git/
+2026-11-01T23:58:59.4875280Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/ndrwbv/bird-delivery
+2026-11-01T23:58:59.6081332Z ##[endgroup]
+2026-11-01T23:58:59.6082150Z ##[group]Disabling automatic garbage collection
+2026-11-01T23:58:59.6093971Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-11-01T23:58:59.6626351Z ##[endgroup]
+2026-11-01T23:58:59.6627204Z ##[group]Setting up auth
+2026-11-01T23:58:59.6641129Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-11-01T23:58:59.7188425Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-11-01T23:59:02.3722575Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-01T23:59:02.4113245Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-11-01T23:59:02.9909436Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-01T23:59:03.0288731Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-11-01T23:59:03.6109785Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-11-01T23:59:03.6508281Z ##[endgroup]
+2026-11-01T23:59:03.6508751Z ##[group]Fetching the repository
+2026-11-01T23:59:03.6524966Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +33be110b9a5ba5820bfac05a88d89481066baab8:refs/remotes/origin/main
+2026-11-01T23:59:06.1900687Z From https://github.com/ndrwbv/bird-delivery
+2026-11-01T23:59:06.1901621Z  * [new ref]         33be110b9a5ba5820bfac05a88d89481066baab8 -> origin/main
+2026-11-01T23:59:06.1944416Z ##[endgroup]
+2026-11-01T23:59:06.1944981Z ##[group]Determining the checkout info
+2026-11-01T23:59:06.1948267Z ##[endgroup]
+2026-11-01T23:59:06.1958593Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-11-01T23:59:06.2454129Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-11-01T23:59:06.2858354Z ##[group]Checking out the ref
+2026-11-01T23:59:06.2867375Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B main refs/remotes/origin/main
+2026-11-01T23:59:07.0475893Z Switched to a new branch 'main'
+2026-11-01T23:59:07.0498469Z branch 'main' set up to track 'origin/main'.
+2026-11-01T23:59:07.0605759Z ##[endgroup]
+2026-11-01T23:59:07.1066569Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-11-01T23:59:07.1422480Z 33be110b9a5ba5820bfac05a88d89481066baab8
+2026-11-01T23:59:07.2144290Z ##[group]Run actions/setup-node@v4
+2026-11-01T23:59:07.2144615Z with:
+2026-11-01T23:59:07.2144815Z   node-version: 20
+2026-11-01T23:59:07.2145010Z   cache: npm
+2026-11-01T23:59:07.2145190Z   always-auth: false
+2026-11-01T23:59:07.2145383Z   check-latest: false
+2026-11-01T23:59:07.2147675Z   token: ***
+2026-11-01T23:59:07.2147869Z ##[endgroup]
+2026-11-01T23:59:07.3998154Z Attempting to download 20...
+2026-11-01T23:59:07.4233748Z (node:9820) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-01T23:59:07.4235575Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-01T23:59:08.1012358Z Acquiring 20.20.2 - x64 from https://github.com/actions/node-versions/releases/download/20.20.2-23521894959/node-20.20.2-win32-x64.7z
+2026-11-01T23:59:08.5010549Z Extracting ...
+2026-11-01T23:59:11.1289869Z Adding to the cache ...
+2026-11-01T23:59:14.9727345Z ##[group]Environment details
+2026-11-01T23:59:16.0647602Z node: v20.20.2
+2026-11-01T23:59:16.0647897Z npm: 10.8.2
+2026-11-01T23:59:16.0648062Z yarn: 1.22.22
+2026-11-01T23:59:16.0648477Z ##[endgroup]
+2026-11-01T23:59:16.1420129Z [command]C:\Windows\system32\cmd.exe /D /S /C "C:\hostedtoolcache\windows\node\20.20.2\x64\npm.cmd config get cache"
+2026-11-01T23:59:16.4805548Z C:\npm\cache
+2026-11-01T23:59:16.7087332Z npm cache is not found
+2026-11-01T23:59:16.7407416Z ##[group]Run npm ci
+2026-11-01T23:59:16.7407705Z [36;1mnpm ci[0m
+2026-11-01T23:59:16.7429840Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-01T23:59:16.7430269Z ##[endgroup]
+2026-11-01T23:59:22.8667424Z npm warn deprecated npmlog@6.0.2: This package is no longer supported.
+2026-11-01T23:59:22.9673735Z npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+2026-11-01T23:59:23.3530855Z npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+2026-11-01T23:59:23.4157520Z npm warn deprecated @npmcli/move-file@2.0.1: This functionality has been moved to @npmcli/fs
+2026-11-01T23:59:23.6471414Z npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+2026-11-01T23:59:23.8539957Z npm warn deprecated glob@8.1.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+2026-11-01T23:59:23.8939568Z npm warn deprecated are-we-there-yet@3.0.1: This package is no longer supported.
+2026-11-01T23:59:24.6660305Z npm warn deprecated gauge@4.0.4: This package is no longer supported.
+2026-11-01T23:59:24.6843433Z npm warn deprecated boolean@3.2.0: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+2026-11-01T23:59:25.1654048Z npm warn deprecated tar@6.2.1: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+2026-11-01T23:59:28.0597027Z npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+2026-11-01T23:59:38.2754598Z 
+2026-11-01T23:59:38.2755458Z added 443 packages, and audited 444 packages in 21s
+2026-11-01T23:59:38.2756160Z 
+2026-11-01T23:59:38.2756463Z 76 packages are looking for funding
+2026-11-01T23:59:38.2756934Z   run `npm fund` for details
+2026-11-01T23:59:38.5492412Z 
+2026-11-01T23:59:38.5493067Z 32 vulnerabilities (16 moderate, 15 high, 1 critical)
+2026-11-01T23:59:38.5493358Z 
+2026-11-01T23:59:38.5493824Z To address issues that do not require attention, run:
+2026-11-01T23:59:38.5494299Z   npm audit fix
+2026-11-01T23:59:38.5494499Z 
+2026-11-01T23:59:38.5494933Z To address all issues (including breaking changes), run:
+2026-11-01T23:59:38.5495581Z   npm audit fix --force
+2026-11-01T23:59:38.5495842Z 
+2026-11-01T23:59:38.5496052Z Run `npm audit` for details.
+2026-11-01T23:59:38.6233827Z ##[group]Run actions/download-artifact@v4
+2026-11-01T23:59:38.6234259Z with:
+2026-11-01T23:59:38.6234494Z   name: prepared-land-data
+2026-11-01T23:59:38.6234794Z   path: D:\a\_temp/prepared-land-data
+2026-11-01T23:59:38.6235104Z   merge-multiple: false
+2026-11-01T23:59:38.6235377Z   repository: ndrwbv/bird-delivery
+2026-11-01T23:59:38.6235675Z   run-id: 41363861435
+2026-11-01T23:59:38.6235870Z ##[endgroup]
+2026-11-01T23:59:38.8059007Z Downloading single artifact
+2026-11-01T23:59:38.8284323Z (node:9232) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-01T23:59:38.8285189Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-01T23:59:38.9534025Z Preparing to download the following artifacts:
+2026-11-01T23:59:38.9534968Z - prepared-land-data (ID: 13106747082, Size: 33675724, Expected Digest: sha256:183098bf773f3a895c622d75cc91055e47eb113b7a30a9b6bab5daf41ca08041)
+2026-11-01T23:59:39.1019988Z Redirecting to blob download url: https://productionresultssa12.blob.core.windows.net/actions-results/7d5f9d31-f715-4913-bf69-cb756c9432c5/workflow-job-run-5a2b04bb-4bdb-50c6-b370-f424dad95d1e/artifacts/38d5b56ea3feb09771cda5356174e1eeda8ac1e3bc0892a88dca7ea21cca9be9.zip
+2026-11-01T23:59:39.1021570Z Starting download of artifact to: D:\a\_temp\prepared-land-data
+2026-11-01T23:59:39.2689213Z (node:9232) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+2026-11-01T23:59:40.5886893Z SHA256 digest of downloaded artifact is 183098bf773f3a895c622d75cc91055e47eb113b7a30a9b6bab5daf41ca08041
+2026-11-01T23:59:40.5887731Z Artifact download completed successfully.
+2026-11-01T23:59:40.5888101Z Total of 1 artifact(s) downloaded
+2026-11-01T23:59:40.5899816Z Download artifact has finished successfully
+2026-11-01T23:59:40.6205091Z ##[group]Run npm version "0.33.10" --no-git-tag-version --allow-same-version
+2026-11-01T23:59:40.6205711Z [36;1mnpm version "0.33.10" --no-git-tag-version --allow-same-version[0m
+2026-11-01T23:59:40.6221430Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-01T23:59:40.6221834Z ##[endgroup]
+2026-11-01T23:59:41.2524134Z v0.33.10
+2026-11-01T23:59:41.2863613Z ##[group]Run set -eu
+2026-11-01T23:59:41.2864006Z [36;1mset -eu[0m
+2026-11-01T23:59:41.2864484Z [36;1mprintf '{"tag":"%s","sha":"%s","date":"%s"}\n' "$TAG" "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > electron/build-tag.json[0m
+2026-11-01T23:59:41.2865026Z [36;1mcat electron/build-tag.json[0m
+2026-11-01T23:59:41.2880970Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-01T23:59:41.2881364Z env:
+2026-11-01T23:59:41.2881536Z   TAG: v0.33.10
+2026-11-01T23:59:41.2881715Z ##[endgroup]
+2026-11-01T23:59:41.3871222Z {"tag":"v0.33.10","sha":"33be110b9a5ba5820bfac05a88d89481066baab8","date":"2026-11-01T23:59:41Z"}
+2026-11-01T23:59:41.4080796Z ##[group]Run npm run build:steam
+2026-11-01T23:59:41.4081140Z [36;1mnpm run build:steam[0m
+2026-11-01T23:59:41.4096648Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-01T23:59:41.4097033Z env:
+2026-11-01T23:59:41.4097207Z   BUILD_VERSION: 0.33.10
+2026-11-01T23:59:41.4097995Z   BIRD_LAND_DATA_DIR: D:\a\_temp/prepared-land-data
+2026-11-01T23:59:41.4098288Z ##[endgroup]
+2026-11-01T23:59:42.0149908Z 
+2026-11-01T23:59:42.0150527Z > bird-pizza-delivery@0.33.10 build:steam
+2026-11-01T23:59:42.0151083Z > vite build --mode steam
+2026-11-01T23:59:42.0151304Z 
+2026-11-01T23:59:44.4223270Z [36mvite v6.4.3 [32mbuilding for steam...[36m[39m
+2026-11-01T23:59:44.5358307Z transforming...
+2026-11-01T23:59:48.1538888Z 
+2026-11-01T23:59:48.1540713Z ./fonts/PressStart2P-Regular.ttf referenced in ./fonts/PressStart2P-Regular.ttf didn't resolve at build time, it will remain unchanged to be resolved at runtime
+2026-11-01T23:59:57.1743802Z [32m✓[39m 426 modules transformed.
+2026-11-01T23:59:58.2260662Z rendering chunks...
+2026-11-01T23:59:59.8174014Z [33m[plugin vite:reporter] 
+2026-11-01T23:59:59.8176657Z (!) D:/a/bird-delivery/bird-delivery/src/game/story.js is dynamically imported by D:/a/bird-delivery/bird-delivery/src/game/orders.js but also statically imported by D:/a/bird-delivery/bird-delivery/src/game/achievements.js, D:/a/bird-delivery/bird-delivery/src/game/doorstep.js, D:/a/bird-delivery/bird-delivery/src/game/game.js, D:/a/bird-delivery/bird-delivery/src/game/minigames/stairs.js, D:/a/bird-delivery/bird-delivery/src/game/storytest.js, dynamic import will not move module into another chunk.
+2026-11-01T23:59:59.8180260Z [39m
+2026-11-01T23:59:59.8180659Z [33m[plugin vite:reporter] 
+2026-11-01T23:59:59.8183733Z (!) D:/a/bird-delivery/bird-delivery/src/game/career.js is dynamically imported by D:/a/bird-delivery/bird-delivery/src/game/orders.js but also statically imported by D:/a/bird-delivery/bird-delivery/src/game/game.js, D:/a/bird-delivery/bird-delivery/src/game/world.js, dynamic import will not move module into another chunk.
+2026-11-01T23:59:59.8186039Z [39m
+2026-11-02T00:00:00.4193501Z computing gzip size...
+2026-11-02T00:00:00.7043691Z [2mdist/steam/[22m[32msfx/index.json                                                                      [39m[1m[2m     0.00 kB[22m[1m[22m[2m │ gzip:     0.02 kB[22m
+2026-11-02T00:00:00.7045208Z [2mdist/steam/[22m[32mmusic/index.json                                                                    [39m[1m[2m     0.00 kB[22m[1m[22m[2m │ gzip:     0.02 kB[22m
+2026-11-02T00:00:00.7047563Z [2mdist/steam/[22m[32mcity-data/catalog.json                                                              [39m[1m[2m     0.90 kB[22m[1m[22m[2m │ gzip:     0.54 kB[22m
+2026-11-02T00:00:00.7049816Z [2mdist/steam/[22m[32mcarlab.html                                                                         [39m[1m[2m     1.37 kB[22m[1m[22m[2m │ gzip:     0.81 kB[22m
+2026-11-02T00:00:00.7052126Z [2mdist/steam/[22m[32msandbox.html                                                                        [39m[1m[2m     1.55 kB[22m[1m[22m[2m │ gzip:     0.82 kB[22m
+2026-11-02T00:00:00.7054166Z [2mdist/steam/[22m[32mpad.html                                                                            [39m[1m[2m     2.16 kB[22m[1m[22m[2m │ gzip:     1.19 kB[22m
+2026-11-02T00:00:00.7056138Z [2mdist/steam/[22m[32mindex.html                                                                          [39m[1m[2m    19.51 kB[22m[1m[22m[2m │ gzip:     6.47 kB[22m
+2026-11-02T00:00:00.7058089Z [2mdist/steam/[22m[32massets/landclean.worker-eLU8qVnL.js                                                 [39m[1m[2m   111.86 kB[22m[1m[22m
+2026-11-02T00:00:00.7060267Z [2mdist/steam/[22m[32mcity-data/965ebbc0994bfe82e2943d1ee3f733a4cc8a273d4100adda8f0f0d649c32f9a4.land.gz  [39m[1m[2m34,231.59 kB[22m[1m[22m
+2026-11-02T00:00:00.7065845Z [2mdist/steam/[22m[35massets/padmenu-DOFw7avD.css                                                         [39m[1m[2m     0.43 kB[22m[1m[22m[2m │ gzip:     0.26 kB[22m
+2026-11-02T00:00:00.7068520Z [2mdist/steam/[22m[35massets/playername-3UM9DJra.css                                                      [39m[1m[2m     1.43 kB[22m[1m[22m[2m │ gzip:     0.72 kB[22m
+2026-11-02T00:00:00.7070680Z [2mdist/steam/[22m[35massets/sandbox-B3uuqu8o.css                                                         [39m[1m[2m     4.71 kB[22m[1m[22m[2m │ gzip:     1.76 kB[22m
+2026-11-02T00:00:00.7072802Z [2mdist/steam/[22m[35massets/index-BT_lyAkV.css                                                           [39m[1m[2m    78.90 kB[22m[1m[22m[2m │ gzip:    17.81 kB[22m
+2026-11-02T00:00:00.7074957Z [2mdist/steam/[22m[35massets/game-BcuaQB8I.css                                                            [39m[1m[2m   252.41 kB[22m[1m[22m[2m │ gzip:    51.93 kB[22m
+2026-11-02T00:00:00.7078400Z [2mdist/steam/[22m[36massets/modulepreload-polyfill-B5Qt9EMX.js                                           [39m[1m[2m     0.71 kB[22m[1m[22m[2m │ gzip:     0.40 kB[22m
+2026-11-02T00:00:00.7080593Z [2mdist/steam/[22m[36massets/preload-helper-Ct5FWWRu.js                                                   [39m[1m[2m     1.23 kB[22m[1m[22m[2m │ gzip:     0.72 kB[22m
+2026-11-02T00:00:00.7082684Z [2mdist/steam/[22m[36massets/steam-mock-BLAErFH-.js                                                       [39m[1m[2m     2.30 kB[22m[1m[22m[2m │ gzip:     1.21 kB[22m
+2026-11-02T00:00:00.7084613Z [2mdist/steam/[22m[36massets/pad-DHYEagai.js                                                              [39m[1m[2m     2.75 kB[22m[1m[22m[2m │ gzip:     1.47 kB[22m
+2026-11-02T00:00:00.7086806Z [2mdist/steam/[22m[36massets/index-Da3NSRTx.js                                                            [39m[1m[2m     3.76 kB[22m[1m[22m[2m │ gzip:     1.89 kB[22m
+2026-11-02T00:00:00.7088696Z [2mdist/steam/[22m[36massets/index-oWyUcYgI.js                                                            [39m[1m[2m     4.84 kB[22m[1m[22m[2m │ gzip:     2.26 kB[22m
+2026-11-02T00:00:00.7090676Z [2mdist/steam/[22m[36massets/carlab-D0J6ts9U.js                                                           [39m[1m[2m     4.85 kB[22m[1m[22m[2m │ gzip:     2.28 kB[22m
+2026-11-02T00:00:00.7092759Z [2mdist/steam/[22m[36massets/steam-Cwzudoc2.js                                                            [39m[1m[2m     5.84 kB[22m[1m[22m[2m │ gzip:     2.63 kB[22m
+2026-11-02T00:00:00.7094671Z [2mdist/steam/[22m[36massets/brands-CS0AufFl.js                                                           [39m[1m[2m     6.61 kB[22m[1m[22m[2m │ gzip:     2.95 kB[22m
+2026-11-02T00:00:00.7096750Z [2mdist/steam/[22m[36massets/padmenu--jHCnbA9.js                                                          [39m[1m[2m     7.95 kB[22m[1m[22m[2m │ gzip:     3.56 kB[22m
+2026-11-02T00:00:00.7098693Z [2mdist/steam/[22m[36massets/orders.config-iIr8IAQs.js                                                    [39m[1m[2m    19.29 kB[22m[1m[22m[2m │ gzip:     9.42 kB[22m
+2026-11-02T00:00:00.7100631Z [2mdist/steam/[22m[36massets/playername-CnJq1Lmh.js                                                       [39m[1m[2m    30.06 kB[22m[1m[22m[2m │ gzip:    12.43 kB[22m
+2026-11-02T00:00:00.7102455Z [2mdist/steam/[22m[36massets/sandbox-BCEDU6MC.js                                                          [39m[1m[2m    35.25 kB[22m[1m[22m[2m │ gzip:    13.04 kB[22m
+2026-11-02T00:00:00.7104324Z [2mdist/steam/[22m[36massets/zh-CmaIi2cP.js                                                               [39m[1m[2m   274.14 kB[22m[1m[22m[2m │ gzip:   101.07 kB[22m
+2026-11-02T00:00:00.7106911Z [2mdist/steam/[22m[36massets/tr-BkJwbZlQ.js                                                               [39m[1m[2m   278.79 kB[22m[1m[22m[2m │ gzip:    99.49 kB[22m
+2026-11-02T00:00:00.7107992Z [33m
+2026-11-02T00:00:00.7108559Z (!) Some chunks are larger than 500 kB after minification. Consider:
+2026-11-02T00:00:00.7109305Z - Using dynamic import() to code-split the application
+2026-11-02T00:00:00.7111294Z - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+2026-11-02T00:00:00.7112850Z - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+2026-11-02T00:00:00.7114523Z [2mdist/steam/[22m[36massets/pl-DyPPIo7r.js                                                               [39m[1m[2m   281.68 kB[22m[1m[22m[2m │ gzip:   101.77 kB[22m
+2026-11-02T00:00:00.7116261Z [2mdist/steam/[22m[36massets/uz-CKwHV-_H.js                                                               [39m[1m[2m   282.04 kB[22m[1m[22m[2m │ gzip:    99.27 kB[22m
+2026-11-02T00:00:00.7117998Z [2mdist/steam/[22m[36massets/pt-CMsqGB4H.js                                                               [39m[1m[2m   282.62 kB[22m[1m[22m[2m │ gzip:    99.79 kB[22m
+2026-11-02T00:00:00.7119960Z [2mdist/steam/[22m[36massets/it-DRhlQ0nb.js                                                               [39m[1m[2m   285.29 kB[22m[1m[22m[2m │ gzip:   100.64 kB[22m
+2026-11-02T00:00:00.7121697Z [2mdist/steam/[22m[36massets/es-BCg-r20a.js                                                               [39m[1m[2m   285.87 kB[22m[1m[22m[2m │ gzip:   101.33 kB[22m
+2026-11-02T00:00:00.7123492Z [2mdist/steam/[22m[36massets/de-BcbwU-Lh.js                                                               [39m[1m[2m   288.55 kB[22m[1m[22m[2m │ gzip:   102.72 kB[22m
+2026-11-02T00:00:00.7125226Z [2mdist/steam/[22m[36massets/fr-C3ZL4-A1.js                                                               [39m[1m[2m   295.32 kB[22m[1m[22m[2m │ gzip:   103.17 kB[22m
+2026-11-02T00:00:00.7126981Z [2mdist/steam/[22m[36massets/ja-hs9orTDF.js                                                               [39m[1m[2m   309.55 kB[22m[1m[22m[2m │ gzip:   104.39 kB[22m
+2026-11-02T00:00:00.7128770Z [2mdist/steam/[22m[36massets/uk-CM1R9mRA.js                                                               [39m[1m[2m   340.11 kB[22m[1m[22m[2m │ gzip:    93.12 kB[22m
+2026-11-02T00:00:00.7130877Z [2mdist/steam/[22m[36massets/be-S040HCOM.js                                                               [39m[1m[2m   340.15 kB[22m[1m[22m[2m │ gzip:    95.73 kB[22m
+2026-11-02T00:00:00.7132690Z [2mdist/steam/[22m[36massets/kk-LNzSwJOI.js                                                               [39m[1m[2m   350.35 kB[22m[1m[22m[2m │ gzip:   100.41 kB[22m
+2026-11-02T00:00:00.7134490Z [2mdist/steam/[22m[36massets/en-BQJBvVwm.js                                                               [39m[1m[33m   558.14 kB[39m[22m[2m │ gzip:   198.47 kB[22m
+2026-11-02T00:00:00.7136334Z [2mdist/steam/[22m[36massets/index-CsPFG6fw.js                                                            [39m[1m[33m 1,944.12 kB[39m[22m[2m │ gzip:   687.40 kB[22m
+2026-11-02T00:00:00.7138173Z [2mdist/steam/[22m[36massets/game-BkcO1YEJ.js                                                             [39m[1m[33m 6,672.80 kB[39m[22m[2m │ gzip: 2,319.74 kB[22m
+2026-11-02T00:00:00.7139211Z [32m✓ built in 16.25s[39m
+2026-11-02T00:00:00.8473696Z ##[group]Run npx electron-builder --win zip --x64 --publish never -c.win.artifactName='bird-pizza-win.${ext}'
+2026-11-02T00:00:00.8474532Z [36;1mnpx electron-builder --win zip --x64 --publish never -c.win.artifactName='bird-pizza-win.${ext}'[0m
+2026-11-02T00:00:00.8490424Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-02T00:00:00.8490823Z ##[endgroup]
+2026-11-02T00:00:02.8290966Z   • electron-builder  version=25.1.8 os=10.0.26100
+2026-11-02T00:00:02.8341939Z   • loaded configuration  file=package.json ("build" field)
+2026-11-02T00:00:02.8355039Z   • author is missed in the package.json  appPackageFile=D:\a\bird-delivery\bird-delivery\package.json
+2026-11-02T00:00:03.0139703Z   • executing @electron/rebuild  electronVersion=33.4.11 arch=x64 buildFromSource=false appDir=./
+2026-11-02T00:00:03.0143223Z   • installing native dependencies  arch=x64
+2026-11-02T00:00:03.7159594Z   • completed installing native dependencies
+2026-11-02T00:00:03.7385038Z   • packaging       platform=win32 arch=x64 electron=33.4.11 appOutDir=release\win-unpacked
+2026-11-02T00:00:03.9258549Z   • downloading     url=https://github.com/electron/electron/releases/download/v33.4.11/electron-v33.4.11-win32-x64.zip size=115 MB parts=8
+2026-11-02T00:00:04.8349301Z   • downloaded      url=https://github.com/electron/electron/releases/download/v33.4.11/electron-v33.4.11-win32-x64.zip duration=1.079s
+2026-11-02T00:00:08.0117499Z   • updating asar integrity executable resource  executablePath=release\win-unpacked\BirdPizza.exe
+2026-11-02T00:00:08.2608869Z   • downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z size=5.6 MB parts=1
+2026-11-02T00:00:08.4416303Z   • downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z duration=386ms
+2026-11-02T00:00:09.1198219Z   • signing with signtool.exe  path=release\win-unpacked\BirdPizza.exe
+2026-11-02T00:00:09.1227916Z   • no signing info identified, signing is skipped  signHook=false cscInfo=null
+2026-11-02T00:00:09.1364531Z   • building        target=zip arch=x64 file=release\bird-pizza-win.zip
+2026-11-02T00:00:58.5993599Z ##[group]Run npx electron-builder --win nsis --x64 --publish never
+2026-11-02T00:00:58.5994149Z [36;1mnpx electron-builder --win nsis --x64 --publish never[0m
+2026-11-02T00:00:58.6011221Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-02T00:00:58.6011631Z ##[endgroup]
+2026-11-02T00:01:00.5906316Z   • electron-builder  version=25.1.8 os=10.0.26100
+2026-11-02T00:01:00.5963050Z   • loaded configuration  file=package.json ("build" field)
+2026-11-02T00:01:00.5976752Z   • author is missed in the package.json  appPackageFile=D:\a\bird-delivery\bird-delivery\package.json
+2026-11-02T00:01:00.7645817Z   • executing @electron/rebuild  electronVersion=33.4.11 arch=x64 buildFromSource=false appDir=./
+2026-11-02T00:01:00.7658541Z   • installing native dependencies  arch=x64
+2026-11-02T00:01:01.4659909Z   • completed installing native dependencies
+2026-11-02T00:01:01.4870445Z   • packaging       platform=win32 arch=x64 electron=33.4.11 appOutDir=release\win-unpacked
+2026-11-02T00:01:04.2551425Z   • updating asar integrity executable resource  executablePath=release\win-unpacked\BirdPizza.exe
+2026-11-02T00:01:04.6330846Z   • signing with signtool.exe  path=release\win-unpacked\BirdPizza.exe
+2026-11-02T00:01:04.6336446Z   • no signing info identified, signing is skipped  signHook=false cscInfo=null
+2026-11-02T00:01:04.6484860Z   • building        target=nsis file=release\bird-pizza-setup.exe archs=x64 oneClick=true perMachine=false
+2026-11-02T00:01:37.3204862Z   • downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/nsis-resources-3.4.1/nsis-resources-3.4.1.7z size=731 kB parts=1
+2026-11-02T00:01:37.3429118Z   • downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/nsis-resources-3.4.1/nsis-resources-3.4.1.7z duration=142ms
+2026-11-02T00:01:37.6622909Z   • downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/nsis-3.0.4.1/nsis-3.0.4.1.7z size=1.3 MB parts=1
+2026-11-02T00:01:37.6998261Z   • downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/nsis-3.0.4.1/nsis-3.0.4.1.7z duration=256ms
+2026-11-02T00:01:39.1247531Z   • signing with signtool.exe  path=release\__uninstaller-nsis-bird-pizza-delivery.exe
+2026-11-02T00:01:39.1250057Z   • no signing info identified, signing is skipped  signHook=false cscInfo=null
+2026-11-02T00:01:40.6406706Z   • signing with signtool.exe  path=release\bird-pizza-setup.exe
+2026-11-02T00:01:40.6409252Z   • no signing info identified, signing is skipped  signHook=false cscInfo=null
+2026-11-02T00:01:40.6414228Z   • building block map  blockMapFile=release\bird-pizza-setup.exe.blockmap
+2026-11-02T00:01:41.8741243Z ##[group]Run if [ "win" = linux ]; then PACK=release/linux-unpacked; else PACK=release/win-unpacked; fi
+2026-11-02T00:01:41.8742006Z [36;1mif [ "win" = linux ]; then PACK=release/linux-unpacked; else PACK=release/win-unpacked; fi[0m
+2026-11-02T00:01:41.8742827Z [36;1mnode tools/land-package-verify-asar.mjs "--asar=$PACK/resources/app.asar" --dir=dist/steam "--report=$RUNNER_TEMP/land-package-asar.json"[0m
+2026-11-02T00:01:41.8759339Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-02T00:01:41.8759729Z ##[endgroup]
+2026-11-02T00:01:42.0614519Z {"ok":true,"archive":"D:\\a\\bird-delivery\\bird-delivery\\release\\win-unpacked\\resources\\app.asar","catalogSha256":"f8a181903273368d7fcf96598061886cbdae3ec0e0f481ef5d21e3a6fd917f04","sourceHash":"0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e","assets":[{"path":"dist/steam/city-data/965ebbc0994bfe82e2943d1ee3f733a4cc8a273d4100adda8f0f0d649c32f9a4.land.gz","bytes":34231591,"sha256":"965ebbc0994bfe82e2943d1ee3f733a4cc8a273d4100adda8f0f0d649c32f9a4"}]}
+2026-11-02T00:01:42.0929905Z ##[group]Run node tools/land-package-smoke.mjs --dir=release/win-unpacked/resources/app.asar/dist/steam --catalog=dist/steam/city-data/catalog.json "--out=$RUNNER_TEMP/land-package-runtime" --preset=high --admission=settled
+2026-11-02T00:01:42.0931574Z [36;1mnode tools/land-package-smoke.mjs --dir=release/win-unpacked/resources/app.asar/dist/steam --catalog=dist/steam/city-data/catalog.json "--out=$RUNNER_TEMP/land-package-runtime" --preset=high --admission=settled[0m
+2026-11-02T00:01:42.0948940Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-02T00:01:42.0949344Z ##[endgroup]
+2026-11-02T00:07:09.6195120Z Error: land-package17b:SMOKE_GRAPHICS
+2026-11-02T00:07:09.6195832Z     at need (file:///D:/a/bird-delivery/bird-delivery/src/game/landdata/land-package-key.js:3:46)
+2026-11-02T00:07:09.6196548Z     at file:///D:/a/bird-delivery/bird-delivery/tools/land-package-smoke.mjs:50:2
+2026-11-02T00:07:09.6197372Z     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-11-02T00:07:09.6335105Z ##[error]Process completed with exit code 1.
+2026-11-02T00:07:09.6547263Z ##[group]Run actions/upload-artifact@v4
+2026-11-02T00:07:09.6547665Z with:
+2026-11-02T00:07:09.6547943Z   name: land-package-runtime-win
+2026-11-02T00:07:09.6548935Z   path: D:\a\_temp/land-package-asar.json
+D:\a\_temp/land-package-runtime/**
+
+2026-11-02T00:07:09.6549443Z   if-no-files-found: ignore
+2026-11-02T00:07:09.6549725Z   retention-days: 7
+2026-11-02T00:07:09.6550015Z   compression-level: 6
+2026-11-02T00:07:09.6550277Z   overwrite: false
+2026-11-02T00:07:09.6550564Z   include-hidden-files: false
+2026-11-02T00:07:09.6550855Z ##[endgroup]
+2026-11-02T00:07:09.8503863Z (node:10032) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-02T00:07:09.8504819Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-02T00:07:09.8603016Z Multiple search paths detected. Calculating the least common ancestor of all paths
+2026-11-02T00:07:09.8607913Z The least common ancestor is D:\a\_temp. This will be the root directory of the artifact
+2026-11-02T00:07:09.8608974Z With the provided path, there will be 6 files uploaded
+2026-11-02T00:07:09.8613973Z Artifact name is valid!
+2026-11-02T00:07:09.8719298Z Root directory input is valid!
+2026-11-02T00:07:10.1180838Z Beginning upload of artifact content to blob storage
+2026-11-02T00:07:10.1563176Z (node:10032) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-02T00:07:10.2569791Z Uploaded bytes 16271
+2026-11-02T00:07:10.2882963Z Finished uploading artifact content to blob storage!
+2026-11-02T00:07:10.2884719Z SHA256 digest of uploaded artifact zip is 1849e1097204b9304406edefb4873500884caaa1c5f2e340a41f289a19ee797e
+2026-11-02T00:07:10.2887366Z Finalizing artifact upload
+2026-11-02T00:07:10.7179811Z Artifact land-package-runtime-win.zip successfully finalized. Artifact ID 13107286622
+2026-11-02T00:07:10.7180815Z Artifact land-package-runtime-win has been successfully uploaded! Final size is 16271 bytes. Artifact ID is 13107286622
+2026-11-02T00:07:10.7191668Z Artifact download URL: https://github.com/ndrwbv/bird-delivery/actions/runs/41363861435/artifacts/13107286622
+2026-11-02T00:07:10.7594585Z Post job cleanup.
+2026-11-02T00:07:10.9541874Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-11-02T00:07:10.9916835Z git version 2.56.0.windows.2
+2026-11-02T00:07:11.0005421Z Temporarily overriding HOME='D:\a\_temp\8765f4aa-01af-4fb3-bba7-5757626abd8c' before making global git config changes
+2026-11-02T00:07:11.0006836Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-02T00:07:11.0016864Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\bird-delivery\bird-delivery
+2026-11-02T00:07:11.0419976Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-11-02T00:07:11.0820977Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-11-02T00:07:11.6735331Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-02T00:07:11.7086822Z http.https://github.com/.extraheader
+2026-11-02T00:07:11.7137767Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-11-02T00:07:11.7550097Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-11-02T00:07:12.3733042Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-02T00:07:12.4131365Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-11-02T00:07:13.0206854Z Cleaning up orphan processes
+2026-11-02T00:07:13.0877360Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/download-artifact@v4, actions/setup-node@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

@@ -50,3 +50,5 @@ ASAR построен локально из точного final dist. Пров�
 [Первый фактический CI run](ci-attempt01/README.md): Linux prepare/pack/runtime PASS, Windows build/pack PASS, затем platform separator bug в ASAR verifier остановил публикацию. Исправлены только внутренние lookup paths;13 tiny cases с actual ASAR Win32 VM и адресный check PASS. Первый run остаётся failed; новая попытка обязательна, v0.33.10 пока не опубликована.
 
 [Вторая CI попытка](ci-attempt02/README.md): ASAR исправлен, но ранние Linux/Windows runtime scripts превысили240с; guard state в первом failure недостаточен длявывода о hold. Для packaging отдельно введён settled-menu admission со строгим Go/W/cache gate и снимком состояния на control deadline. Два localASAR pilots и targetedchecks PASS; прежняя12 остаётся отдельной immutable early-серией. Выпуск ещё не опубликован.
+
+[Третья CI попытка](ci-attempt03/README.md): LinuxPASS; Windowsданные/controlPASS, но strictsizegate обнаружил1024×720 вместо1280×800. Вsettled testharness включён реальныйCDPviewport доnavigation, проверенный canvas/WebGL fixture иlocalASAR; графика/sizecheck не ослаблены. Публикация остаётся впереди.

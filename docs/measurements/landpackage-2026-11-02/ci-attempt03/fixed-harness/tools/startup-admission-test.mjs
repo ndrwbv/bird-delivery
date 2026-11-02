@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import admission from './startup-admission.cjs';
+const {admissionSettings,admissionViewportMetrics,checkedAdmissionViewport}=admission;
+assert.deepEqual(admissionSettings(),{mode:'early',early:true,bootWaitSec:360,controlWaitMs:240000,probeTimeoutSec:480,hardTimeoutMs:520000,movementWaitMs:600});
+const c=admissionSettings('settled');assert.equal(c.early,false);assert.equal(c.controlWaitMs,420000);
+assert.ok(c.probeTimeoutSec>c.bootWaitSec+c.controlWaitMs/1000+c.movementWaitMs/1000);
+assert.ok(c.hardTimeoutMs>c.probeTimeoutSec*1000);assert.equal(Object.isFrozen(c),true);
+for(const mode of ['','quiet','settled-faster',null,420])assert.throws(()=>admissionSettings(mode),/Invalid/);
+assert.notEqual(admissionSettings(),admissionSettings());
+assert.equal(admissionViewportMetrics('early',1280,800),null);
+const metrics=admissionViewportMetrics('settled',1280,800);
+assert.deepEqual(metrics,{width:1280,height:800,deviceScaleFactor:1,mobile:false,screenWidth:1280,screenHeight:800});
+for(const [w,h]of [[0,800],[-1,800],[1280,NaN],[Infinity,800],[1280,800.5],[8193,800],[8192,8192],['1280',800]])assert.throws(()=>admissionViewportMetrics('settled',w,h),/viewport size/);
+assert.throws(()=>admissionViewportMetrics('quiet',1280,800),/admission mode/);
+const viewport=checkedAdmissionViewport(metrics,{width:1280,height:800,devicePixelRatio:1},[1024,720]);
+assert.equal(viewport.nativeContentSize.width,1024);assert.equal(viewport.actual.width,1280);
+for(const actual of [{width:1024,height:720,devicePixelRatio:1},{width:1280,height:800,devicePixelRatio:2},null])assert.throws(()=>checkedAdmissionViewport(metrics,actual,[1024,720]),/override/);
+assert.throws(()=>checkedAdmissionViewport(metrics,{width:1280,height:800,devicePixelRatio:1},[0,720]),/native/);
+const body=fs.readFileSync(new URL('./probe-checks/startup-ready.js',import.meta.url),'utf8');
+const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
+const execute=new AsyncFunction('window','document','location','performance','URLSearchParams','d','wait',body);
+function fixture(settled=false,preexisting=false){
+ let clock=0,clicks=0;const marker=preexisting?{at:4}:null;
+ const trace={enabled:true,firstControl:marker,report:()=>({marks:settled?{'queue.full':{at:1}}:{}})};
+ const window={__startupTrace:trace,__startupHost:settled?{admission:admissionSettings('settled')}:{},__boot:{full:1}};
+ const button={click:()=>clicks++},document={querySelector:q=>q.startsWith('.crm-card')?button:null,body:{classList:{contains:()=>false}}};
+ const d={S:{state:settled?'title':'load',paused:false},V:{x:0,z:0},DIST:{cur:()=>0,opened:()=>1,city:()=>false},CITYOPEN:{seen:()=>false},DLG:{isOpen:()=>false},LATE:{busy:()=>!settled},crashlog:{entries:()=>[]}};
+ return{window,trace,args:[window,document,{search:''},{now:()=>clock},URLSearchParams,d,async()=>{clock+=500000;}],clicks:()=>clicks};
+}
+const timeout=fixture();await assert.rejects(execute(...timeout.args),/No controllable rendered frame within 240000ms/);
+assert.equal(timeout.clicks(),1);assert.equal(timeout.window.__startupFailureState.state,'load');
+assert.equal(timeout.window.__startupFailureState.holds.dialog,false);
+assert.equal(timeout.window.__startupFailureState.holds.handcam,null);assert.equal(timeout.window.__startupFailureState.mapOpen,null);
+assert.equal(timeout.window.__startupFailureState.late.busy,true);
+const premature=fixture(true,true),original=premature.trace.firstControl;
+await assert.rejects(execute(...premature.args),/completed, untouched title/);assert.equal(premature.clicks(),0);assert.equal(premature.trace.firstControl,original);
+console.log('Startup admission: unchanged early defaults, explicit bounded settled allowance PASS');

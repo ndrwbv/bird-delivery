@@ -1,0 +1,14 @@
+
+> bird-pizza-delivery@0.1.0 check
+> node tools/check.cjs --serial --only=startup-admission,probe-terminal,startup-ordinary
+
+  проверок в игре разом: 1
+  ок  первый итог проверки сохраняется при поздних ошибках окна (0.0 с)
+  ок  обычные cold/warm запуски: ввод, источник и полные пары (0.1 с)
+  ок  отдельная CI-приёмка пакета и прежний ранний старт (0.0 с)
+
+ок        первый итог проверки сохраняется при поздних ошибках окна   0.0 с  {"ok":true,"checks":5,"firstTerminalWins":true,"lateEvalCannotOverwrite":true,"lateGlobalCatchQuiet":true,"realFatalPreserved":true,"electronOrGameLaunched":false}
+ок        обычные cold/warm запуски: ввод, источник и полные пары     0.1 с  {"ok":true,"checks":33,"ordinaryOnly":true,"realPilotWitness":true,"noAssetReads":true,"noProcesses":true}
+ок        отдельная CI-приёмка пакета и прежний ранний старт          0.0 с  Startup admission: unchanged early defaults, explicit bounded settled allowance PASS
+
+всё ок · 0 с
