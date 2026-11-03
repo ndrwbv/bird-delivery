@@ -1,13 +1,14 @@
 import { STARTUP } from './startuptrace.js';
+import { createTileQueue } from './tilequeue.js';
 /* Подробная поверхность нужна вокруг камеры, а не сразу во всём городе.
    Опора и правила движения уже готовы; до замены остаётся исходная земля.
    Готовый участок публикуется целиком, затем скрывается его старый слой. */
-export function createLandStream({terrain,build,publish=()=>{},radius=832,now=()=>performance.now()}) {
+export function createLandStream({terrain,build,publish=()=>{},dispose=()=>{},visible=()=>false,radius=832,now=()=>performance.now()}) {
   const size=terrain.g*16,x0=terrain.x0,z0=terrain.z0;
   const nx=Math.ceil((terrain.nx-1)/16),nz=Math.ceil((terrain.nz-1)/16);
   const ready=new Uint8Array(nx*nz),failed=new Set();
   const stats={ready:0,total:nx*nz,steps:0,maxStep:0,ms:0,failed:0};
-  let active=null,visualSeed=0x5a17;
+  let visualSeed=0x5a17,focus=null,lastPlan=null;
   // UUID мешей three.js используют Math.random. Догрузка рисунка не
   // должна менять случайные события и поведение людей во время смены.
   const quiet=fn=>{const previous=Math.random;Math.random=()=>((visualSeed=(Math.imul(visualSeed,1664525)+1013904223)>>>0)/4294967296);try{return fn();}finally{Math.random=previous;}};
@@ -22,22 +23,64 @@ export function createLandStream({terrain,build,publish=()=>{},radius=832,now=()
       }
     return best;
   }
-  function advance(x,z,r) {
-    if(!active){const id=nearest(x,z,r);if(id===null)return false;STARTUP.count('land.cellsRequested');active={id,it:build(bounds(id))};}
+  const queue=createTileQueue({build:id=>build(bounds(id)),dispose,
+    onError:id=>failed.add(id),
+    onRequest:()=>STARTUP.count('land.cellsRequested'),publish(id,value){publish(id,value);ready[id]=255;stats.ready++;}});
+  stats.queue=queue.stats;
+  function request(x,z,r,{heading=0,speed=0,route=null,routeIndex=0,initial=false}={}) {
+    const requests=new Map(),hx=Math.sin(heading),hz=Math.cos(heading);
+    const reset=initial||!!focus&&Math.hypot(x-focus.x,z-focus.z)>radius;
+    focus={x,z};
+    function add(cx,cz,range,tier) {
+      for(let j=Math.max(0,Math.floor((cz-range-z0)/size));j<=Math.min(nz-1,Math.floor((cz+range-z0)/size));j++)
+        for(let i=Math.max(0,Math.floor((cx-range-x0)/size));i<=Math.min(nx-1,Math.floor((cx+range-x0)/size));i++){
+          const id=j*nx+i;if(ready[id]||failed.has(id))continue;
+          const b=bounds(id),dx=Math.max(b[0]-cx,0,cx-b[2]),dz=Math.max(b[1]-cz,0,cz-b[3]);
+          if(dx*dx+dz*dz>range*range)continue;
+          const distance=Math.hypot(Math.max(b[0]-x,0,x-b[2]),Math.max(b[1]-z,0,z-b[3]));
+          const rank=tier===2?(distance<=size?0:visible(b)?1:2):tier;
+          const priority=rank*1e6+distance,previous=requests.get(id);
+          if(!previous||priority<previous.priority)requests.set(id,{id,priority});
+        }
+    }
+    add(x,z,r,2);
+    if(!initial){
+      // Bounded speculative work. This is a scheduling hint, not a measured
+      // latency reserve and never a replacement for the full near circle.
+      const ahead=Math.min(size*3,Math.abs(speed)*4);
+      if(ahead>0)add(x+hx*ahead,z+hz*ahead,size,3);
+      if(route)for(let i=Math.max(0,routeIndex);i<Math.min(route.length,routeIndex+24);i++){
+        const p=route[i];if(Math.hypot(p[0]-x,p[1]-z)<=r+size*2)add(p[0],p[1],size/2,4);
+      }
+    }
+    queue.sync([...requests.values()],{reset});
+  }
+  function advance() {
+    if(!queue.stats.queued)return false;
     const t=now();
     try {
-      const result=quiet(()=>active.it.next());
-      if(result.done){quiet(()=>publish(active.id,result.value));ready[active.id]=255;stats.ready++;active=null;}
+      return quiet(()=>queue.advance());
     } catch(error) {
       // Не скрываем исходный участок при ошибке. Предохранитель кадра
       // запишет исключение, а очередь сможет строить соседние участки.
-      failed.add(active.id);stats.failed++;active=null;throw error;
+      stats.failed++;throw error;
     } finally {const ms=now()-t;stats.ms+=ms;stats.maxStep=Math.max(stats.maxStep,ms);stats.steps++;}
-    return true;
   }
   return {ready,stats,size,nx,nz,x0,z0,x1:x0+(terrain.nx-1)*terrain.g,z1:z0+(terrain.nz-1)*terrain.g,bounds,
-    *prepare(x,z,r=640){while(advance(x,z,r))yield 'земля рядом';if(nearest(x,z,r,true)!==null)throw Error('Участок земли не построен');},
-    step(x,z,budget=.75){const t=now();while(advance(x,z,radius)&&now()-t<budget){}},
+    *prepare(x,z,r=640){lastPlan=null;quiet(()=>request(x,z,r,{initial:true}));while(advance())yield 'земля рядом';if(nearest(x,z,r,true)!==null)throw Error('Участок земли не построен');},
+    step(x,z,budget=.75,options={}){
+      const t=now(),heading=options.heading||0,speed=options.speed||0;
+      if(!lastPlan||t-lastPlan.at>=200||Math.hypot(x-lastPlan.x,z-lastPlan.z)>32||
+        Math.abs(Math.atan2(Math.sin(heading-lastPlan.heading),Math.cos(heading-lastPlan.heading)))>.35||
+        Math.abs(speed-lastPlan.speed)>10||options.route!==lastPlan.route){
+        quiet(()=>request(x,z,radius,options));lastPlan={x,z,heading,speed,route:options.route,at:t};
+      }
+      // Include planning in the frame budget; the next indivisible builder
+      // step may still exceed it, as before. Do not claim a hard time cap.
+      while(now()-t<budget&&advance()){}
+    },
+    // Publication only. GPU upload/warm and supportReady remain separate
+    // startup barriers; this must not be used to bypass LATE.
     readyAt(x,z,r=0){return nearest(x,z,r,true)===null;}
   };
 }

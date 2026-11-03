@@ -6255,26 +6255,38 @@ function buildCity () {
   let landPackedMat=null,landPaletteMat=null,landPaletteTex=null,landPaletteRevision=-1;
   let groundMat=litMat,groundStreamMask=null;
   if (RLAND.ON && LATE.busy() && !new URLSearchParams(location.search).has('fullterrain')) {
+    const disposeLand=g=>{if(g){g.removeFromParent();g.traverse(m=>m.geometry?.dispose());}};
     LAND_STREAM=createLandStream({terrain:TER,build:function* (bounds) {
       LAND_READ17?.assertReady();
       landPackageUsable();
       const M=Mesher({alpha:true,index:true,keepFront:true,mainRGB:true,noLandRecord:true});
-      if (!INTRO) {
-        const halo=[bounds[0]-8,bounds[1]-8,bounds[2]+8,bounds[3]+8];
-        yield* buildCurbs({LITM:clippedMesher(M,bounds,{includeMaxX:bounds[2]===TX0+(TNX-1)*TG,includeMaxZ:bounds[3]===TZ0+(TNZ-1)*TG}),
-          groundH:terrainH,visualOnly:true,contours:()=>RLAND.boundaries({bounds:halo}),
-          landTopAt:(x,z)=>RLAND.topOffset(x,z,terrainH(x,z))});
-      }
-      yield* RLAND.build({M,terrain:TER,heights:TH,groundH:terrainH,groundHex,skip:DMASK?farOut:null,
-        buildings:CITY.buildings,curbed:!INTRO&&!new URLSearchParams(location.search).has('nocurbs'),bounds,
-        triangulate:(p,holes=[])=>THREE.ShapeUtils.triangulateShape(p.map(q=>new THREE.Vector2(...q)),holes.map(h=>h.map(q=>new THREE.Vector2(...q))))});
       const g=new THREE.Group();g.matrixAutoUpdate=false;g.matrixWorldAutoUpdate=false;
-      yield* M.prep(litMat,g,()=>{});
-      const tail=M.mesh(litMat);for(const m of tail.children.slice())g.add(m);
-      return g;
+      let transferred=false;
+      try {
+        if (!INTRO) {
+          const halo=[bounds[0]-8,bounds[1]-8,bounds[2]+8,bounds[3]+8];
+          yield* buildCurbs({LITM:clippedMesher(M,bounds,{includeMaxX:bounds[2]===TX0+(TNX-1)*TG,includeMaxZ:bounds[3]===TZ0+(TNZ-1)*TG}),
+            groundH:terrainH,visualOnly:true,contours:()=>RLAND.boundaries({bounds:halo}),
+            landTopAt:(x,z)=>RLAND.topOffset(x,z,terrainH(x,z))});
+        }
+        yield* RLAND.build({M,terrain:TER,heights:TH,groundH:terrainH,groundHex,skip:DMASK?farOut:null,
+          buildings:CITY.buildings,curbed:!INTRO&&!new URLSearchParams(location.search).has('nocurbs'),bounds,
+          triangulate:(p,holes=[])=>THREE.ShapeUtils.triangulateShape(p.map(q=>new THREE.Vector2(...q)),holes.map(h=>h.map(q=>new THREE.Vector2(...q))))});
+        yield* M.prep(litMat,g,()=>{});
+        const tail=M.mesh(litMat);for(const m of tail.children.slice())g.add(m);
+        transferred=true;
+        return g;
+      } finally {
+        // return() on cancellation unwinds the nested raisedland builder
+        // first, then releases unpublished buffers and geometries here.
+        if(!transferred){M.discard();disposeLand(g);}
+      }
+    },dispose:disposeLand,visible:b=>{
+      const x=(b[0]+b[2])/2,z=(b[1]+b[3])/2;
+      return CULL.inView(x,terrainH(x,z),z,Math.hypot(b[2]-b[0],b[3]-b[1])/2);
     },publish(id,g) {
       STARTUP.geometry('land.surfacePublished', g);
-      groups.push(g);scene.add(g);CULL.register(g);groundStreamMask.update();
+      scene.add(g);CULL.register(g);groundStreamMask.update();groups.push(g);
     }});
     groundStreamMask=streamedGroundMaterial(THREE,litMat,LAND_STREAM);
     groundMat=groundStreamMask.material;
@@ -18569,7 +18581,9 @@ function frameStep (now) {
   if (LAND_READ17 && !LAND_READ17.ready || LAND_PACKAGE?.fatal || ADDRESS_PREPARED17?.meta().fatal) return;
   if (LAND_STREAM && !LAND_ENTERING && (!LAND_READ17 || LAND_READ17.ready)) CL.step('земля рядом', () => {
     const menu=S.state==='title'||S.state==='over';
-    LAND_STREAM.step(menu?PIZZA.bx:cam.position.x,menu?PIZZA.bz:cam.position.z);
+    LAND_STREAM.step(menu?PIZZA.bx:cam.position.x,menu?PIZZA.bz:cam.position.z,.75,
+      {heading:Math.hypot(V.vx,V.vz)>1?Math.atan2(V.vx,V.vz):V.h,speed:menu?0:Math.hypot(V.vx,V.vz),
+        route:menu?null:routePts,routeIndex:RP.k});
   }, 0);
   // настройки графики (gfx.js): 30 / 60 к/с, город за меню застывший или 30 к/с — лишний кадр пропускаем
   // целиком, время копится (last не трогаем): следующий кадр шагнёт мир на всё прошедшее
