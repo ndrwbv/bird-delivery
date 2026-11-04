@@ -1,10 +1,11 @@
 /* Изолированные состояния телефона для просмотра и скриншотов без запуска города. */
-export default function iphoneScreens ({ HUDFONE, HUDMAP, t, log }) {
+export default function iphoneScreens ({ HUDFONE, HUDMAP, t, log, makePerson, faceDataURL }) {
   return [{
     id: 'iphone', group: 'Телефон в HUD', name: 'iPhone 4 · iOS 5–6',
     note: 'Карта и заказ видны слева в HUD. Телефон выглядывает снизу справа: внутри сообщения, новая накладная, рейтинг и заработок за смену.',
     knobs: [
       { k: 'phase', label: 'состояние', type: 'sel', def: 'dock', opts: [['dock', 'карта и телефон внизу'], ['order', 'новый заказ в телефоне'], ['paid', 'доставлено и выплата'], ['message', 'новое сообщение'], ['rating', 'рейтинг после заказа'], ['courier', 'заработок за смену'], ['home', 'домашний экран'], ['live', 'анимация от сообщения']] },
+      { k: 'reaction', label: 'реакция гостя', type: 'sel', def: 'happy', opts: [['happy', 'понравилось'], ['angry', 'не понравилось'], ['ok', 'нормально']] },
       { k: 'text', label: 'текст сообщения', type: 'text', def: 'Клиент уже ждёт. Ты где?' },
     ],
     show (o) {
@@ -16,7 +17,12 @@ export default function iphoneScreens ({ HUDFONE, HUDMAP, t, log }) {
         HUDFONE.receive({ name: t('Ирина Сергеевна'), role: t('управляющая'), text: String(o.text || '') });
       } else {
         HUDFONE.demo(o.phase, String(o.text || ''));
-        if (o.phase === 'paid') HUDMAP.payment({ name: 'Света Т.', amount: '850 ₽', money: '3 200 ₽' });
+        if (o.phase === 'paid') {
+          const mood = o.reaction || 'happy', tip = mood === 'happy' ? 150 : 0;
+          HUDMAP.payment({ name: 'Света Т.', avatar: faceDataURL(makePerson({ seed: 4711, fem: true }), 96, mood), mood,
+            amount: '+' + (700 + tip) + ' ₽', money: (3050 + tip) + ' ₽',
+            breakdown: [{ label: t('заказ'), amount: '+700 ₽' }, { label: t('чаевые'), amount: tip ? '+150 ₽' : '0 ₽', kind: 'tip' }] });
+        }
       }
       log('телефон: ' + o.phase);
     },
