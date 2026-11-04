@@ -238,6 +238,7 @@ import * as CL from '../platform/crashlog.js';   // журнал ошибок, �
 import * as RELIEF from './relief.js';          // неровный газон: бугры и холмики на газонах и пустырях (relief.js)
 import * as OSKM from './osk.js';                // экранная клавиатура Стима в полях ввода: поднять, гасить автоповтор, геймпад — не игре (osk.js)
 import * as RW from './roadwear.js';            // асфальт разный: свежий, ровный, в заплатках, старый, разбитый (roadwear.js)
+import * as WINROAD from './winterroads.js';     // зимняя дорога: местами песок, колея, сгребённый снег и рыхлые участки
 import * as LAWN from './lawn.js';              // пятна на газоне — в краске земли (lawn.js)
 import * as SHORT from './shortcuts.js';        // тропинки-срезки через газоны дворов (shortcuts.js, 2г9)
 import * as MEADOW from './meadow.js';         // некошеная трава рядом с камерой, маска земли для края газона, плит и тропинок (meadow.js, 2г8—2г9)
@@ -1971,6 +1972,7 @@ WINS.init(CHUNK);
 // окна с комнатами — настройка графики (gfx.js): на Низкой комнаты за стеклом нет — рама, шторы и свет остаются (windows.js)
 WINS.quality(GFX.winQ());
 const LITM = Mesher({ alpha: !NO_LITJ || !NO_SMJ, index: true, keepFront: true, mainRGB: true });   // всё материальное: земля, дороги, дома; с 17.10.2026 и склейки реквизита (LIT) — признак «реквизит» в четвёртом байте цвета
+const WINM = Mesher({ index: true });             // зимний слой дороги; скрыт вне снега
 const FLATM = Mesher({ alpha: true, index: true, mainRGB: true });   // разметка, окна, вывески — света не ловят; с 17.10.2026 и плафоны (LAMPH) — признак «светится» в четвёртом байте цвета
 const GROUND_M = RLAND.ON ? Mesher({ alpha: true, index: true, keepFront: true, mainRGB: true, groundOnly: true }) : LITM;
 // Старый проход нужен декору для индекса бордюров. Его невидимые
@@ -2231,6 +2233,8 @@ function osmRoads () {
       if (pass) RW.decorate(LITM, r, w, y, (x, z) => { const n = NODE_IDX.get(x + ',' + z); return n !== undefined && nodeDeg(n) >= 3; });   // заплатки
     }
   }
+  WINROAD.build({ M: WINM, roads: CITY.roads, roadWidth, yOf: r => yOf(r, true), groundH,
+    junction: (x, z) => { const n = NODE_IDX.get(x + ',' + z); return n !== undefined && nodeDeg(n) >= 3; } });
 }
 /* ступенька тротуара по плитке (0—2,6 мм внутри класса): разная плитка одного класса — не на одной высоте.
    Шаг 1,3 мм (до 09.10.2026 — 0,5 мм: вдали точности глубины не хватало, стык тротуаров мерцал, О3);
@@ -2677,6 +2681,7 @@ function osmBridges () {
                       lerp(x1, x2, 0.8), lerp(y1, y2, 0.8) + 0.19, lerp(z1, z2, 0.8), 0.4);
       }
     }
+    WINROAD.bridge({ M: WINM, road: r, points: P, width: w });
     // быки — там, где под настилом есть глубина
     const piers = Math.floor(len / 55);
     for (let k = 1; k <= piers; k++) {
@@ -6252,6 +6257,9 @@ function buildCity () {
   HUR.holeMat(flatMat);
   FSH.mat(litMat); FSH.mat(flatMat);            // тени домов: маска в шейдере земли и разметки (fakeshadows.js)
   const groups = [];
+  const winterGroup = WINM.mesh(SEAS.winterRoadMat());
+  WINROAD.addSandAttribute(winterGroup, THREE);
+  if (winterGroup.children.length) { groups.push(winterGroup); scene.add(winterGroup); SEAS.bindWinterRoadGroup(winterGroup); }
   let landPackedMat=null,landPaletteMat=null,landPaletteTex=null,landPaletteRevision=-1;
   let groundMat=litMat,groundStreamMask=null;
   if (RLAND.ON && LATE.busy() && !new URLSearchParams(location.search).has('fullterrain')) {
@@ -12952,8 +12960,11 @@ function driveStep (dt) {
   NOS.was = NOS.burn;
 
   const sand = V.air || flyOn ? 0 : BEACH.sandAt(V.x, V.z);  // песок пляжа: вязнет — разгон меньше, тормозит, сильнее заносит (beach.js SAND)
-  if (IN.gas && !V.air && !dead) vf += acc * Math.max(flyOn ? 0 : 0.25, 1 - vf / vmax) * (sand ? 1 - BEACH.SAND.ACC * Math.min(1, sand) : 1) * dt;
-  const wet = Math.min(1, ENV.rain + SEAS.slip());   // дождь, а зимой и снег
+  const softSnow = V.air || flyOn ? 0 : WINROAD.softUnderCar(V.x, V.z, V.h, SEAS.snowAmt());
+  const roadSand = V.air || flyOn ? 0 : WINROAD.sandUnderCar(V.x, V.z, V.h, SEAS.snowAmt());
+  const inRut = V.air || flyOn ? 0 : WINROAD.rutAt(V.x, V.z, V.h, SEAS.snowAmt());
+  if (IN.gas && !V.air && !dead) vf += acc * Math.max(flyOn ? 0 : 0.25, 1 - vf / vmax) * (sand ? 1 - BEACH.SAND.ACC * Math.min(1, sand) : 1) * (1 - softSnow * WINROAD.WINTER_ROAD.SOFT_ACC) * dt;
+  const wet = Math.min(1, ENV.rain + SEAS.slip()) * (1 - 0.45 * roadSand) * (1 - 0.18 * inRut);   // в колее и на посыпанном снегу лучше держит
   if (IN.brake) vf -= (vf > 0.4 ? BRK * (1 - wet * WET.BRAKE) : dead ? 0 : ACC * 0.5) * dt;
   if (dead) vf -= vf * 0.55 * dt;                 // без мотора — накатом до остановки
   vf = clamp(vf, -15, beast ? VMAX * BEAST.NITRO : Math.max(VBOOST, vmax));
@@ -12962,6 +12973,7 @@ function driveStep (dt) {
   if (V.wade && !V.air) vf -= vf * STREAMS.drag(V.wade) * dt;   // вброд по речке или у берега пруда — сильно тормозит (streams.js)
   if (IN.hand) vf -= vf * 1.1 * dt;
   if (sand) vf -= vf * BEACH.SAND.DRAG * sand * dt;
+  if (softSnow) vf -= vf * WINROAD.WINTER_ROAD.SOFT_DRAG * softSnow * dt;
   // руль набирается плавно; при перекладке быстро возвращается только до центра (econ.js)
   const want = IN.joy ? -clamp(IN.jx * 1.35, -1, 1) : (IN.left ? 1 : 0) - (IN.right ? 1 : 0);
   const sv = V.steer = ECON.steeringStep(V.steer || 0, want, HANDLE.rate, dt);
@@ -12970,7 +12982,7 @@ function driveStep (dt) {
   // дрифт, газон и лёд — сильнее; ?olddrift — по-старому (ручник — 2,2 при любой скорости)
   const side0 = lerp(WET.SIDE_DRY, WET.SIDE_WET, wet) * HANDLE.side;
   const sideK = DRIFTM.DRIFT.on ? DRIFTM.step(V, IN, side0, sv, vf, vl, dt).k : IN.hand ? 2.2 : side0;
-  vl *= Math.exp(-sideK * (sand ? 1 - BEACH.SAND.SIDE * Math.min(1, sand) : 1) * dt);
+  vl *= Math.exp(-sideK * (sand ? 1 - BEACH.SAND.SIDE * Math.min(1, sand) : 1) * (1 - softSnow * WINROAD.WINTER_ROAD.SOFT_SIDE) * (1 + 0.18 * inRut) * dt);
   const spd = Math.abs(vf);
   const grip = clamp(spd / 8, 0, 1) / (1 + spd * 0.014 * HANDLE.fall) * (V.air ? 0.15 : 1);
   // радиус разворота не меньше HANDLE.rmin (econ.js RMIN): на малой скорости не крутится на пятачке; ручник — резче, как было
@@ -12986,7 +12998,8 @@ function driveStep (dt) {
   let out = SOFTEDGE.slow(V, dt);
   V.x += V.vx * dt;
   V.z += V.vz * dt;
-  V.wheel += vf * dt / 0.46;
+  V.wheel += (vf + (IN.gas && !dead ? softSnow * WINROAD.WINTER_ROAD.WHEEL_SPIN : 0)) * dt / 0.46;
+  WINROAD.spray(V, IN.gas && !dead, softSnow, dt, fxPart);
 
   if (SOFTEDGE.hold(V)) out = true;               // на пределе — просто стоит: без отскока, звука и урона
   if (V.x < BOUNDS.x0) { V.x = BOUNDS.x0; V.vx = Math.max(0, V.vx); }
@@ -17263,6 +17276,14 @@ addEventListener('contextmenu', e => { if (e.target && e.target.closest && e.tar
 /* смена начинается у пиццерии, на ближайшей проезжей части */
 function startPose () {
   V.kickW = 0;                                      // увод от удара (carbump.js) — не тащим в новую смену
+  // Локальный зимний стенд: сразу на рыхлый участок, колею или посыпанный снег.
+  const winterSpot = import.meta.env.DEV ? new URLSearchParams(location.search).get('winterspot') : null;
+  const winterPose = winterSpot === 'sand' ? WINROAD.ST.exampleSand : winterSpot === 'rut' ? WINROAD.ST.exampleRut : WINROAD.ST.exampleSoft;
+  if (winterSpot !== null && winterPose) {
+    const p = winterPose;
+    V.x = p.x; V.z = p.z; V.h = p.h; V.vx = V.vz = 0; V.y = surfaceAt(V.x, V.z); V.hero = 0;
+    return;
+  }
   // смена начинается на своём месте на парковке курьеров, носом к улице
   if (COURIER_SLOTS) {
     const s = COURIER_SLOTS[0];
@@ -19068,7 +19089,13 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   STORY, STORY_DBG: STORY.DEBUG, MAP, Store, SBX, CARSM: AUTO, startRun, goRun, endShift, wallet, addWallet, hudHearts, marker, updateEnv, humanLod, get SPOTS_N () { return SPOTS.length; },
   DRIVERS, SMOKERS, NITRO_CANS, NOS, RESPECT: RESPECT.DEBUG, RESPECT_API: RESPECT, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, SKY: SKYM.SKY, SKY_LIGHT: SKYM.LIGHT, MATS: MATS.MAT, PIGEONS, FLOCKS, AMB, INCIDENTS, scare, RIVALS, FOES, RIVSTAT: RIVAL_STATS, rivalBoard: () => rivalBoard(), THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, drivingPath: (x0, z0, x1, z1, h, deck) => roadPath(x0, z0, x1, z1, h, deck, true), FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, XLIFE, askRevive, addWallet, RQ: RQ.DEBUG, HINTS_API: HINTS };
 if (window.__dlv) Object.assign(window.__dlv, { FXP: { S: FXP.STATS, count: FXP.count, part: fxPart, FX, puff, fire, nosFlame, steam, splash, crumbs, emote }, FXQ: FXP.FXP });   // частицы из запаса (fxpool.js): S — родилось / живо / пик / рост / ?oldfx
-if (window.__dlv) Object.assign(window.__dlv, { IXS, MESHM: () => ({ lit: LITM.memStat(), flat: FLATM.memStat() }), LITN: () => { let b = 0; for (const L of [LIT, FLAT, LAMPH]) for (const g of L) b += g.p ? g.p.byteLength : g.attributes.position.array.byteLength * 2; return { lit: LIT.length, flat: FLAT.length, lamph: LAMPH.length, mb: +(b / 1048576).toFixed(1), smash: SMASH.length }; }, HPOOL: HPOOL.DEBUG, HSK: HSTATS, holdFixed, FAHEAD: FAHEAD.STATS, makeHuman, freshHuman, makePerson, setSeason: SEAS.setSeason, SEASMEM: SEAS.pileMem, CSNOW: CSNOW.DEBUG, PETW: PETW.DEBUG });   // запас готовых людей: собрано на ходу / из запаса, ключи (humanpool.js)
+if (window.__dlv) Object.assign(window.__dlv, { IXS, MESHM: () => ({ lit: LITM.memStat(), flat: FLATM.memStat() }), WINROAD: { ST: WINROAD.ST, softAt: WINROAD.softAt, softUnderCar: WINROAD.softUnderCar, sandAt: WINROAD.sandAt, sandUnderCar: WINROAD.sandUnderCar, rutAt: WINROAD.rutAt, snowAmt: SEAS.snowAmt }, LITN: () => { let b = 0; for (const L of [LIT, FLAT, LAMPH]) for (const g of L) b += g.p ? g.p.byteLength : g.attributes.position.array.byteLength * 2; return { lit: LIT.length, flat: FLAT.length, lamph: LAMPH.length, mb: +(b / 1048576).toFixed(1), smash: SMASH.length }; }, HPOOL: HPOOL.DEBUG, HSK: HSTATS, holdFixed, FAHEAD: FAHEAD.STATS, makeHuman, freshHuman, makePerson, setSeason: SEAS.setSeason, SEASMEM: SEAS.pileMem, CSNOW: CSNOW.DEBUG, PETW: PETW.DEBUG });   // запас готовых людей: собрано на ходу / из запаса, ключи (humanpool.js)
+if (import.meta.env.DEV && new URLSearchParams(location.search).has('winterdebug'))
+  setInterval(() => { document.documentElement.dataset.winterRoad = JSON.stringify({ ...WINROAD.ST,
+    snowAmt: SEAS.snowAmt(), car: [V.x, V.z, V.h],
+    underCar: WINROAD.softUnderCar(V.x, V.z, V.h, SEAS.snowAmt()),
+    sandUnderCar: WINROAD.sandUnderCar(V.x, V.z, V.h, SEAS.snowAmt()),
+    rutUnderCar: WINROAD.rutAt(V.x, V.z, V.h, SEAS.snowAmt()) }); }, 350);
 if (window.__dlv) window.__dlv.FLOWL = FL.DEBUG;   // поток: перестроения, уступи, кольца, подрезка (flowlane.js): ST, cut()
 if (window.__dlv) window.__dlv.CBUMP = { STATS: CBUMP.STATS, BUMP: CBUMP.BUMP, YAW: CBUMP.YAW, hit: CBUMP.hit };   // толчки от людей, столбов, кустов (carbump.js)
 if (window.__dlv) { window.__dlv.BOARD = BOARD; window.__dlv.Platform = Platform; }

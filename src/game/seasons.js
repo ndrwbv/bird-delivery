@@ -289,6 +289,35 @@ export function seasonMat (m, dryK = 1, propK, smashJ) {
   return m;
 }
 
+let WINTER_ROAD_GROUP = null;
+export function winterRoadMat () {
+  // Нормаль берётся из настоящих граней колеи и сугробов; без flatShading
+  // материал ожидает отсутствующий атрибут normal и чернит дорогу.
+  const m = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, flatShading: true });
+  m.onBeforeCompile = sh => {
+    sh.vertexShader = 'attribute float roadSand; varying float vRoadSand; varying vec2 vRoadXZ;\n' +
+      sh.vertexShader.replace('#include <begin_vertex>',
+        '#include <begin_vertex>\nvRoadSand = roadSand; vRoadXZ = position.xz;');
+    sh.fragmentShader = `varying float vRoadSand; varying vec2 vRoadXZ;
+float winterHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float winterNoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(winterHash(i), winterHash(i + vec2(1.0, 0.0)), f.x),
+             mix(winterHash(i + vec2(0.0, 1.0)), winterHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+float grit = smoothstep(0.62, 0.79, winterNoise(vRoadXZ * 5.0)) * 0.42
+           + smoothstep(0.75, 0.87, winterNoise(vRoadXZ * 1.2 + vec2(17.0))) * 0.04;
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.51, 0.39, 0.27), vRoadSand * grit);`);
+  };
+  m.customProgramCacheKey = () => 'winter-road-grit4';
+  return m;
+}
+export function bindWinterRoadGroup (group) {
+  WINTER_ROAD_GROUP = group;
+  group.visible = (A.snow || 0) > 0.42;
+}
+
 /* Мелочь дворов (SMASH): как статика, но у кустов (aux.x = 1) листва
    своя: осенью желтеет и краснеет, к зиме — голые бурые прутья под
    снежной шапкой, весной — свежая зелень. Листвой считаем только
@@ -738,6 +767,7 @@ function apply () {
   setPeopleSeason(A.warm);
   for (const m of MESH_GARL) m.visible = A.ny > 0.001;
   for (const m of DRIFT_MESH) m.visible = A.drift > 0.004;
+  if (WINTER_ROAD_GROUP) WINTER_ROAD_GROUP.visible = A.snow > 0.42;
   // новогодние ёлки стоят, пока видны (шейдер: зерно 4/255 < uNY)
   for (const f of FIRS) if (f.solid) f.solid.hw = f.solid.hd = A.ny > 0.016 ? f.hw : -50;     // -50 — «препятствия нет», как в игре
   // ледяные горки и снеговики: вне зимы вершины — в точку

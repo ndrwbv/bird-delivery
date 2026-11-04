@@ -39,6 +39,11 @@ npm run probe -- --js="await onShift(); autopilot(); await run(10); return d.S.d
 npm run probe -- --eval=my-check.js --size=phone --errors
 ```
 
+Для зимней дороги в локальном браузере: `?season=2.5&mute&winterdebug&winterspot` —
+смена начинается на рыхлом участке; `winterspot=sand` — на посыпанном, `winterspot=rut` — внутри колеи тихой улицы. `document.documentElement.dataset.winterRoad` показывает
+число участков, рыхлый снег (`underCar`), песок (`sandUnderCar`) и сцепление внутри колеи (`rutUnderCar`) под машиной, выбросы снега (`sprays`).
+Оба отладочных флага работают только в dev. Для обычного вида убрать `winterdebug&winterspot`.
+
 - скрипт (`--js` или `--eval=файл`) — тело async-функции в странице. Есть: `d` (= `__dlv`),
   `wait(ms)`, `until(fn, ms)`, `run(secs, k)` — дать игре идти (k — ускорение до 3),
   `onShift()` — начать смену и принять заказ, `ride()` — просто кататься, `tp(x, z)` — машину
