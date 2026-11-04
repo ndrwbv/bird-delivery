@@ -211,7 +211,7 @@ export function update (el, rows, live) {
   if (top && ST.lead && top.R !== ST.lead && me > 0 && top.d > 0 && !ST.ev && ST.clock - ST.leadT > RANK.LEAD && top.R.name !== ST.lead.name) ST.ev = { kind: 'lead', who: top, loser: ST.lead, at: ST.clock };
   ST.lead = top ? top.R : null;
   ST.above = above; ST.place = me + 1; ST.n = n;
-  PHONE?.rank({ place: me + 1, total: n });
+  PHONE?.rank({ place: me + 1, total: n, rows: rows.slice(0, 3).map(r => ({ n: r.n, d: r.d, money: ST.money(r.m), me: r.me })) });
 
   if (!live || n < 2 || ST.clock < RANK.GRACE || ST.clock - ST.last < (CHAT.phone() ? RANK.GAP_PH : RANK.GAP) || CHAT.busy()) return;
   const ev = ST.ev;

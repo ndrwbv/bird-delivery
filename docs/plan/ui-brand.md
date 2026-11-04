@@ -2,7 +2,7 @@
 
 [← план](../IDEAS.md)
 
-**Статус:** [уютный телефон и события смены №8-5](../IDEAS-ARCHIVE.md#ui-phone-cozy), [новая компоновка HUD №8-4](../IDEAS-ARCHIVE.md#ui-phone-layout) и [карта №8-3](../IDEAS-ARCHIVE.md#ui-phone-2gis) готовы. Автор разрешил перенос в `main` и запуск релиза 04.11.2026.
+**Статус:** [тройка лидеров и единый вид чата №8-6](../IDEAS-ARCHIVE.md#ui-phone-leaders), [уютный телефон №8-5](../IDEAS-ARCHIVE.md#ui-phone-cozy), [компоновка HUD №8-4](../IDEAS-ARCHIVE.md#ui-phone-layout) и [карта №8-3](../IDEAS-ARCHIVE.md#ui-phone-2gis) готовы.
 
 <details><summary><b>Решения</b> (что уже решено и почему)</summary>
 
@@ -18,6 +18,7 @@
 чинит интерфейс и готовит выпуск в Стиме.
 
 ## Трек 8. Интерфейс и бренд
+
 
 
 **Статус:** сделан 10.10.2026 (всё — в [архиве](IDEAS-ARCHIVE.md) «Трек 8»): логотип и бордовый бренд,
