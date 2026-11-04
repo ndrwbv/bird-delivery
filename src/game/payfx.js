@@ -1,8 +1,9 @@
-/* CSS does the drawing, but its paused timelines are advanced ONLY by game dt.
+/* CSS draws the pile and receipt; the flight transform advances with game dt.
    No timeout can finish a payment under pause, a map, a scene, or a later shift. */
 let active = null;
 export function show (o) {
   hide(); active = { ...o, t: 0, flying: false };
+  for (const b of o.bits) { b.style.removeProperty('transform'); b.style.removeProperty('opacity'); }
   o.el.hidden = false; o.el.classList.remove('on', 'fly');
   void o.el.offsetWidth; o.el.classList.add('on');
   sync(active);
@@ -31,6 +32,17 @@ export function step (dt) {
     p.el.classList.add('fly');
   }
   sync(p);
+  if (p.flying) for (const b of p.bits) {
+    if (b.className === 'x') continue;
+    const delay = parseFloat(b.style.getPropertyValue('--fd')) || 0;
+    const q = Math.max(0, Math.min(1, (p.t - 1.45 - delay) / .65));
+    const ease = q * q * (3 - 2 * q);
+    const x = (parseFloat(b.style.getPropertyValue('--fx')) || 0) * ease;
+    const y = (parseFloat(b.style.getPropertyValue('--fy')) || 0) * ease;
+    const r = parseFloat(b.style.getPropertyValue('--r')) || 0;
+    b.style.setProperty('transform', `translate(${x}px, ${y}px) rotate(${r + (90 - r) * ease}deg) scale(${1 - .65 * ease})`, 'important');
+    b.style.setProperty('opacity', String(1 - .8 * ease), 'important');
+  }
   if (p.t >= 2.4) { const done = p.done; hide(); if (done) done(); }
 }
 export function hide () {

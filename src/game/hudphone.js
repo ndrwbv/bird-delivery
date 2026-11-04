@@ -11,6 +11,10 @@ const H = { root: null, device: null, thread: null, banner: null, modal: null,
 
 const icon = kind => '<span class="hp-icon hp-icon-' + kind + '" aria-hidden="true"><i></i></span>';
 const $ = s => H.root && H.root.querySelector(s);
+const payConfetti = Array.from({ length: 28 }, (_, i) => {
+  const a = i * 2.399, x = Math.round(Math.cos(a) * (65 + i % 5 * 17)), y = Math.round(Math.sin(a) * (78 + i % 4 * 24));
+  return '<i style="--dx:' + x + 'px;--dy:' + y + 'px;--rot:' + (i * 73) + 'deg;--delay:' + (i % 7 * .035).toFixed(3) + 's"></i>';
+}).join('');
 
 function setApp (app) {
   if (!H.device) return;
@@ -35,7 +39,7 @@ export function dock () {
   H.modal.hidden = true;
   document.body.classList.remove('hp-order-open');
   setApp('courier');
-  H.root.classList.remove('hp-expanded', 'hp-new-message', 'hp-focus-latest', 'hp-app-launching', 'hp-notifying', 'hp-paid');
+  H.root.classList.remove('hp-expanded', 'hp-new-message', 'hp-focus-latest', 'hp-app-launching', 'hp-notifying', 'hp-paying', 'hp-paid');
 }
 
 function banner (name, text) {
@@ -84,7 +88,7 @@ export function init ({ visible = false } = {}) {
       <div class="hp-camera"></div><div class="hp-speaker"></div>
       <div class="hp-glass">
         <div class="hp-status"><span class="hp-health">♥ 6/6</span><span class="hp-clock">9:41</span><span class="hp-money-slot"><span class="hp-money-fallback">0 ₽</span></span></div>
-        <button class="hp-banner" type="button" aria-label="${t('открыть сообщение')}">${icon('messages')}<span class="hp-banner-copy"><b>${t('Новое сообщение')} <em>${t('сейчас')}</em></b><strong class="hp-banner-name"></strong><span class="hp-banner-text"></span></span></button>
+        <button class="hp-banner" type="button" aria-label="${t('открыть сообщение')}">${icon('messages')}<span class="hp-banner-copy"><span class="hp-banner-head"><strong class="hp-banner-name"></strong><em>${t('сейчас')}</em></span><span class="hp-banner-text"></span></span></button>
         <div class="hp-home" data-hp-app="home" hidden><div class="hp-wallpaper"></div><div class="hp-home-head">${t('Солнечный')}</div>
           <div class="hp-app-grid"><button type="button" data-open="messages">${icon('messages')}<span>${t('Сообщения')}</span></button><button type="button" data-open="courier">${icon('courier')}<span>${t('Птица Пицца')}</span></button></div>
           <div class="hp-home-dock"><button type="button" data-open="courier">${icon('courier')}</button><button type="button" data-open="messages">${icon('messages')}</button></div>
@@ -96,6 +100,7 @@ export function init ({ visible = false } = {}) {
             <div class="hp-current"><small>${t('ТЕКУЩИЙ ЗАКАЗ')}</small><b class="hp-current-title">${t('Нет активного заказа')}</b><span class="hp-current-address"></span><span class="hp-current-time"></span></div>
             <div class="hp-last-rating" hidden><small>${t('РЕЙТИНГ ПОСЛЕ ЗАКАЗА')}</small><b></b></div>
           </div>
+          <div class="hp-pay-celebration" aria-live="polite"><div class="hp-pay-confetti" aria-hidden="true">${payConfetti}</div><div class="hp-pay-ribbon"></div><strong class="hp-pay-amount"></strong><div class="hp-pay-breakdown"></div><small>${t('Заработано за смену')}</small><b class="hp-pay-total"></b></div>
           <nav class="hp-courier-nav"><button type="button" data-open="courier">${t('Смена')}</button><button type="button" data-open="messages">${t('Сообщения')}</button></nav>
         </section>
         <section class="hp-app hp-messages" data-hp-app="messages" hidden><header class="hp-nav"><button type="button" data-open="courier" aria-label="${t('назад')}">‹ <span>${t('Назад')}</span></button><b>${t('Сообщения')}</b><span class="hp-nav-space"></span></header><div class="hp-thread"></div></section>
@@ -216,14 +221,30 @@ export function rank ({ place = 1, total = 1, rows = [] } = {}) {
   });
   $('.hp-competition').setAttribute('aria-label', t('Рейтинг смены') + ': ' + t('место {i} из {n}', { i: place, n: total }));
 }
-export function paid ({ amount, money }) {
+export function paying () {
   if (!active()) return;
   clearTimeout(H.shrink); clearTimeout(H.messageTimer);
-  setApp('courier'); H.root.classList.add('hp-expanded', 'hp-paid');
+  setApp('courier'); H.root.classList.add('hp-expanded', 'hp-paying'); H.root.classList.remove('hp-paid');
+}
+export function paid ({ amount, money, delivery = false, breakdown = [] }) {
+  if (!active()) return;
+  paying(); H.root.classList.remove('hp-paying'); H.root.classList.add('hp-paid');
   $('.hp-earned').textContent = money;
   $('.hp-shift-earn').dataset.gain = '+' + amount;
-  H.shrink = setTimeout(dock, 4200);
+  $('.hp-pay-ribbon').textContent = delivery ? '✓ ' + t('Доставлено') : '★ ' + t('Заработано');
+  $('.hp-pay-amount').textContent = '+' + amount;
+  $('.hp-pay-total').textContent = money;
+  const list = $('.hp-pay-breakdown'); list.replaceChildren();
+  for (const entry of breakdown) {
+    const row = document.createElement('div'); row.className = 'hp-pay-line' + (entry.kind === 'tip' ? ' tip' : entry.kind === 'neg' ? ' neg' : '');
+    const label = document.createElement('span'); label.textContent = entry.label;
+    const value = document.createElement('b'); value.textContent = entry.amount;
+    row.append(label, value); list.appendChild(row);
+  }
+  list.hidden = !breakdown.length;
+  H.shrink = setTimeout(dock, 2300);
 }
+export function cancelPayment () { if (H.root?.classList.contains('hp-paying')) dock(); }
 export function showRating ({ rows, money }, autoOpen = true) {
   if (!active() || !rows?.length) return false;
   const me = rows.findIndex(r => r.me);
@@ -269,6 +290,7 @@ export function demo (phase = 'dock', text = 'Клиент уже ждёт. Ты
   else if (phase === 'home') open('home');
   else if (phase === 'message' || phase === 'banner' || phase === 'big') { open('messages'); H.root.classList.add('hp-new-message'); if (phase === 'banner') banner(t('Ирина Сергеевна'), text); }
   else if (phase === 'courier') open('courier');
-  else if (phase === 'paid') paid({ amount: '850 ₽', money: '3 200 ₽' });
+  else if (phase === 'paid') paid({ amount: '850 ₽', money: '3 200 ₽', delivery: true,
+    breakdown: [{ label: t('заказ'), amount: '+700 ₽' }, { label: t('чаевые'), amount: '+150 ₽', kind: 'tip' }] });
   else dock();
 }

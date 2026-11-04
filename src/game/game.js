@@ -14932,8 +14932,9 @@ function payHide () {
   if (!P.el) return;
   PAYVIS.hide();
   P.el.classList.remove('on', 'fly'); P.el.hidden = true;
+  HUDFONE.cancelPayment();
 }
-function payShow (total, rows, title, face, done, touch) {
+function payShow (total, rows, title, face, done, touch, delivery = false) {
   const P = payFxEl();
   // лицо клиента (то же, что в карточке заказа) с настроением — payMood
   P.face.hidden = !(face && face.person);
@@ -14954,20 +14955,26 @@ function payShow (total, rows, title, face, done, touch) {
     b.style.left = (kind === 'b' ? 2 + col * 32 + (row % 2) * 10 : 8 + col * 21) + (Math.random() * 6 - 3) + '%';
     b.style.bottom = (kind === 'b' ? row * 17 : 30 + (row - 2) * 14) + Math.random() * 4 + '%';
     b.style.setProperty('--d', (k * 0.045).toFixed(3) + 's');
-    b.style.setProperty('--fd', ((n - 1 - k) * 0.03).toFixed(3) + 's');
+    b.style.setProperty('--fd', ((n - 1 - k) * 0.016).toFixed(3) + 's');
   });
   P.title.textContent = title || '';
   P.sum.textContent = (total >= 0 ? '+' : '−') + money(Math.abs(total));
   P.sum.classList.toggle('late', rows.some(r => r[2] === 'neg'));
   P.chk.innerHTML = rows.map(r => '<p class="' + (r[2] || '') + '"><span>' + r[0] + '</span><b>' + (r[1] < 0 ? '−' : '') + money(Math.abs(r[1])) + '</b></p>').join('');
-  if (HUDFONE.active() && total > 0) {
-    HUDMAP.payment({ name: face?.person ? NICK.label(face.person, $t('клиент')) : $t('клиент'),
+  const phonePay = HUDFONE.active() && total > 0;
+  if (phonePay) {
+    if (delivery) HUDMAP.payment({ name: face?.person ? NICK.label(face.person, $t('клиент')) : $t('клиент'),
       avatar: face?.person ? NICK.avatar(face.person, 64, face.mood) : '', amount: money(total), money: money(S.money) });
-    HUDFONE.paid({ amount: money(total), money: money(S.money) });
+    HUDFONE.paying();
   }
   Snd.coin();
   PAYVIS.show({ el: P.el, bits: P.bits, target: () => CAREER ? SC.DEBUG.el : elMoney,
-    ready: () => NQ.DEBUG.phase() === 'ride' && NQ.showing() === 'pay', done, touch });
+    ready: () => NQ.DEBUG.phase() === 'ride' && NQ.showing() === 'pay',
+    done: () => {
+      if (phonePay) HUDFONE.paid({ amount: money(total), money: money(S.money), delivery,
+        breakdown: rows.map(r => ({ label: r[0], amount: (r[1] < 0 ? '−' : '+') + money(Math.abs(r[1])), kind: r[2] })) });
+      if (done) done();
+    }, touch });
 }
 
 
@@ -15056,7 +15063,7 @@ function hudStep (dt) {
   const lg = curLang();
   if (lg !== HUDC.lang) { HUDC.lang = lg; HUDC.money = NaN; HUDC.nos = -1; HUDC.bur = ''; HUDC.spd = -1; HUDC.key = ''; HUDC.dist = -1; HUDC.fx = '#'; }
   if (CAREER) walletHud(dt); else if (S.money !== HUDC.money) { HUDC.money = S.money; elMoney.textContent = money(S.money); }
-  HUDFONE.resources({ hp: S.hp, hpMax: S.hpMax, money: money(S.money),
+  HUDFONE.resources({ hp: S.hp, hpMax: S.hpMax, money: CAREER ? (SC.DEBUG.text || money(S.money)) : money(S.money),
     order: S.order ? { title: $t('заказ {n}', { n: S.orders }), address: S.addr || (PIZZA ? PIZZA.name : '') } : null,
     time: S.order && S.timeMax > 0 ? dashLeft(S.time) : '' });
   touchpadStep();
@@ -16221,10 +16228,10 @@ function checkArrival (dt) {
         if (completionBonus > 0) rows.push([$t('премия за развоз'), completionBonus, '']);
         payShow(part + completionBonus, rows, pp.late ? (CAREER ? $t('клиент недоволен') : '') : pp.rich ? $t('сдачи не надо!') : pp.tip ? $t('чаевые!') : '',
           st.talk && st.talk.person && !st.talk.aborted ? { person: st.talk.person, mood: payMood(st, onTime, tier) }   // встреча-катсцена (encounters.js): лицо героя
-            : st.persons[0] ? { person: st.persons[0], mood: payMood(st, onTime, tier) } : null, done);
+            : st.persons[0] ? { person: st.persons[0], mood: payMood(st, onTime, tier) } : null, done, null, true);
         if (!deliveryReacted) { deliveryReacted = true; bossOnDeliver(paidOrder, st, onTime, tier); }
       } else {
-        payShow(part, [[$t('заказ'), part, '']], '', null, done);
+        payShow(part, [[$t('заказ'), part, '']], '', null, done, null, true);
       }
     };
     HANDOFF.payment(handoff, showPay);
@@ -16587,7 +16594,7 @@ function bossOnDeliver (o, st, onTime, tier) {
   if (DIRECTOR.quiet() && kind !== 'late') return;
   if (!kind) return;
   const fee = pp.fee || 0;
-  CHAT.later(HUDFONE.active() ? 5200 : 2500, () => { // телефон успевает показать доставку и уйти вниз до SMS управляющей
+  CHAT.later(HUDFONE.active() ? 6000 : 2500, () => { // телефон успевает показать выплату и уйти вниз до SMS управляющей
     if (kind !== 'late' && !isPlaying() && !CHAT.waiting()) return;
     RQ.hold(1500);                                 // Толик сказал — подсказка и достижение после
     CHAT.react(kind, kind === 'late' ? () => lateFine(fee) : null);
