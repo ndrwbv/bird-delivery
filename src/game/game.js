@@ -201,6 +201,7 @@ import * as TRK from './tracks.js';              // следы колёс на �
 import * as HAV from './havoc.js';             // Толик считает разрушения за смену: «красавчик, но лавочек уже 6» (havoc.js)
 import * as FAHEAD from './faceahead.js';       // портреты заранее: получатель заказа, Толик, герои катсцен (в спокойные кадры)
 import * as CHAT from './chat.js';             // «Толик управляющий» пишет справа сверху, как в iMessage (похвала, ругань, вычет за опоздание)
+import * as HUDFONE from './hudphone.js';       // телефон курьера: сообщения и карта как приложения в HUD
 import * as CREWC from './crewcast.js';        // свои люди в каждой пиццерии: состав, характеры, машины с наклейками (crewcast.js)
 import * as CREWR from './crewrank.js';        // рейтинг смены: вспышка и стрелка «место N из M» на хаде, коллеги и Толик пишут в чат, кто кого обогнал (crewrank.js)
 import * as SC from './shiftcash.js';             // карьера: пачка купюр на хаде — заработок смены (shiftcash.js)
@@ -14380,6 +14381,7 @@ function setFullMap (on) {
   const toPause = !on && FM.open && FM.fromPause;   // открыли из паузы — «закрыть» возвращает в паузу, а не в езду
   FM.fromPause = false;
   FM.open = on;
+  if (!TOUCH) HUDFONE.showMap(on);
   elFull.hidden = !on;
   if (isPlaying() && !S.paused) { if (on) Platform.gameplayStop(); else Platform.gameplayStart(); }
   for (const k in FM.keys) FM.keys[k] = 0;
@@ -14952,6 +14954,9 @@ function hudStep (dt) {
   const lg = curLang();
   if (lg !== HUDC.lang) { HUDC.lang = lg; HUDC.money = NaN; HUDC.nos = -1; HUDC.bur = ''; HUDC.spd = -1; HUDC.key = ''; HUDC.dist = -1; HUDC.fx = '#'; }
   if (CAREER) walletHud(dt); else if (S.money !== HUDC.money) { HUDC.money = S.money; elMoney.textContent = money(S.money); }
+  HUDFONE.resources({ hp: S.hp, hpMax: S.hpMax, money: money(S.money),
+    order: S.order ? { title: $t('заказ {n}', { n: S.orders }), address: S.addr || (PIZZA ? PIZZA.name : '') } : null,
+    time: S.order && S.timeMax > 0 ? dashLeft(S.time) : '' });
   touchpadStep();
   const bk = S.burgers + '|' + S.people + '|' + S.scoots + '|' + S.wrecks;
   if (bk !== HUDC.bur) {
@@ -15354,6 +15359,7 @@ function showOrderCard (order) {
   elPhone.classList.remove('drop');
   elPhone.classList.add('on');
   document.body.classList.add('brief');
+  HUDFONE.showOrder({ number: S.orders, html: elPhList.innerHTML });
   phoneT = 0;
   BRIEF.t = 0; BRIEF.gasUp = !IN.gas;           // газ зажат с прошлого заказа — не считается, нужен новый нажим
 }
@@ -15392,6 +15398,12 @@ function briefGoHTML () {
     : '<kbd class="pp-key">' + key + '</kbd>' + escHtml($t('газ — поехали'))) + '</div>';
 }
 function dropPhone () {
+  if (HUDFONE.active() && HUDFONE.hasOrder()) {
+    hidePhone();
+    HUDFONE.dock();
+    OTAGS.land(0.4);
+    return;
+  }
   const to = OTAGS.anchor(), r = elPhone.getBoundingClientRect();
   document.body.classList.remove('brief');
   if (!to || !r.width) { hidePhone(); OTAGS.land(0); return; }
@@ -17390,6 +17402,8 @@ CREWR.init({ adult: ADULT, money, face: faceDataURL });   // money — сумм�
 CREWC.init({ THREE, ADULT, makePerson, faceDataURL, put, mergeGeos, spec: m => CAR_SPEC[m] || CAR_SPEC.sedan, districtId: i => (DIST.list()[i] || {}).id });
 CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x1a1a5e, fem: true }), face: (p, size) => faceDataURL(p, size), blip: (f, d, ty, v) => Snd.blip(f, d, ty, v), fx: (n, synth) => Snd.fx(n, synth),
   speed: () => Math.hypot(V.vx || 0, V.vz || 0) });   // телефон: едешь — прочитанные сообщения чата прозрачнее (chat.js PH)
+HUDFONE.init({ mapElement: elFull, radarElement: elRadarBox, onRadarMove: sizeRadar, closeMap: on => setFullMap(!!on) });
+CHAT.bindPhone(HUDFONE);
 /* заказы карьеры (orders.js): очередь, поручения, развоз смены — через это */
 if (CAREER) ORD.init({ S, V, CITY, MAP, THREE, Store, ADULT, SPOTS, LIFE, Snd, get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get DAY_LEN () { return DAY_LEN; }, lang: curLang,
   alive, releaseIdle, pushOut, walkSpawn, nearestRoad, makeGuest, clearGuest, realAddress, routeLen, orderTime, rebuildRoutePath, syncTarget, pinFront,
@@ -17413,7 +17427,7 @@ if (CAREER) DOOR.init({ ORD, S, Store, ADULT, Snd, money, root: () => $('game') 
   rehuman: (p, person) => { dropMesh(p.grp); p.grp = makeHuman(person); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });   // разговор у двери: клиент в мире — как портрет «под роль» (doorstep.js)   // клиент дома / не дома (doorstep.js plan, «клиент не дома»)
 if (CAREER) WRONG.init({ S, V, ADULT, CHAT, NICK, DIST, ZN, SPOTS, routeLen, realAddress, guestMove, nearestRoad,
   shiftsDone: () => +Store.get('dlv-shifts', 0) || 0, onShiftStart: CAREERM.onShiftStart });   // клиент ошибся адресом (wrongaddr.js)
-if (CAREER) { elMoney.hidden = true; SC.init({ S, money }); }
+if (CAREER) { elMoney.hidden = true; SC.init({ S, money }); HUDFONE.mountMoney(SC.DEBUG.el); }
 HANDOFF.init({
   reserve: amount => CAREER ? SC.reserve(amount) : null, extend: SC.extend, settle: SC.settle, hidePay: payHide,
   cancelScene: list => HCAM.cancelHanded(list),
@@ -18577,6 +18591,7 @@ function frame (now) {
 }
 function frameStep (now) {
   CL.at.ph = 'pre';
+  HUDFONE.setVisible(!TOUCH && isPlaying() && (!S.paused || FM.open));
   if (LATE.busy() && lateFrame(now)) return;      // город ещё достраивается за меню (latebuild.js)
   if (LAND_READ17 && !LAND_READ17.ready || LAND_PACKAGE?.fatal || ADDRESS_PREPARED17?.meta().fatal) return;
   if (LAND_STREAM && !LAND_ENTERING && (!LAND_READ17 || LAND_READ17.ready)) CL.step('земля рядом', () => {
