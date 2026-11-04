@@ -14833,10 +14833,10 @@ function payFxEl () {
 /* в общей очереди уведомлений (notifyq.js): чек — самое важное после срочного, перебивает всё остальное (cut),
    держит экран 2,5 с; Толик, рейтинг, достижения — после него */
 const PAY_MS = 2500;
-function popPay (total, rows, title, face) {
+function popPay (total, rows, title, face, delivery = false) {
   const cash = CAREER ? SC.reserve(total) : null;
   NQ.push({ kind: 'pay', text: (total >= 0 ? '+' : '−') + money(Math.abs(total)), ms: PAY_MS, manual: true, cut: true, fresh: 1000, wait: 30,
-    show: it => payShow(total, rows, title, face, () => { SC.settle(cash, true); payHide(); NQ.done(it); }, () => NQ.touch(it)),
+    show: it => payShow(total, rows, title, face, () => { SC.settle(cash, true); payHide(); NQ.done(it); }, () => NQ.touch(it), delivery),
     hide: (it, again) => { payHide(); if (!again) SC.settle(cash, false); }, drop: () => SC.settle(cash, false) });
 }
 function payHide () {
@@ -14844,7 +14844,6 @@ function payHide () {
   if (!P.el) return;
   PAYVIS.hide();
   P.el.classList.remove('on', 'fly'); P.el.hidden = true;
-  HUDFONE.cancelPayment();
 }
 function payShow (total, rows, title, face, done, touch, delivery = false) {
   const P = payFxEl();
@@ -14873,18 +14872,18 @@ function payShow (total, rows, title, face, done, touch, delivery = false) {
   P.sum.textContent = (total >= 0 ? '+' : '−') + money(Math.abs(total));
   P.sum.classList.toggle('late', rows.some(r => r[2] === 'neg'));
   P.chk.innerHTML = rows.map(r => '<p class="' + (r[2] || '') + '"><span>' + r[0] + '</span><b>' + (r[1] < 0 ? '−' : '') + money(Math.abs(r[1])) + '</b></p>').join('');
-  const phonePay = HUDFONE.active() && total > 0;
-  if (phonePay) {
-    if (delivery) HUDMAP.payment({ name: face?.person ? NICK.label(face.person, $t('клиент')) : $t('клиент'),
-      avatar: face?.person ? NICK.avatar(face.person, 64, face.mood) : '', amount: money(total), money: money(S.money) });
-    HUDFONE.paying();
-  }
+  const phoneHud = HUDFONE.active();
+  if (phoneHud && (total > 0 || delivery)) HUDFONE.dock();
   Snd.coin();
   PAYVIS.show({ el: P.el, bits: P.bits, target: () => CAREER ? SC.DEBUG.el : elMoney,
     ready: () => NQ.DEBUG.phase() === 'ride' && NQ.showing() === 'pay',
     done: () => {
-      if (phonePay) HUDFONE.paid({ amount: money(total), money: money(S.money), delivery,
-        breakdown: rows.map(r => ({ label: r[0], amount: (r[1] < 0 ? '−' : '+') + money(Math.abs(r[1])), kind: r[2] })) });
+      if (phoneHud && delivery) HUDMAP.payment({
+        name: face?.person ? NICK.label(face.person, $t('клиент')) : $t('клиент'),
+        avatar: face?.person ? NICK.avatar(face.person, 64, face.mood) : '', mood: face?.mood,
+        amount: (total < 0 ? '−' : '+') + money(Math.abs(total)), money: money(S.money), zero: money(0),
+        breakdown: rows.map(r => ({ label: r[0], amount: (r[1] < 0 ? '−' : '+') + money(Math.abs(r[1])), kind: r[2] })),
+      });
       if (done) done();
     }, touch });
 }

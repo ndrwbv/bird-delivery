@@ -69,22 +69,39 @@ export function fuel (value) {
   bars.forEach((bar, i) => bar.classList.toggle('on', i < count));
 }
 
-export function payment ({ name = '', avatar = '', amount = '', money = '' } = {}) {
+export function payment ({ name = '', avatar = '', mood = 'ok', amount = '', money = '', zero = '0 ₽', breakdown = [] } = {}) {
   let card = document.getElementById('hios-paid');
   if (!card) {
-    card = document.createElement('div'); card.id = 'hios-paid';
-    card.innerHTML = '<div class="hios-paid-confetti" aria-hidden="true">' + '<i></i>'.repeat(14) + '</div><span class="hios-paid-avatar"></span><div class="hios-paid-copy"><b class="hios-paid-name"></b><strong class="hios-paid-status">✓ ' + t('Доставлено') + '</strong><small class="hios-paid-gain"></small><small class="hios-paid-total"></small></div>';
+    card = document.createElement('div'); card.id = 'hios-paid'; card.setAttribute('role', 'status');
+    card.innerHTML = '<div class="hios-paid-confetti" aria-hidden="true">' + '<i></i>'.repeat(14) + '</div>' +
+      '<div class="hios-paid-head"><strong>✓ ' + t('Доставлено') + '</strong><span class="hios-paid-star" aria-hidden="true">★</span></div>' +
+      '<div class="hios-paid-guest"><span class="hios-paid-avatar"></span><div><b class="hios-paid-name"></b><span class="hios-paid-reaction"></span></div></div>' +
+      '<div class="hios-paid-receipt"></div><div class="hios-paid-bottom"><span>' + t('Выплата') + '</span><strong class="hios-paid-gain"></strong></div>' +
+      '<div class="hios-paid-shift"><span>' + t('За смену') + '</span><b class="hios-paid-total"></b></div>';
     (document.getElementById('game') || document.body).appendChild(card);
   }
   const face = card.querySelector('.hios-paid-avatar');
   if (avatar) { const img = document.createElement('img'); img.src = avatar; img.alt = ''; face.replaceChildren(img); }
-  else face.textContent = (name || t('клиент')).slice(0, 1).toUpperCase();
+  else face.replaceChildren((name || t('клиент')).slice(0, 1).toUpperCase());
   card.querySelector('.hios-paid-name').textContent = name || t('клиент');
-  card.querySelector('.hios-paid-gain').textContent = '+' + amount;
-  card.querySelector('.hios-paid-total').textContent = t('За смену') + ': ' + money;
+  const reaction = card.querySelector('.hios-paid-reaction');
+  const reactionText = mood === 'happy' ? t('Понравилось') : mood === 'angry' ? t('Не понравилось') : t('Нормально');
+  reaction.textContent = (mood === 'happy' ? '♥ ' : mood === 'angry' ? '✕ ' : '✓ ') + reactionText;
+  reaction.className = 'hios-paid-reaction ' + (mood === 'happy' ? 'happy' : mood === 'angry' ? 'angry' : 'ok');
+  const receipt = card.querySelector('.hios-paid-receipt'); receipt.replaceChildren();
+  const lines = breakdown.some(r => r.kind === 'tip') ? breakdown : [...breakdown, { label: t('чаевые'), amount: zero, kind: 'tip' }];
+  for (const line of lines) {
+    const row = document.createElement('div'); row.className = 'hios-paid-line ' + (line.kind || '');
+    const label = document.createElement('span'); label.textContent = line.label;
+    const value = document.createElement('b'); value.textContent = line.amount;
+    row.append(label, value); receipt.appendChild(row);
+  }
+  card.querySelector('.hios-paid-gain').textContent = amount;
+  card.querySelector('.hios-paid-total').textContent = money;
+  card.classList.toggle('negative', amount.startsWith('−'));
   clearTimeout(paidTimer);
   card.classList.remove('on'); void card.offsetWidth; card.classList.add('on');
-  paidTimer = setTimeout(() => { card.classList.remove('on'); setTimeout(() => card.remove(), 450); }, 4300);
+  paidTimer = setTimeout(() => { card.classList.remove('on'); setTimeout(() => card.remove(), 450); }, 5300);
 }
 export function hidePayment () { clearTimeout(paidTimer); document.getElementById('hios-paid')?.remove(); }
 
