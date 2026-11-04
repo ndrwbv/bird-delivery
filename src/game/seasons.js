@@ -239,7 +239,9 @@ vec3 seasonTint (vec3 c, float dryK, float snowK) {
   }
   float lim = uSnow * up * 1.35 * snowK - 0.22;
   float cov = (1.0 - smoothstep(lim - 0.1, lim + 0.1, n)) * (1.0 - water * 0.7);   // край проталины — мягкий (до 09.10 ±0,06)
-  cov *= 1.0 - road * 0.55 * (0.45 + 0.55 * n);
+  // На расчищенных улицах через редкую снежную пыль читаются асфальт
+  // и разметка; непосыпанные улицы получают отдельный снежный слой.
+  cov *= 1.0 - road * 0.9 * (0.75 + 0.25 * n);
   cov *= 1.0 - yardP * (0.45 + 0.3 * n);       // дворовая дорожка зимой протоптана: плитка проглядывает пятнами
   vec3 snowC = mix(vec3(0.88, 0.91, 0.97), vec3(0.46, 0.48, 0.52), road * 0.6);
   snowC = mix(snowC, vec3(0.66, 0.68, 0.72), yardP * 0.55);   // утоптанный снег — серее
@@ -289,16 +291,17 @@ export function seasonMat (m, dryK = 1, propK, smashJ) {
   return m;
 }
 
-let WINTER_ROAD_GROUP = null;
-export function winterRoadMat () {
+let WINTER_ROAD_GROUPS = [];
+export function winterRoadMat (blended = false) {
   // Нормаль берётся из настоящих граней колеи и сугробов; без flatShading
   // материал ожидает отсутствующий атрибут normal и чернит дорогу.
-  const m = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, flatShading: true });
+  const m = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, flatShading: true,
+    transparent: blended, depthWrite: !blended });
   m.onBeforeCompile = sh => {
-    sh.vertexShader = 'attribute float roadSand; varying float vRoadSand; varying vec2 vRoadXZ;\n' +
+    sh.vertexShader = 'attribute float roadSand; attribute float roadBlend; varying float vRoadSand; varying float vRoadBlend; varying vec2 vRoadXZ;\n' +
       sh.vertexShader.replace('#include <begin_vertex>',
-        '#include <begin_vertex>\nvRoadSand = roadSand; vRoadXZ = position.xz;');
-    sh.fragmentShader = `varying float vRoadSand; varying vec2 vRoadXZ;
+        '#include <begin_vertex>\nvRoadSand = roadSand; vRoadBlend = roadBlend; vRoadXZ = position.xz;');
+    sh.fragmentShader = `varying float vRoadSand; varying float vRoadBlend; varying vec2 vRoadXZ;
 float winterHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float winterNoise(vec2 p) {
   vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -306,16 +309,23 @@ float winterNoise(vec2 p) {
              mix(winterHash(i + vec2(0.0, 1.0)), winterHash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 ` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-float grit = smoothstep(0.62, 0.79, winterNoise(vRoadXZ * 5.0)) * 0.42
-           + smoothstep(0.75, 0.87, winterNoise(vRoadXZ * 1.2 + vec2(17.0))) * 0.04;
-diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.51, 0.39, 0.27), vRoadSand * grit);`);
+float grit = smoothstep(0.65, 0.82, winterNoise(vRoadXZ * 5.0)) * 0.18
+           + smoothstep(0.78, 0.9, winterNoise(vRoadXZ * 1.2 + vec2(17.0))) * 0.025;
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.56, 0.47, 0.39), vRoadSand * grit);
+${blended ? `float feather = winterNoise(vRoadXZ * 0.8 + vec2(23.0));
+float patches = winterNoise(vRoadXZ * 0.28 + vec2(47.0)) * 0.72
+              + winterNoise(vRoadXZ * 1.05 + vec2(9.0)) * 0.28;
+float snowCover = mix(0.92, 1.0, smoothstep(0.26, 0.76, patches));
+diffuseColor.rgb *= mix(0.96, 1.0, patches);
+diffuseColor.a *= vRoadBlend * snowCover * smoothstep(0.04, 0.94, vRoadBlend + (feather - 0.5) * 0.18);
+if (diffuseColor.a < 0.005) discard;` : ''}`);
   };
-  m.customProgramCacheKey = () => 'winter-road-grit4';
+  m.customProgramCacheKey = () => blended ? 'winter-road-grit-blend6' : 'winter-road-grit-opaque6';
   return m;
 }
-export function bindWinterRoadGroup (group) {
-  WINTER_ROAD_GROUP = group;
-  group.visible = (A.snow || 0) > 0.42;
+export function bindWinterRoadGroup (groups) {
+  WINTER_ROAD_GROUPS = Array.isArray(groups) ? groups : [groups];
+  for (const group of WINTER_ROAD_GROUPS) group.visible = (A.snow || 0) > 0.42;
 }
 
 /* Мелочь дворов (SMASH): как статика, но у кустов (aux.x = 1) листва
@@ -767,7 +777,7 @@ function apply () {
   setPeopleSeason(A.warm);
   for (const m of MESH_GARL) m.visible = A.ny > 0.001;
   for (const m of DRIFT_MESH) m.visible = A.drift > 0.004;
-  if (WINTER_ROAD_GROUP) WINTER_ROAD_GROUP.visible = A.snow > 0.42;
+  for (const group of WINTER_ROAD_GROUPS) group.visible = A.snow > 0.42;
   // новогодние ёлки стоят, пока видны (шейдер: зерно 4/255 < uNY)
   for (const f of FIRS) if (f.solid) f.solid.hw = f.solid.hd = A.ny > 0.016 ? f.hw : -50;     // -50 — «препятствия нет», как в игре
   // ледяные горки и снеговики: вне зимы вершины — в точку

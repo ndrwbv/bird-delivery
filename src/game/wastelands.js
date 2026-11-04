@@ -66,7 +66,8 @@ const hash = (x, z, k = 0) => { const s = Math.sin(x * 12.9898 + z * 78.233 + k 
 
 let A = null;
 const LOTS = [];
-const STATS = { lots: 0, kinds: {}, trails: 0, trailM: 0, spots: 0, puddles: [0, 0, 0], smash: 0, solids: 0, npcLive: 0, dogs: 0, people: 0, hitDogs: 0, ms: 0, trailMs: 0, tried: 0 };
+let SNOW_MESH = null;
+const STATS = { lots: 0, snowdrifts: 0, kinds: {}, trails: 0, trailM: 0, spots: 0, puddles: [0, 0, 0], smash: 0, solids: 0, npcLive: 0, dogs: 0, people: 0, hitDogs: 0, ms: 0, trailMs: 0, tried: 0 };
 const PUDS = [[], [], []];                         // лужи по ярусам: [x, z, r, seed]
 const SPOTS = [];                                   // вытоптанные пятна: { x, z, r } — для луж
 
@@ -145,6 +146,46 @@ function frame (s) {
     blob (a, b, ra, rb, hex, lift = 0.055, k = 0) { const [px, pz] = P(a, b); blobAt(px, pz, ra, rb, Math.atan2(uz, ux), hex, lift, k); },
   };
   return c;
+}
+
+/* На незаасфальтированных пустырях снег собирается неровными островками.
+   Всё в одном меше; летние площадки и ларьки остаются без сугробов. */
+function buildSnowDrifts () {
+  if (SNOW_MESH) { SNOW_MESH.removeFromParent(); SNOW_MESH.geometry.dispose(); SNOW_MESH.material.dispose(); }
+  const positions = [], colors = [];
+  const vertex = (x, y, z, rgb) => { positions.push(x, y, z); colors.push(rgb >> 16, (rgb >> 8) & 255, rgb & 255); };
+  STATS.snowdrifts = 0;
+  for (const s of LOTS) {
+    if (s.kind === 'football' || s.kind === 'kiosks') continue;
+    const c = frame(s), count = s.W > 30 ? 10 : 6;
+    for (let k = 0; k < count; k++) {
+      const a = (hash(s.x, s.z, 211 + k * 5) - 0.5) * (s.W - 6);
+      const b = (hash(s.x, s.z, 212 + k * 5) - 0.5) * (s.D - 6);
+      const ra = 1.9 + hash(s.x, s.z, 213 + k * 5) * 1.8;
+      const rb = 1.3 + hash(s.x, s.z, 214 + k * 5) * 1.2;
+      const h = 0.15 + hash(s.x, s.z, 215 + k * 5) * 0.18;
+      const [cx, cz] = c.P(a, b), cy = A.groundH(cx, cz) + 0.055 + h;
+      const rim = [];
+      for (let i = 0; i < 10; i++) {
+        const ang = i * Math.PI * 2 / 10, wobble = 0.82 + hash(cx, cz, i + 216) * 0.32;
+        const [x, z] = c.P(a + Math.cos(ang) * ra * wobble, b + Math.sin(ang) * rb * wobble);
+        rim.push([x, A.groundH(x, z) + 0.058, z]);
+      }
+      for (let i = 0; i < rim.length; i++) {
+        const next = rim[(i + 1) % rim.length], current = rim[i];
+        vertex(cx, cy, cz, 0xe7eff0); vertex(...next, 0xdce6e9); vertex(...current, 0xdce6e9);
+      }
+      STATS.snowdrifts++;
+    }
+  }
+  if (!positions.length) return;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setAttribute('color', new THREE.Uint8BufferAttribute(new Uint8Array(colors), 3, true));
+  g.computeBoundingSphere();
+  SNOW_MESH = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }));
+  SNOW_MESH.visible = SEAS.snowAmt() > 0.45;
+  A.scene.add(SNOW_MESH);
 }
 /* пятно неровного края: n точек, радиус гуляет ±25 % */
 function blobAt (x, z, ra, rb, ang, hex, lift, k = 0) {
@@ -577,6 +618,7 @@ export function* build (api) {
     A.scene.add(m);
   }
   STATS.lots = LOTS.length; STATS.kinds = used;
+  buildSnowDrifts();
   STATS.ms = Math.round(performance.now() - t0);
 }
 
@@ -886,6 +928,7 @@ function dogStep (s, o, dt, sp) {
 let scanT = 0;
 export function step (dt) {
   if (!A) return;
+  if (SNOW_MESH) SNOW_MESH.visible = SEAS.snowAmt() > 0.45;
   // лужи: по сезону и дождю — раз в полсекунды
   if ((wetT -= dt) <= 0) {
     wetT = 0.5;

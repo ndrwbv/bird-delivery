@@ -40,8 +40,8 @@ npm run probe -- --eval=my-check.js --size=phone --errors
 ```
 
 Для зимней дороги в локальном браузере: `?season=2.5&mute&winterspot` сохраняет обычный старт смены у пиццерии.
-Явный `winterspot=soft` начинает смену на ближайшем к пиццерии рыхлом участке (не дальше 450 м); `winterspot=sand` — на посыпанном, `winterspot=rut` — внутри колеи тихой улицы, `winterspot=junction` — перед перекрёстком. `?winterdebug` и `document.documentElement.dataset.winterRoad` показывают
-число участков, рыхлый снег (`underCar`), песок (`sandUnderCar`) и сцепление внутри колеи (`rutUnderCar`) под машиной, выбросы снега (`sprays`).
+Явный `winterspot=soft` начинает смену на ближайшем к пиццерии рыхлом участке (не дальше 450 м); `winterspot=sand` — на посыпанном, `winterspot=clear` — на расчищенном асфальте, `winterspot=rut` — внутри колеи дворового проезда, `winterspot=junction` — перед перекрёстком, `winterspot=deep` — на открытом снегу вне дороги, `winterspot=lot` — напротив пустыря со снежными наносами. `?winterdebug` и `document.documentElement.dataset.winterRoad` показывают
+число участков, рыхлый снег (`underCar`), песок (`sandUnderCar`) и сцепление внутри колеи (`rutUnderCar`) под машиной, выбросы снега (`sprays`), осевшие бугры (`crushed`), примятые отрезки (`imprints`) и снежные наносы на пустырях (`vacantSnow`). Колея теперь только на дворовых и придворовых проездах; при движении вне дороги в глубоком снегу остаётся рельефный след двух колёс.
 Оба отладочных флага работают только в dev. Для обычного вида убрать `winterdebug&winterspot`.
 
 - скрипт (`--js` или `--eval=файл`) — тело async-функции в странице. Есть: `d` (= `__dlv`),
