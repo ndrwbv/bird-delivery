@@ -7,19 +7,27 @@ import { t } from '../i18n/index.js';
 const H = { root: null, device: null, banner: null, thread: null, map: null, mock: null,
   messages: [], shrink: 0, bannerTimer: 0, enterTimer: 0, mapElement: null, mapParent: null,
   radarElement: null, radarParent: null, onRadarMove: null, moneyElement: null, moneyParent: null,
-  closeMap: null, visible: false, app: 'glance', order: null, resourcesKey: '' };
+  closeMap: null, onMapZoom: null, visible: false, app: 'glance', order: null, resourcesKey: '' };
 
 const icon = kind => '<span class="hp-icon hp-icon-' + kind + '" aria-hidden="true"><i></i></span>';
 const demoMap = `<svg viewBox="0 0 284 416" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-  <rect width="284" height="416" fill="#e8eadc"/><path fill="#b3d7b2" d="M0 0h76v104H0zm222 0h62v152h-62zM0 293h93v123H0zm179 334h105v82H179z"/>
-  <path d="M-15 78 300 149M-10 256 300 210M52-10l95 440M199-20l-18 455" stroke="#d2d5c8" stroke-width="28" fill="none"/>
-  <path d="M-15 78 300 149M-10 256 300 210M52-10l95 440M199-20l-18 455" stroke="#fff" stroke-width="19" fill="none"/>
-  <path d="M-10 343 297 33M32-10l235 435" stroke="#fff" stroke-width="10" fill="none"/>
-  <path d="M128 296 123 241 179 212 177 160" stroke="#2589e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <path d="M128 296 123 241 179 212 177 160" stroke="#80c5ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <g fill="#7e8b80" font-family="Arial,sans-serif" font-size="10"><text x="12" y="116" transform="rotate(12 12 116)">ул. Царевского</text><text x="195" y="306" transform="rotate(-11 195 306)">пр. Коммунистический</text><text x="46" y="382" transform="rotate(-42 46 382)">ул. Мира</text></g>
-  <circle cx="128" cy="296" r="15" fill="#2789e7" opacity=".22"/><circle cx="128" cy="296" r="7" fill="#2789e7" stroke="white" stroke-width="3"/>
-  <path d="M177 145c-11 0-18 7-18 18 0 13 18 29 18 29s18-16 18-29c0-11-7-18-18-18z" fill="#f04b37" stroke="white" stroke-width="3"/><circle cx="177" cy="162" r="5" fill="white"/>
+  <rect width="284" height="416" fill="#e9e4d6"/>
+  <path fill="#c9e1aa" d="M0 0h85l-7 99H0zm214 0h70v159l-42-9-17-71zM0 304l85-11 8 123H0zM229 303l55 8v105h-61z"/>
+  <path fill="#b4d797" d="M0 19 72 5 62 52 2 76zm241 13 43 10v80l-34-7zM1 335l50-12 16 63-66 28z"/>
+  <path d="M-18 78 302 151M-18 251 302 211M52-14l84 447M199-20l-20 456" stroke="#d5d2c7" stroke-width="31" fill="none"/>
+  <path d="M-18 78 302 151M-18 251 302 211M52-14l84 447M199-20l-20 456" stroke="#f9f7eb" stroke-width="24" fill="none"/>
+  <path d="M-10 342 292 33M32-10l235 435" stroke="#d3b67e" stroke-width="24" fill="none"/>
+  <path d="M-10 342 292 33M32-10l235 435" stroke="#f3c574" stroke-width="20" fill="none"/>
+  <g fill="#d6d4c9" stroke="#a7a89f" stroke-width="1.2">
+    <path d="m82 20 32-4 7 26-31 5zM132 12l42-5-3 34-36 3zM10 118l30 5 2 37-30-5zM57 120l32 5 8 30-34-4zM116 113l35-7 5 32-36 9zM188 106l30-5 9 37-35 4zM242 171l32 5-4 27-29-4zM8 186l36 6-1 32-31-4zM67 183l35 7 4 33-31-4zM138 184l27-7 5 26-30 9zM212 233l46-5 2 40-42 7zM11 271l31-4 4 31-33 3zM97 270l31-5 5 30-31 5zM154 276l38-6 2 30-35 7zM102 346l29-5 4 37-31 4zM208 349l42-5 4 30-41 4z"/>
+  </g>
+  <path fill="#c5c9c6" stroke="#a7a89f" stroke-width="1.2" d="m13 11 31-5 6 37-33 7zM220 14l40 3-5 30-33-2zM7 352l40-7 7 36-42 9z"/>
+  <g fill="#7a7c74" font-family="Arial,sans-serif" font-size="7"><text x="93" y="35">2</text><text x="145" y="29">6</text><text x="20" y="143">12</text><text x="71" y="142">14</text><text x="127" y="127">18</text><text x="200" y="124">22</text><text x="19" y="207">5</text><text x="83" y="207">9</text><text x="225" y="253">27</text><text x="107" y="283">11</text><text x="167" y="292">15</text></g>
+  <g fill="#5e625f" stroke="#f8f7f0" stroke-width="2.5" paint-order="stroke" font-family="Arial,sans-serif" font-size="10"><text x="9" y="105" transform="rotate(13 9 105)">ул. Царевского</text><text x="184" y="319" transform="rotate(-12 184 319)">пр. Коммунистический</text><text x="46" y="384" transform="rotate(-44 46 384)">ул. Мира</text></g>
+  <path d="M128 296 123 241 179 212 177 160" stroke="#2d88c9" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M128 296 123 241 179 212 177 160" stroke="#85caec" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="128" cy="296" r="15" fill="#2789e7" opacity=".18"/><circle cx="128" cy="296" r="7" fill="#2789e7" stroke="white" stroke-width="3"/>
+  <path d="M177 145c-11 0-18 7-18 18 0 13 18 29 18 29s18-16 18-29c0-11-7-18-18-18z" fill="#e94b38" stroke="white" stroke-width="3"/><circle cx="177" cy="162" r="5" fill="white"/>
   </svg>`;
 
 function setApp (app) {
@@ -73,7 +81,7 @@ function addMessage ({ name, role = '', text, avatar = '' }) {
   H.thread.scrollTop = H.thread.scrollHeight;
 }
 
-export function init ({ mapElement = null, radarElement = null, onRadarMove = null, closeMap = null, visible = false } = {}) {
+export function init ({ mapElement = null, radarElement = null, onRadarMove = null, closeMap = null, onMapZoom = null, visible = false } = {}) {
   if (H.root) return H.root;
   const root = document.createElement('div'); root.id = 'hud-phone';
   root.innerHTML = `<div class="hp-backdrop"></div>
@@ -93,7 +101,7 @@ export function init ({ mapElement = null, radarElement = null, onRadarMove = nu
           <div class="hp-glance-foot"><span>${t('Солнечный')}</span><span>● ${t('на связи')}</span></div>
         </section>
         <section class="hp-app hp-messages" data-hp-app="messages" hidden><header class="hp-nav"><button type="button" data-open="home" aria-label="${t('назад')}">‹ <span>${t('Сообщения')}</span></button><b class="hp-contact-name">${t('Ирина Сергеевна')}</b><span class="hp-nav-space"></span></header><div class="hp-contact"><img class="hp-contact-avatar" alt="" hidden><b class="hp-contact-name">${t('Ирина Сергеевна')}</b><small>${t('управляющая')}</small></div><div class="hp-thread"></div><div class="hp-compose"><span>＋</span><p>${t('Сообщение')}</p><span>◉</span></div></section>
-        <section class="hp-app hp-map-app" data-hp-app="map" hidden><header class="hp-nav"><button type="button" data-open="home" aria-label="${t('назад')}">‹ <span>${t('Назад')}</span></button><b>${t('Карты')}</b><span class="hp-nav-space"></span></header><div class="hp-map-search">⌕ <span>${t('Поиск по карте')}</span></div><div class="hp-map-body"><div class="hp-real-map"></div><div class="hp-mock-map">${demoMap}</div><div class="hp-map-chip">● ${t('ты')} <i></i> ● ${t('заказ')}</div></div><div class="hp-map-footer"><span>➤</span><b>${t('Солнечный')} · ${t('маршрут')}</b><span>⋯</span></div></section>
+        <section class="hp-app hp-map-app" data-hp-app="map" hidden><header class="hp-nav"><button type="button" data-open="home" aria-label="${t('назад')}">‹ <span>${t('Назад')}</span></button><b>${t('Солнечный')}</b><span class="hp-nav-space"></span></header><div class="hp-map-search">⌕ <span>${t('Поиск по карте')}</span></div><div class="hp-map-body"><div class="hp-real-map"></div><div class="hp-mock-map">${demoMap}</div><div class="hp-map-zoom"><button type="button" data-hp-zoom="in" aria-label="${t('увеличить карту')}">+</button><button type="button" data-hp-zoom="out" aria-label="${t('уменьшить карту')}">−</button></div><div class="hp-map-chip">● ${t('ты')} <i></i> ● ${t('заказ')}</div></div><div class="hp-map-footer"><button type="button" data-open="glance"><span>▤</span>${t('Сводка')}</button><button type="button" data-open="courier"><span>➤</span>${t('Маршрут')}</button><button type="button" data-open="messages"><span>✉</span>${t('Сообщения')}</button><button type="button" data-open="map" class="hp-selected"><span>▦</span>${t('Карта')}</button></div></section>
         <section class="hp-app hp-courier-app" data-hp-app="courier" hidden><header class="hp-nav"><button type="button" data-open="glance" aria-label="${t('назад')}">‹ <span>${t('Сводка')}</span></button><b>${t('Курьер')}</b><span class="hp-nav-space"></span></header>
           <div class="hp-courier-scroll"><div class="hp-courier-brand">${icon('courier')}<div><b>${t('Птица Пицца')}</b><span>${t('Курьерская служба')}</span></div></div>
             <div class="hp-order-sheet"><div class="hp-order-title"><span>${t('НАКЛАДНАЯ')}</span><b class="hp-order-no">№ 0000</b></div><div class="hp-order-list">${t('Нет активного заказа')}</div></div></div>
@@ -104,9 +112,15 @@ export function init ({ mapElement = null, radarElement = null, onRadarMove = nu
   (document.getElementById('game') || document.body).appendChild(root);
   H.root = root; H.device = root.querySelector('.hp-device'); H.banner = root.querySelector('.hp-banner');
   H.thread = root.querySelector('.hp-thread'); H.mock = root.querySelector('.hp-mock-map');
-  H.map = root.querySelector('.hp-real-map'); H.mapElement = mapElement; H.mapParent = mapElement && mapElement.parentNode; H.closeMap = closeMap;
+  H.map = root.querySelector('.hp-real-map'); H.mapElement = mapElement; H.mapParent = mapElement && mapElement.parentNode; H.closeMap = closeMap; H.onMapZoom = onMapZoom;
   H.radarElement = radarElement; H.radarParent = radarElement && radarElement.parentNode; H.onRadarMove = onRadarMove;
   root.addEventListener('click', e => {
+    const zoom = e.target.closest('[data-hp-zoom]');
+    if (zoom) {
+      if (H.onMapZoom && H.mapElement && !H.mapElement.hidden) H.onMapZoom(zoom.dataset.hpZoom === 'in' ? 1.6 : 1 / 1.6);
+      else { const mock = H.root.querySelector('.hp-mock-map'); mock.classList.toggle('hp-mock-zoomed', zoom.dataset.hpZoom === 'in'); }
+      return;
+    }
     if (e.target.closest('.hp-banner')) { root.classList.remove('hp-notifying'); open('messages'); return; }
     if (e.target.closest('.hp-glance-map')) {
       if (e.target.closest('#radar')) return;  // настоящий радар сам открывает карту
@@ -206,6 +220,7 @@ export function reset () {
   if (!H.root) return;
   clearTimeout(H.shrink); clearTimeout(H.bannerTimer);
   H.root.classList.remove('hp-notifying', 'hp-real-map-open', 'hp-order-brief');
+  H.mock.classList.remove('hp-mock-zoomed');
   H.messages = []; H.thread.replaceChildren(); clearOrder(); dock(); H.resourcesKey = '';
 }
 /* Песочница: фиксированные состояния для сравнимых скриншотов без ожидания таймеров. */

@@ -73,7 +73,7 @@
 #hud-phone .hp-glance-head button { min-width: 0; min-height: 0; width: 30px; height: 30px; padding: 1px; border-radius: 6px; }
 #hud-phone .hp-glance-head .hp-icon { width: 27px; height: 27px; border-radius: 7px; }
 #hud-phone .hp-glance-head .hp-icon i { transform: scale(.48); transform-origin: top left; left: 5px; top: 6px; }
-#hud-phone .hp-glance-map { position: relative; width: 100%; height: 205px; flex: none; overflow: hidden; border: 5px solid #d5d7d6; border-top: 4px solid #8f9dab; background: #e8eadc; box-shadow: inset 0 2px 5px #0005, 0 2px 2px #fff7; cursor: pointer; }
+#hud-phone .hp-glance-map { position: relative; width: 100%; height: 205px; flex: none; overflow: hidden; border: 5px solid #d5d7d6; border-top: 4px solid #8f9dab; background: #e9e4d6; box-shadow: inset 0 2px 5px #0005, 0 2px 2px #fff7; cursor: pointer; }
 #hud-phone .hp-glance-map-mock, #hud-phone .hp-glance-map-mock svg, #hud-phone .hp-radar-slot { position: absolute; inset: 0; width: 100%; height: 100%; }
 #hud-phone .hp-glance-map-label { position: absolute; z-index: 2; left: 7px; top: 7px; padding: 4px 8px; border: 1px solid #8798a9; border-radius: 5px; background: linear-gradient(#fff, #dce3ea); color: #324c6b; font-size: 11px; font-weight: 700; text-shadow: 0 1px #fff; box-shadow: 0 1px 3px #0005; pointer-events: none; }
 #hud-phone #radar { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; padding: 0; border: 0; border-radius: 0; box-shadow: none; background: none; cursor: pointer; }
@@ -103,13 +103,21 @@
 #hud-phone .hp-map-app { display: flex; flex-direction: column; }
 #hud-phone .hp-map-search { height: 32px; flex: none; margin: 7px 8px; padding: 4px 8px; border: 1px solid #8e98a3; border-radius: 5px; background: linear-gradient(#f5f6f7, #fff); box-shadow: inset 0 1px 3px #0003, 0 1px #fff; color: #7a8290; font-size: 18px; }
 #hud-phone .hp-map-search span { font-size: 13px; vertical-align: 2px; }
-#hud-phone .hp-map-body { position: relative; min-height: 0; flex: 1; overflow: hidden; border-top: 1px solid #a0a8a5; border-bottom: 1px solid #8896a5; background: #e8eadc; box-shadow: inset 0 2px 4px #0004; }
+#hud-phone .hp-map-body { position: relative; min-height: 0; flex: 1; overflow: hidden; border-top: 1px solid #a0a8a5; border-bottom: 1px solid #8896a5; background: #e9e4d6; box-shadow: inset 0 2px 4px #0004; }
 #hud-phone .hp-mock-map, #hud-phone .hp-mock-map svg, #hud-phone .hp-real-map { position: absolute; inset: 0; width: 100%; height: 100%; }
+#hud-phone .hp-mock-map svg { transition: transform .25s; }
+#hud-phone .hp-mock-map.hp-mock-zoomed svg { transform: scale(1.35); }
 #hud-phone.hp-real-map-open .hp-mock-map { display: none; }
+#hud-phone .hp-map-zoom { position: absolute; z-index: 3; right: 9px; top: 12px; display: flex; flex-direction: column; border: 1px solid #515458; border-radius: 4px; background: #252a2e; box-shadow: 0 2px 5px #0006; overflow: hidden; }
+#hud-phone .hp-map-zoom button { width: 31px; height: 31px; padding: 0; border: 0; border-bottom: 1px solid #080b0e; background: linear-gradient(#4f555a, #262b30); color: white; font: 23px/28px Arial, sans-serif; text-shadow: 0 -1px #000; cursor: pointer; }
+#hud-phone .hp-map-zoom button:last-child { border-bottom: 0; }
 #hud-phone .hp-map-chip { position: absolute; z-index: 2; left: 9px; bottom: 10px; border: 1px solid #7b91a7; border-radius: 5px; background: linear-gradient(#fff, #d6e1eb); padding: 5px 7px; font-size: 10px; font-weight: 700; color: #356184; box-shadow: 0 1px 4px #0005; pointer-events: none; }
 #hud-phone .hp-map-chip i { display: inline-block; width: 12px; }
-#hud-phone .hp-map-footer { height: 39px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border-top: 1px solid #fff; background: linear-gradient(#dadfe6, #a8b4c3); color: #45678e; font-size: 16px; text-shadow: 0 1px #fff; }
-#hud-phone .hp-map-footer b { font-size: 11px; color: #39495f; }
+#hud-phone .hp-map-footer { height: 48px; flex: none; display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid #5c6268; background: linear-gradient(#343b42, #11171c); box-shadow: inset 0 1px #ffffff24; }
+#hud-phone .hp-map-footer button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 2px 0; border: 0; border-right: 1px solid #ffffff14; background: none; color: #a8b0b7; font-size: 9px; text-shadow: 0 -1px #000; cursor: pointer; }
+#hud-phone .hp-map-footer button:last-child { border-right: 0; }
+#hud-phone .hp-map-footer button span { height: 21px; color: #d9dee3; font: bold 19px/21px Arial, sans-serif; }
+#hud-phone .hp-map-footer button.hp-selected { color: #fff; background: linear-gradient(#4b5966, #26313b); box-shadow: inset 0 1px #ffffff38; }
 #hud-phone .hp-courier-app { display: flex; flex-direction: column; background: repeating-linear-gradient(90deg, #dedfdc 0 2px, #e6e7e5 2px 4px); }
 #hud-phone .hp-courier-scroll { flex: 1; min-height: 0; overflow: auto; padding: 10px 9px; scrollbar-width: none; }
 #hud-phone .hp-courier-scroll::-webkit-scrollbar { display: none; }
@@ -154,7 +162,7 @@ body.hud-phone-active #chat { display: none !important; }
 #hud-phone #fullmap .fm-box { width: 100%; height: 100%; gap: 0; padding: 0; border: 0; border-radius: 0; background: none; color: inherit; box-shadow: none; animation: none; }
 #hud-phone #fullmap .fm-box::before, #hud-phone #fullmap .fm-box::after { display: none; }
 #hud-phone #fullmap .fm-top, #hud-phone #fullmap .fm-leg { display: none; }
-#hud-phone #fullmap .fm-view { border: 0; border-radius: 0; background: #e8eadc; }
+#hud-phone #fullmap .fm-view { border: 0; border-radius: 0; background: #e9e4d6; }
 #hud-phone #fullmap .fm-view::before, #hud-phone #fullmap .fm-view::after { display: none; }
 @media (max-height: 690px) { #hud-phone.hp-expanded .hp-device { top: calc(100% - 307px); transform: translate(-50%, -50%) scale(.87) rotate(0deg); } }
 @media (prefers-reduced-motion: reduce) { #hud-phone .hp-device, #hud-phone .hp-banner, #hud-phone .hp-backdrop { transition-duration: .01ms; animation-duration: .01ms; } }

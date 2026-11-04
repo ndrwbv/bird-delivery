@@ -202,6 +202,7 @@ import * as HAV from './havoc.js';             // Толик считает ра
 import * as FAHEAD from './faceahead.js';       // портреты заранее: получатель заказа, Толик, герои катсцен (в спокойные кадры)
 import * as CHAT from './chat.js';             // «Толик управляющий» пишет справа сверху, как в iMessage (похвала, ругань, вычет за опоздание)
 import * as HUDFONE from './hudphone.js';       // телефон курьера: сообщения и карта как приложения в HUD
+import { PHONE_MAP, phoneBuildingColor } from './maptheme2gis.js';
 import * as CREWC from './crewcast.js';        // свои люди в каждой пиццерии: состав, характеры, машины с наклейками (crewcast.js)
 import * as CREWR from './crewrank.js';        // рейтинг смены: вспышка и стрелка «место N из M» на хаде, коллеги и Толик пишут в чат, кто кого обогнал (crewrank.js)
 import * as SC from './shiftcash.js';             // карьера: пачка купюр на хаде — заработок смены (shiftcash.js)
@@ -13737,13 +13738,14 @@ const RADAR_W = new Map();                       // толщина линии �
    (сотни вызовов холста в кадре). Цвета непрозрачные — картинка та же */
 function drawRadar () {
   const R = radarSize / 2, s = R / 135;
+  const phoneMap = HUDFONE.active();
   RADAR.t = performance.now(); RADAR.h = V.h; RADAR.x = V.x; RADAR.z = V.z; RADAR.draws++;
   if (RADAR.tf) { RADAR.tf = ''; radarC.style.transform = ''; }
   const RC = radarCan / 2;                          // центр холста
   rctx.clearRect(0, 0, radarCan, radarCan);
   rctx.save();
   // фон, вода и улицы — приглушённые: ярко на радаре только заказ — маршрут и пин адреса
-  rctx.fillStyle = '#b3c3a4'; rctx.fillRect(0, 0, radarCan, radarCan);
+  rctx.fillStyle = phoneMap ? PHONE_MAP.land : '#b3c3a4'; rctx.fillRect(0, 0, radarCan, radarCan);
   rctx.translate(RC, RC);
   const cs = Math.cos(V.h), sn = Math.sin(V.h);
   const tr = (wx, wz) => {
@@ -13751,7 +13753,7 @@ function drawRadar () {
     return [(dz * sn - dx * cs) * s, -(dx * sn + dz * cs) * s];
   };
   // Томь на радаре: без неё непонятно, где мост
-  rctx.fillStyle = '#93b2bf';
+  rctx.fillStyle = phoneMap ? PHONE_MAP.water : '#93b2bf';
   const st = RADAR_WST, half = st * s * 0.8;
   const qx = (wx, wz) => ((wz - V.z) * sn - (wx - V.x) * cs) * s, qy = (wx, wz) => -((wx - V.x) * sn + (wz - V.z) * cs) * s;
   rctx.beginPath();
@@ -13793,6 +13795,11 @@ function drawRadar () {
     rctx.lineWidth = W.lw;
     rctx.beginPath();
     for (let q = 0; q < L.length; q++) { const sg = RSEG[L[q]]; rctx.moveTo(qx(sg.x1, sg.z1), qy(sg.x1, sg.z1)); rctx.lineTo(qx(sg.x2, sg.z2), qy(sg.x2, sg.z2)); }
+    if (phoneMap) {
+      rctx.strokeStyle = PHONE_MAP.radarEdge; rctx.lineWidth = W.lw + 1.4; rctx.stroke();
+      rctx.strokeStyle = W.lw >= 8 ? PHONE_MAP.radarMajor : PHONE_MAP.radarRoad;
+      rctx.lineWidth = W.lw;
+    }
     rctx.stroke();
     L.length = 0;
   }
@@ -13937,6 +13944,7 @@ function buildFullMap () {
    подложки на экранный пиксель, тонкие линии и подписи — в экранных пикселях, не в метрах).
    x уже со своим масштабом в координатах подложки, B — видимая рамка [x0, y0, x1, y1]. */
 function paintBase (x, px, B) {
+  const phoneMap = !TOUCH;
   const vis = o => { const b = FM.bb.get(o); return !b || !(b[2] < B[0] || b[0] > B[2] || b[3] < B[1] || b[1] > B[3]); };
   const poly = (p, fill) => {
     x.beginPath();
@@ -13948,9 +13956,9 @@ function paintBase (x, px, B) {
     p.forEach((q, i) => (i ? x.lineTo(fmX(q[0]), fmZ(q[1])) : x.moveTo(fmX(q[0]), fmZ(q[1]))));
     x.lineWidth = w * FM.s; x.strokeStyle = col; x.lineCap = 'round'; x.lineJoin = 'round'; x.stroke();
   };
-  { const a = Math.max(0, B[0]), b = Math.max(0, B[1]); x.fillStyle = '#a6d189'; x.fillRect(a, b, Math.min(FM.bw, B[2]) - a, Math.min(FM.bh, B[3]) - b); }
+  { const a = Math.max(0, B[0]), b = Math.max(0, B[1]); x.fillStyle = phoneMap ? PHONE_MAP.land : '#a6d189'; x.fillRect(a, b, Math.min(FM.bw, B[2]) - a, Math.min(FM.bh, B[3]) - b); }
   // река — по урезу рельефа, клетками сетки высот (только клетки в рамке)
-  x.fillStyle = '#6fb0c9';
+  x.fillStyle = phoneMap ? PHONE_MAP.water : '#6fb0c9';
   const wx = v => v / FM.s - FM.pad + BOUNDS.x0, wz = v => v / FM.s - FM.pad + BOUNDS.z0;
   const i0 = Math.max(0, Math.floor((wx(B[0]) - TX0) / TG)), i1 = Math.min(TNX - 1, Math.ceil((wx(B[2]) - TX0) / TG) + 1);
   const j0 = Math.max(0, Math.floor((wz(B[1]) - TZ0) / TG)), j1 = Math.min(TNZ - 1, Math.ceil((wz(B[3]) - TZ0) / TG) + 1);
@@ -13959,12 +13967,12 @@ function paintBase (x, px, B) {
       if (TH[j * TNX + i] >= 0) continue;
       x.fillRect(fmX(TX0 + i * TG - TG / 2), fmZ(TZ0 + j * TG - TG / 2), TG * FM.s + px, TG * FM.s + px);
     }
-  for (const l of CITY.lots) if (vis(l)) poly(l.p, l.k === 'park' ? '#a6abb3' : '#c6c5b8');
-  for (const g of CITY.green) if (vis(g)) poly(g.p, FOREST.isForest(g) ? '#5f8a4c' : GREEN_HEX[g.k] || '#95c579');   // лес на карте темнее
-  for (const q of CITY.paths) if (vis(q)) line(q, 1.6, '#ddd5c6');
-  for (const r of CITY.roads) if (vis(r)) line(r.p, SIDEWALK(r), '#e3ded4');
-  for (const r of CITY.roads) if (vis(r)) line(r.p, roadWidth(r), r.b ? '#8c8680' : ROAD_HEX[r.c]);
-  x.fillStyle = '#f2efe6';
+  for (const l of CITY.lots) if (vis(l)) poly(l.p, phoneMap ? (l.k === 'park' ? PHONE_MAP.parkLot : PHONE_MAP.lot) : (l.k === 'park' ? '#a6abb3' : '#c6c5b8'));
+  for (const g of CITY.green) if (vis(g)) poly(g.p, phoneMap ? (FOREST.isForest(g) ? PHONE_MAP.forest : g.k === 'play' ? PHONE_MAP.playground : PHONE_MAP.green) : (FOREST.isForest(g) ? '#5f8a4c' : GREEN_HEX[g.k] || '#95c579'));
+  for (const q of CITY.paths) if (vis(q)) line(q, 1.6, phoneMap ? PHONE_MAP.path : '#ddd5c6');
+  for (const r of CITY.roads) if (vis(r)) line(r.p, SIDEWALK(r), phoneMap ? PHONE_MAP.sidewalk : '#e3ded4');
+  for (const r of CITY.roads) if (vis(r)) line(r.p, roadWidth(r), phoneMap ? (r.b ? PHONE_MAP.bridge : PHONE_MAP.road[r.c]) : (r.b ? '#8c8680' : ROAD_HEX[r.c]));
+  x.fillStyle = phoneMap ? PHONE_MAP.crossing : '#f2efe6';
   for (const zb of ZEBRAS) {
     const zx = fmX(zb.x), zz = fmZ(zb.z), m = 12 * FM.s;
     if (zx < B[0] - m || zx > B[2] + m || zz < B[1] - m || zz > B[3] + m) continue;
@@ -13974,8 +13982,8 @@ function paintBase (x, px, B) {
   }
   for (const b of CITY.buildings) {
     if (!vis(b)) continue;
-    poly(b.p, KIND_WALL[b.k] || '#e7b9a6');
-    x.lineWidth = px; x.strokeStyle = 'rgba(80, 50, 60, 0.55)'; x.stroke();
+    poly(b.p, phoneMap ? phoneBuildingColor(b.k) : KIND_WALL[b.k] || '#e7b9a6');
+    x.lineWidth = px; x.strokeStyle = phoneMap ? PHONE_MAP.buildingEdge : 'rgba(80, 50, 60, 0.55)'; x.stroke();
   }
   // подписи улиц: на целом городе — в метрах (мелкий город), при зуме — экранного размера,
   // но только когда кварталы уже различимы
@@ -13986,8 +13994,8 @@ function paintBase (x, px, B) {
       const hw = n.t.length * fs * 0.4;
       if (n.x + hw < B[0] || n.x - hw > B[2] || n.y + hw < B[1] || n.y - hw > B[3]) continue;
       x.save(); x.translate(n.x, n.y); x.rotate(n.ang);
-      x.lineWidth = fs / 3; x.strokeStyle = 'rgba(255,255,255,0.8)'; x.strokeText(n.t, 0, 0);
-      x.fillStyle = '#3a3345'; x.fillText(n.t, 0, 0);
+      x.lineWidth = fs / 3; x.strokeStyle = phoneMap ? PHONE_MAP.streetHalo : 'rgba(255,255,255,0.8)'; x.strokeText(n.t, 0, 0);
+      x.fillStyle = phoneMap ? PHONE_MAP.street : '#3a3345'; x.fillText(n.t, 0, 0);
       x.restore();
     }
   }
@@ -17402,7 +17410,7 @@ CREWR.init({ adult: ADULT, money, face: faceDataURL });   // money — сумм�
 CREWC.init({ THREE, ADULT, makePerson, faceDataURL, put, mergeGeos, spec: m => CAR_SPEC[m] || CAR_SPEC.sedan, districtId: i => (DIST.list()[i] || {}).id });
 CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x1a1a5e, fem: true }), face: (p, size) => faceDataURL(p, size), blip: (f, d, ty, v) => Snd.blip(f, d, ty, v), fx: (n, synth) => Snd.fx(n, synth),
   speed: () => Math.hypot(V.vx || 0, V.vz || 0) });   // телефон: едешь — прочитанные сообщения чата прозрачнее (chat.js PH)
-HUDFONE.init({ mapElement: elFull, radarElement: elRadarBox, onRadarMove: sizeRadar, closeMap: on => setFullMap(!!on) });
+HUDFONE.init({ mapElement: elFull, radarElement: elRadarBox, onRadarMove: sizeRadar, closeMap: on => setFullMap(!!on), onMapZoom: k => fmZoom(k) });
 CHAT.bindPhone(HUDFONE);
 /* заказы карьеры (orders.js): очередь, поручения, развоз смены — через это */
 if (CAREER) ORD.init({ S, V, CITY, MAP, THREE, Store, ADULT, SPOTS, LIFE, Snd, get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get DAY_LEN () { return DAY_LEN; }, lang: curLang,
