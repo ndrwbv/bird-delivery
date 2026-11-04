@@ -2,7 +2,7 @@
 
 [← план](../IDEAS.md)
 
-**Статус:** [тройка лидеров и единый вид чата №8-6](../IDEAS-ARCHIVE.md#ui-phone-leaders), [уютный телефон №8-5](../IDEAS-ARCHIVE.md#ui-phone-cozy), [компоновка HUD №8-4](../IDEAS-ARCHIVE.md#ui-phone-layout) и [карта №8-3](../IDEAS-ARCHIVE.md#ui-phone-2gis) готовы.
+**Статус:** [деньги и чаевые летят в телефон №8-7](../IDEAS-ARCHIVE.md#ui-phone-payout), [тройка лидеров №8-6](../IDEAS-ARCHIVE.md#ui-phone-leaders) и прежние шаги телефона готовы.
 
 <details><summary><b>Решения</b> (что уже решено и почему)</summary>
 
@@ -18,6 +18,7 @@
 чинит интерфейс и готовит выпуск в Стиме.
 
 ## Трек 8. Интерфейс и бренд
+
 
 
 
