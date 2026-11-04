@@ -94,9 +94,10 @@ const ST = { leadT: -1e9, adult: false, clock: 0, last: -1e9, next: 0, above: nu
   money: n => Math.round(n || 0) + ' ₽', face: null };
 // st: idle → wait (вручил) → show → close → idle; snap — порядок строк на прошлой таблице (стрелки — от него)
 const SH = { st: 'idle', t: 0, hold: 0, go: false, again: false, snap: null, el: null };
+let PHONE = null;
 export const DEBUG = { log: [], moves: [], sheets: [], L, RANK, SHEET, ST, SH };
 
-export function init ({ adult, money, face } = {}) { ST.adult = !!adult; if (money) ST.money = money; if (face) ST.face = face; }
+export function init ({ adult, money, face, phone } = {}) { ST.adult = !!adult; if (money) ST.money = money; if (face) ST.face = face; PHONE = phone || null; }
 
 /** новая смена: всё с нуля */
 export function reset () {
@@ -210,6 +211,7 @@ export function update (el, rows, live) {
   if (top && ST.lead && top.R !== ST.lead && me > 0 && top.d > 0 && !ST.ev && ST.clock - ST.leadT > RANK.LEAD && top.R.name !== ST.lead.name) ST.ev = { kind: 'lead', who: top, loser: ST.lead, at: ST.clock };
   ST.lead = top ? top.R : null;
   ST.above = above; ST.place = me + 1; ST.n = n;
+  PHONE?.rank({ place: me + 1, total: n });
 
   if (!live || n < 2 || ST.clock < RANK.GRACE || ST.clock - ST.last < (CHAT.phone() ? RANK.GAP_PH : RANK.GAP) || CHAT.busy()) return;
   const ev = ST.ev;
@@ -249,6 +251,14 @@ function face (r) {
 
 function sheetOpen (rows, anchor, hold) {
   const n = rows.length, me = rows.findIndex(r => r.me);
+  if (PHONE && PHONE.active() && PHONE.showRating({ rows: rows.map(r => ({ n: r.n, d: r.d, me: r.me, money: ST.money(r.m) })), money: ST.money(rows[me].m) }, false)) {
+    SH.phone = false; SH.st = 'idle'; SH.t = 0;
+    SH.snap = rows.map(rowKey);
+    NQ.release('rank');
+    DEBUG.sheets.push({ t: Math.round(ST.clock), place: me + 1, n, rows: n, hold: 0, phone: true });
+    return;
+  }
+  SH.phone = false;
   const prev = new Map((SH.snap || []).map((k, i) => [k, i]));
   const cap = Math.min(n, CHAT.phone() ? SHEET.ROWS_PH : SHEET.ROWS);
   const lo = Math.max(0, Math.min(me - (cap >> 1), n - cap)), hi = lo + cap - 1;
@@ -290,11 +300,13 @@ function sheetOpen (rows, anchor, hold) {
 
 function sheetClose () {
   SH.st = 'close'; SH.t = 0;
+  if (SH.phone) { sheetHide(); return; }
   if (!SH.el || SH.el.classList.contains('rk-calm')) { sheetHide(); return; }
   SH.el.classList.remove('rk-open'); void SH.el.offsetWidth; SH.el.classList.add('rk-close');
 }
 
 function sheetHide () {
+  if (SH.phone) { PHONE?.hideRating(); SH.phone = false; }
   if (SH.el) { SH.el.hidden = true; SH.el.className = ''; SH.el.innerHTML = ''; }
   NQ.release('rank');                                // экран свободен — следующее уведомление (notifyq.js)
   if (SH.st === 'show' || SH.st === 'close') { SH.st = SH.again ? 'wait' : 'idle'; SH.t = 0; SH.again = false; }
@@ -318,7 +330,7 @@ export function sheet (dt, on, free, clash, rowsFn, anchor) {
     return;
   }
   if (SH.st === 'show') {
-    if (!SH.go && SH.t >= SHEET.OPEN) { SH.go = true; SH.el.classList.add('rk-go'); }   // развернулась — строки поехали
+    if (!SH.go && SH.t >= SHEET.OPEN) { SH.go = true; if (SH.el) SH.el.classList.add('rk-go'); }   // развернулась — строки поехали
     if (!NQ.claim('rank')) { hide(); return; }       // срочное уведомление сразу освобождает экран
     if (SH.t >= SH.hold) sheetClose();
   } else if (SH.st === 'close') { NQ.claim('rank'); if (SH.t >= SHEET.CLOSE) sheetHide(); }

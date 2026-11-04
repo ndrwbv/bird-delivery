@@ -77,7 +77,7 @@ const ADULT_LINES = {
 };
 const KIDS_LINES = ADULT_LINES;
 
-const C = { el: null, face: null, person: null, adult: false, blip: null, fx: null, speed: null, items: [], last: {}, wait: 0, pl: 0, ph: false, bot: 0 };
+const C = { el: null, face: null, person: null, adult: false, blip: null, fx: null, speed: null, hud: null, items: [], last: {}, wait: 0, pl: 0, ph: false, bot: 0 };
 const PEND = new Set();                                  // отложенные сообщения (later)
 const ANGRY = new Set(['late', 'bump', 'kill', 'urgent', 'back']);
 
@@ -85,6 +85,7 @@ const ANGRY = new Set(['late', 'bump', 'kill', 'urgent', 'back']);
 export function init ({ face, person, adult, blip, fx, speed }) {
   C.face = face; C.person = person; C.adult = !!adult; C.blip = blip || null; C.fx = fx || null; C.speed = speed || null;
 }
+export function bindPhone (hud) { C.hud = hud; }
 /* телефон: касания и низкий (боком) или узкий экран. Дека, компьютер, планшет боком — как было */
 export const phone = () => document.body.classList.contains('touch') && (innerHeight <= 500 || innerWidth <= 900);
 
@@ -312,12 +313,13 @@ function sayNow (text, onShow, angry, who) {
     place();                                              // текст пришёл — влезает ли по высоте (fit), до «крупно»
     m.said = true;
     shown(m);
+    if (C.hud && C.hud.active()) C.hud.receive({ name: nm0, role, text, avatar: img ? img.src : '' });
     ding(angry);
     if (img) TF.talk(img, TF.talkTime(text));
-    const big = !m.calm && grow(m) ? bigHold(text) : 0;
+    const big = !m.calm && !(C.hud && C.hud.active()) && grow(m) ? bigHold(text) : 0;
     if (big) m.t3 = setTimeout(() => shrink(m), big * 1000);
     m.t2 = setTimeout(() => drop(m), (big + hold(text)) * 1000);
-  }, TYPE_S * 1000);
+  }, C.hud && C.hud.active() ? 0 : TYPE_S * 1000);
   return m;
 }
 
