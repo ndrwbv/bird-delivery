@@ -6,16 +6,17 @@ export const WINTER_ROAD = {
   CELL: 32,
   SAND_MAIN: 0.5,             // доля посыпанных улиц классов 0–3
   SAND_LOCAL: 0.3,            // классы 4–5 посыпают реже
-  SOFT_ACC: 0.78,             // потеря тяги в рыхлом снегу
-  SOFT_DRAG: 2.0,             // сопротивление качению, 1/с
-  SOFT_SIDE: 0.55,            // потеря бокового сцепления
-  WHEEL_SPIN: 5.0,            // добавочная видимая прокрутка колеса, м/с
+  SOFT_ACC: 0.3,              // рыхлый снег ощущается, но не останавливает машину
+  SOFT_DRAG: 0.25,            // лёгкое сопротивление качению, 1/с
+  SOFT_SIDE: 0.22,            // небольшая потеря бокового сцепления
+  WHEEL_SPIN: 3.0,            // добавочная видимая прокрутка колеса, м/с
 };
 
-export const ST = { snow: 0, sand: 0, tracks: 0, soft: 0, edges: 0, sprays: 0, exampleSoft: null, exampleSand: null, exampleRut: null };
+export const ST = { snow: 0, sand: 0, tracks: 0, soft: 0, edges: 0, crossings: 0, sprays: 0, exampleSoft: null, exampleSand: null, exampleRut: null, exampleJunction: null };
 const GRID = new Map();
 const SAND_GRID = new Map();
 const RUT_GRID = new Map();
+const SPOTS = { soft: [], sand: [], rut: [], junction: [] };
 let sprayT = 0, spraySide = 1;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -27,9 +28,27 @@ function hash (x, z, salt = 0) {
 const key = (i, j) => i + ',' + j;
 const laneCount = w => w >= 18 ? 4 : w >= 12.5 ? 3 : w >= 8.5 ? 2 : 1;
 const laneCenter = (lane, count, w) => (lane + 0.5 - count / 2) * w / count;
+const rutFade = (progress, total, fade, breaks) => {
+  let factor = fade ? clamp(Math.min(progress, total - progress) / fade, 0, 1) : 1;
+  for (const b of breaks) factor = Math.min(factor, clamp((Math.abs(progress - b.at) - b.core) / b.ramp, 0, 1));
+  return factor;
+};
 
-function rutSegment (cx, cz, ux, uz, length, width, count, depth, along, total, fade) {
-  const p = { cx, cz, ux, uz, hl: length / 2, hw: width / 2, count, depth, along, total, fade };
+/* Явный dev-стенд выбирает место рядом с пиццерией. Голый ?winterspot
+   оставляет обычный старт смены. */
+export function nearestSpot (kind, x, z, maxDistance = 450) {
+  const list = SPOTS[kind];
+  if (!list) return null;
+  let best = null, dist = maxDistance * maxDistance;
+  for (const p of list) {
+    const d = (p.x - x) ** 2 + (p.z - z) ** 2;
+    if (d < dist) { best = p; dist = d; }
+  }
+  return best;
+}
+
+function rutSegment (cx, cz, ux, uz, length, width, count, depth, along, total, fade, breaks) {
+  const p = { cx, cz, ux, uz, hl: length / 2, hw: width / 2, count, depth, along, total, fade, breaks };
   const nx = -uz, nz = ux;
   const rx = Math.abs(ux) * p.hl + Math.abs(nx) * p.hw, rz = Math.abs(uz) * p.hl + Math.abs(nz) * p.hw;
   for (let i = Math.floor((cx - rx) / WINTER_ROAD.CELL); i <= Math.floor((cx + rx) / WINTER_ROAD.CELL); i++)
@@ -58,7 +77,7 @@ export function rutAt (x, z, h, snow) {
     const center = laneCenter(lane, p.count, p.hw * 2);
     const inside = clamp((0.55 - Math.abs(off - center)) / 0.35, 0, 1);
     const progress = p.along + d + p.hl;
-    const fade = p.fade ? clamp(Math.min(progress, p.total - progress) / p.fade, 0, 1) : 1;
+    const fade = rutFade(progress, p.total, p.fade, p.breaks);
     best = Math.max(best, inside * fade * p.depth * align);
   }
   return best * clamp((snow - 0.45) / 0.35, 0, 1);
@@ -110,7 +129,11 @@ function softPatch (cx, cz, ux, uz, length, offset, width, strength) {
       if (list) list.push(p); else GRID.set(k, [p]);
     }
   ST.soft++;
-  if (!ST.exampleSoft && strength > 0.8) ST.exampleSoft = { x: cx - uz * offset, z: cz + ux * offset, h: Math.atan2(ux, uz) };
+  if (strength > 0.8) {
+    const spot = { x: cx - uz * offset, z: cz + ux * offset, h: Math.atan2(ux, uz) };
+    SPOTS.soft.push(spot);
+    if (!ST.exampleSoft) ST.exampleSoft = spot;
+  }
 }
 
 /* 0…1: рыхлый снег под машиной. Только видимые снежные пятна; песок не вязкий. */
@@ -156,7 +179,15 @@ export function spray (V, gas, soft, dt, emit) {
 
 /* Поперечный профиль: две (или четыре) настоящие борозды с поднятым снегом
    по бокам. Основание под ними остаётся, но дно борозды лежит выше него. */
-function ruts (M, x, z, ux, uz, len, w, surfaceY, count, depth, along, total, fade) {
+function fadedSnowColor (hex, factor) {
+  if (factor >= 0.995) return hex;
+  if (factor <= 0.005) return '#dce2e3';
+  const n = parseInt(hex.slice(1), 16), b = [0xdc, 0xe2, 0xe3];
+  const rgb = b.map((base, i) => Math.round(base + (((n >> (16 - i * 8)) & 255) - base) * factor));
+  return '#' + rgb.map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+function ruts (M, x, z, ux, uz, len, w, surfaceY, count, depth, along, total, fade, breaks = []) {
   const nx = -uz, nz = ux, step = Math.min(0.78, w / (count * 2.6));
   const outer = Math.min(0.48, step * 0.63), inner = outer * 0.45;
   const ridge = 0.13 + depth * 0.8, floor = Math.max(0.08, 0.13 - depth * 0.4);
@@ -177,7 +208,7 @@ function ruts (M, x, z, ux, uz, len, w, surfaceY, count, depth, along, total, fa
   sections.push([len]);
   for (const sec of sections) {
     const d = sec[0], progress = along + d;
-    sec.push(fade ? clamp(Math.min(progress, total - progress) / fade, 0, 1) : 1,
+    sec.push(rutFade(progress, total, fade, breaks),
       (hash(x + ux * d, z + uz * d, 161) - 0.5) * 0.13,
       0.92 + hash(x + ux * d, z + uz * d, 162) * 0.16);
   }
@@ -187,9 +218,11 @@ function ruts (M, x, z, ux, uz, len, w, surfaceY, count, depth, along, total, fa
     return [px, surfaceY(px, pz, d) + 0.075 + (node.h - 0.075) * f * rise, pz];
   };
   for (let j = 1; j < sections.length; j++) for (let i = 1; i < nodes.length; i++) {
+    const strength = (sections[j - 1][1] + sections[j][1]) / 2;
+    if (strength < 0.005) continue;
     const a = point(sections[j - 1], nodes[i - 1]), b = point(sections[j], nodes[i - 1]);
     const c = point(sections[j], nodes[i]), d = point(sections[j - 1], nodes[i]);
-    M.color(colors[i - 1]);
+    M.color(fadedSnowColor(colors[i - 1], strength));
     M.tri(...a, ...b, ...c); M.tri(...a, ...c, ...d);
   }
 }
@@ -228,8 +261,30 @@ export function build ({ M, roads, roadWidth, yOf, groundH, junction }) {
   GRID.clear();
   SAND_GRID.clear();
   RUT_GRID.clear();
-  ST.snow = ST.sand = ST.tracks = ST.soft = ST.edges = ST.sprays = 0;
-  ST.exampleSoft = ST.exampleSand = ST.exampleRut = null;
+  for (const list of Object.values(SPOTS)) list.length = 0;
+  ST.snow = ST.sand = ST.tracks = ST.soft = ST.edges = ST.crossings = ST.sprays = 0;
+  ST.exampleSoft = ST.exampleSand = ST.exampleRut = ST.exampleJunction = null;
+  // На перекрёстке остаётся колея более важной улицы. Если продолжение
+  // той же оси записано отдельной дорогой, оно тоже проходит насквозь.
+  const junctionAxes = new Map();
+  for (const road of roads) {
+    if (road.x || road.b || road.c === 6 || road.c > 7) continue;
+    const pts = road.p, w = roadWidth(road);
+    if (w < 3 || pts.length < 2) continue;
+    const total = pts.slice(1).reduce((sum, p, i) => sum + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      if (!junction(p[0], p[1])) continue;
+      for (const j of [i - 1, i + 1]) {
+        if (j < 0 || j >= pts.length) continue;
+        const dx = pts[j][0] - p[0], dz = pts[j][1] - p[1], len = Math.hypot(dx, dz);
+        if (len < 0.01) continue;
+        const k = key(p[0], p[1]), score = (8 - road.c) * 100000 + w * 100 + Math.min(total, 10000) * 0.01;
+        if (!junctionAxes.has(k) || score > junctionAxes.get(k).score)
+          junctionAxes.set(k, { road, ux: dx / len, uz: dz / len, w, score });
+      }
+    }
+  }
   const coveredJunctions = new Map();
   const segments = [];
   for (const road of roads) {
@@ -242,6 +297,30 @@ export function build ({ M, roads, roadWidth, yOf, groundH, junction }) {
     const total = pts.slice(1).reduce((sum, p, i) => sum + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
     const count = laneCount(w), depth = road.c <= 1 ? 0.035 : road.c === 2 ? 0.05 : road.c === 3 ? 0.075 : road.c === 4 ? 0.105 : 0.145;
     const fade = (road.c === 7 || (road.c >= 5 && total < 55)) ? Math.min(9, total / 3) : 0;
+    const breaks = [];
+    let progress = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i], main = junctionAxes.get(key(p[0], p[1]));
+      if (main && main.road !== road) {
+        let alignment = 0;
+        for (const j of [i - 1, i + 1]) {
+          if (j < 0 || j >= pts.length) continue;
+          const dx = pts[j][0] - p[0], dz = pts[j][1] - p[1], len = Math.hypot(dx, dz);
+          if (len > 0.01) alignment = Math.max(alignment, Math.abs((dx * main.ux + dz * main.uz) / len));
+        }
+        if (alignment < 0.9) {
+          const core = Math.min(24, (main.w / 2 + 1) / Math.max(0.4, Math.sqrt(1 - alignment * alignment)));
+          breaks.push({ at: progress, core, ramp: 8 });
+          ST.crossings++;
+          const offset = laneCenter(0, laneCount(main.w), main.w);
+          const spot = { x: p[0] - main.ux * 18 - main.uz * offset,
+            z: p[1] - main.uz * 18 + main.ux * offset, h: Math.atan2(main.ux, main.uz) };
+          SPOTS.junction.push(spot);
+          if (!ST.exampleJunction) ST.exampleJunction = spot;
+        }
+      }
+      if (i + 1 < pts.length) progress += Math.hypot(pts[i + 1][0] - p[0], pts[i + 1][1] - p[1]);
+    }
     // На большой карте миллиметры разницы глубины исчезают. Снег выше полотна,
     // а каждый видимый слой выше предыдущего на сантиметры.
     const y = yOf(road) + 0.06;
@@ -275,20 +354,27 @@ export function build ({ M, roads, roadWidth, yOf, groundH, junction }) {
         return true;
       };
       coverJunction(a); coverJunction(b);
-      segments.push({ a, b, ux, uz, len, w, surfaceY, sand, road, count, depth, fade, total, along });
+      segments.push({ a, b, ux, uz, len, w, surfaceY, sand, road, count, depth, fade, breaks, total, along });
       along += len;
     }
   }
-  for (const { a, b, ux, uz, len, w, surfaceY, sand, road, count, depth, fade, total, along } of segments) {
-      ruts(M, a[0], a[1], ux, uz, len, w, surfaceY, count, depth, along, total, fade);
+  for (const { a, b, ux, uz, len, w, surfaceY, sand, road, count, depth, fade, breaks, total, along } of segments) {
+      ruts(M, a[0], a[1], ux, uz, len, w, surfaceY, count, depth, along, total, fade, breaks);
       rutSegment((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, ux, uz, len, w, count,
-        clamp(depth / 0.145, 0, 1), along, total, fade);
-      if (!ST.exampleRut && road.c >= 4 && len > 22 && along > 8 && total - along - len > 8)
-        ST.exampleRut = { x: (a[0] + b[0]) / 2 - uz * laneCenter(0, count, w),
+        clamp(depth / 0.145, 0, 1), along, total, fade, breaks);
+      if (road.c >= 4 && len > 22 && along > 8 && total - along - len > 8) {
+        const spot = { x: (a[0] + b[0]) / 2 - uz * laneCenter(0, count, w),
           z: (a[1] + b[1]) / 2 + ux * laneCenter(0, count, w), h: Math.atan2(ux, uz) };
+        SPOTS.rut.push(spot);
+        if (!ST.exampleRut) ST.exampleRut = spot;
+      }
       if (sand) {
         sandSection((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, ux, uz, len, w - 0.5, along, total);
-        if (!ST.exampleSand && len > 20) ST.exampleSand = { x: (a[0] + b[0]) / 2, z: (a[1] + b[1]) / 2, h: Math.atan2(ux, uz) };
+        if (len > 20) {
+          const spot = { x: (a[0] + b[0]) / 2, z: (a[1] + b[1]) / 2, h: Math.atan2(ux, uz) };
+          SPOTS.sand.push(spot);
+          if (!ST.exampleSand) ST.exampleSand = spot;
+        }
         ST.sand++;
       }
       // Сгребённая к бордюру снежная кромка: кусками, чтобы она не была ровной линией.

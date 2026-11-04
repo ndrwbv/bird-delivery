@@ -39,8 +39,8 @@ npm run probe -- --js="await onShift(); autopilot(); await run(10); return d.S.d
 npm run probe -- --eval=my-check.js --size=phone --errors
 ```
 
-Для зимней дороги в локальном браузере: `?season=2.5&mute&winterdebug&winterspot` —
-смена начинается на рыхлом участке; `winterspot=sand` — на посыпанном, `winterspot=rut` — внутри колеи тихой улицы. `document.documentElement.dataset.winterRoad` показывает
+Для зимней дороги в локальном браузере: `?season=2.5&mute&winterspot` сохраняет обычный старт смены у пиццерии.
+Явный `winterspot=soft` начинает смену на ближайшем к пиццерии рыхлом участке (не дальше 450 м); `winterspot=sand` — на посыпанном, `winterspot=rut` — внутри колеи тихой улицы, `winterspot=junction` — перед перекрёстком. `?winterdebug` и `document.documentElement.dataset.winterRoad` показывают
 число участков, рыхлый снег (`underCar`), песок (`sandUnderCar`) и сцепление внутри колеи (`rutUnderCar`) под машиной, выбросы снега (`sprays`).
 Оба отладочных флага работают только в dev. Для обычного вида убрать `winterdebug&winterspot`.
 

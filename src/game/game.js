@@ -17276,10 +17276,12 @@ addEventListener('contextmenu', e => { if (e.target && e.target.closest && e.tar
 /* смена начинается у пиццерии, на ближайшей проезжей части */
 function startPose () {
   V.kickW = 0;                                      // увод от удара (carbump.js) — не тащим в новую смену
-  // Локальный зимний стенд: сразу на рыхлый участок, колею или посыпанный снег.
+  // Только явный локальный стенд переносит машину; голый ?winterspot
+  // сохраняет обычное начало смены у пиццерии.
   const winterSpot = import.meta.env.DEV ? new URLSearchParams(location.search).get('winterspot') : null;
-  const winterPose = winterSpot === 'sand' ? WINROAD.ST.exampleSand : winterSpot === 'rut' ? WINROAD.ST.exampleRut : WINROAD.ST.exampleSoft;
-  if (winterSpot !== null && winterPose) {
+  const winterOrigin = COURIER_SLOTS?.[0] || PIZZA;
+  const winterPose = winterOrigin && WINROAD.nearestSpot(winterSpot, winterOrigin.x, winterOrigin.z);
+  if (winterPose) {
     const p = winterPose;
     V.x = p.x; V.z = p.z; V.h = p.h; V.vx = V.vz = 0; V.y = surfaceAt(V.x, V.z); V.hero = 0;
     return;
