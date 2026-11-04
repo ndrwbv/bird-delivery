@@ -211,6 +211,7 @@ export function update (el, rows, live) {
   if (top && ST.lead && top.R !== ST.lead && me > 0 && top.d > 0 && !ST.ev && ST.clock - ST.leadT > RANK.LEAD && top.R.name !== ST.lead.name) ST.ev = { kind: 'lead', who: top, loser: ST.lead, at: ST.clock };
   ST.lead = top ? top.R : null;
   ST.above = above; ST.place = me + 1; ST.n = n;
+  PHONE?.rank({ place: me + 1, total: n });
 
   if (!live || n < 2 || ST.clock < RANK.GRACE || ST.clock - ST.last < (CHAT.phone() ? RANK.GAP_PH : RANK.GAP) || CHAT.busy()) return;
   const ev = ST.ev;
@@ -250,10 +251,11 @@ function face (r) {
 
 function sheetOpen (rows, anchor, hold) {
   const n = rows.length, me = rows.findIndex(r => r.me);
-  if (PHONE && PHONE.active() && PHONE.showRating({ rows: rows.map(r => ({ n: r.n, d: r.d, me: r.me, money: ST.money(r.m) })), money: ST.money(rows[me].m) })) {
-    SH.phone = true; SH.st = 'show'; SH.t = 0; SH.hold = Math.max(hold, 6.5); SH.go = true;
+  if (PHONE && PHONE.active() && PHONE.showRating({ rows: rows.map(r => ({ n: r.n, d: r.d, me: r.me, money: ST.money(r.m) })), money: ST.money(rows[me].m) }, false)) {
+    SH.phone = false; SH.st = 'idle'; SH.t = 0;
     SH.snap = rows.map(rowKey);
-    DEBUG.sheets.push({ t: Math.round(ST.clock), place: me + 1, n, rows: n, hold: SH.hold, phone: true });
+    NQ.release('rank');
+    DEBUG.sheets.push({ t: Math.round(ST.clock), place: me + 1, n, rows: n, hold: 0, phone: true });
     return;
   }
   SH.phone = false;

@@ -86,6 +86,7 @@ export async function boot ({ adult, lang }) {
     CHAT.clear();
     HUDFONE.reset(); HUDFONE.setVisible(false);
     HUDMAP.hideDemo();
+    HUDMAP.hidePayment();
     const ov = $('over'); if (ov) ov.hidden = true;
     const pay = $('cr-payout'); if (pay) pay.remove();
     for (const id of ['cr-spend', 'payfx', 'choice', 'wasted', 'ul-mg']) { const e = $(id); if (e) { e.hidden = true; e.classList.remove('on', 'fly'); } }

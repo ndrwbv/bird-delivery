@@ -14872,6 +14872,11 @@ function payShow (total, rows, title, face, done, touch) {
   P.sum.textContent = (total >= 0 ? '+' : '−') + money(Math.abs(total));
   P.sum.classList.toggle('late', rows.some(r => r[2] === 'neg'));
   P.chk.innerHTML = rows.map(r => '<p class="' + (r[2] || '') + '"><span>' + r[0] + '</span><b>' + (r[1] < 0 ? '−' : '') + money(Math.abs(r[1])) + '</b></p>').join('');
+  if (HUDFONE.active() && total > 0) {
+    HUDMAP.payment({ name: face?.person ? NICK.label(face.person, $t('клиент')) : $t('клиент'),
+      avatar: face?.person ? NICK.avatar(face.person, 64, face.mood) : '', amount: money(total), money: money(S.money) });
+    HUDFONE.paid({ amount: money(total), money: money(S.money) });
+  }
   Snd.coin();
   PAYVIS.show({ el: P.el, bits: P.bits, target: () => CAREER ? SC.DEBUG.el : elMoney,
     ready: () => NQ.DEBUG.phase() === 'ride' && NQ.showing() === 'pay', done, touch });
@@ -15372,11 +15377,11 @@ function showOrderCard (order) {
   const ik = inputKind();
   const recipient = order.stops[0] && order.stops[0].persons && order.stops[0].persons[0];
   const routeOverview = { route: routePts, roads: RSEG, origin: [V.x, V.z], target: S.target && [S.target.x, S.target.z] };
-  if (HUDFONE.active()) HUDMAP.routePreview($('radar'), routeOverview);
-  HUDFONE.showOrder({ number: S.orders, html: elPhList.innerHTML,
+  const phoneOrder = HUDFONE.showOrder({ number: S.orders, html: elPhList.innerHTML,
     name: recipient ? NICK.label(recipient, $t('клиент')) : $t('клиент'), avatar: recipient ? NICK.avatar(recipient) : '',
     many: order.stops.length > 1, routeOverview,
     driveKey: ik.kind === 'pad' ? (ik.family === 'ps' ? 'R2' : 'RT') : 'W' });
+  if (phoneOrder) HUDMAP.routePreview($('radar'), routeOverview);
   phoneT = 0;
   BRIEF.t = 0; BRIEF.gasUp = !IN.gas;           // газ зажат с прошлого заказа — не считается, нужен новый нажим
 }
@@ -16491,7 +16496,7 @@ function bossOnDeliver (o, st, onTime, tier) {
   if (DIRECTOR.quiet() && kind !== 'late') return;
   if (!kind) return;
   const fee = pp.fee || 0;
-  CHAT.later(2500, () => {                         // после чека и денег в пачку (ridequeue.js); конец смены ждёт это сообщение (career.js showEnd → CHAT.idle)
+  CHAT.later(HUDFONE.active() ? 5200 : 2500, () => { // телефон успевает показать доставку и уйти вниз до SMS управляющей
     if (kind !== 'late' && !isPlaying() && !CHAT.waiting()) return;
     RQ.hold(1500);                                 // Толик сказал — подсказка и достижение после
     CHAT.react(kind, kind === 'late' ? () => lateFine(fee) : null);

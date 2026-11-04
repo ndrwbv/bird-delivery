@@ -6,7 +6,7 @@ import * as HUDMAP from './hudmapios.js';
 
 const H = { root: null, device: null, thread: null, banner: null, modal: null,
   visible: false, app: 'courier', order: null, messages: [], rating: null,
-  shrink: 0, bannerTimer: 0, enterTimer: 0, resourcesKey: '',
+  shrink: 0, bannerTimer: 0, messageTimer: 0, enterTimer: 0, resourcesKey: '', rankKey: '',
   moneyElement: null, moneyParent: null };
 
 const icon = kind => '<span class="hp-icon hp-icon-' + kind + '" aria-hidden="true"><i></i></span>';
@@ -21,7 +21,8 @@ function setApp (app) {
 
 function open (app = 'messages') {
   if (!H.root || !H.visible) return;
-  clearTimeout(H.shrink);
+  clearTimeout(H.shrink); clearTimeout(H.messageTimer);
+  H.root.classList.remove('hp-focus-latest', 'hp-app-launching');
   setApp(app);
   H.root.classList.add('hp-expanded');
   if (app === 'messages') requestAnimationFrame(() => { H.thread.scrollTop = H.thread.scrollHeight; });
@@ -30,10 +31,11 @@ function open (app = 'messages') {
 export function dock () {
   if (!H.root) return;
   clearTimeout(H.shrink);
+  clearTimeout(H.messageTimer);
   H.modal.hidden = true;
   document.body.classList.remove('hp-order-open');
   setApp('courier');
-  H.root.classList.remove('hp-expanded', 'hp-new-message');
+  H.root.classList.remove('hp-expanded', 'hp-new-message', 'hp-focus-latest', 'hp-app-launching', 'hp-notifying', 'hp-paid');
 }
 
 function banner (name, text) {
@@ -89,6 +91,7 @@ export function init ({ visible = false } = {}) {
         </div>
         <section class="hp-app hp-courier-app" data-hp-app="courier"><header class="hp-nav"><b>${t('Птица Пицца')}</b><button type="button" data-open="messages" aria-label="${t('Сообщения')}">${icon('messages')}</button></header>
           <div class="hp-courier-scroll">
+            <button class="hp-competition" type="button" data-open="rating"><span class="hp-rank-medal">★</span><span class="hp-rank-copy"><small>${t('РЕЙТИНГ СМЕНЫ')}</small><b class="hp-rank-place">${t('место {i} из {n}', { i: 1, n: 1 })}</b></span><span class="hp-rank-arrow">›</span></button>
             <div class="hp-shift-earn"><small>${t('ЗАРАБОТАНО ЗА СМЕНУ')}</small><strong class="hp-earned">0 ₽</strong></div>
             <div class="hp-current"><small>${t('ТЕКУЩИЙ ЗАКАЗ')}</small><b class="hp-current-title">${t('Нет активного заказа')}</b><span class="hp-current-address"></span><span class="hp-current-time"></span></div>
             <div class="hp-last-rating" hidden><small>${t('РЕЙТИНГ ПОСЛЕ ЗАКАЗА')}</small><b></b></div>
@@ -97,7 +100,7 @@ export function init ({ visible = false } = {}) {
         </section>
         <section class="hp-app hp-messages" data-hp-app="messages" hidden><header class="hp-nav"><button type="button" data-open="courier" aria-label="${t('назад')}">‹ <span>${t('Птица Пицца')}</span></button><b>${t('Сообщения')}</b><span class="hp-nav-space"></span></header><div class="hp-thread"></div><div class="hp-compose"><span>＋</span><p>${t('Сообщение')}</p><span>◉</span></div></section>
         <section class="hp-app hp-rating-app" data-hp-app="rating" hidden><header class="hp-nav"><button type="button" data-open="courier" aria-label="${t('назад')}">‹ <span>${t('Смена')}</span></button><b>${t('Рейтинг смены')}</b><span class="hp-nav-space"></span></header><div class="hp-rating-head"><small>${t('ПОСЛЕ ЗАКАЗА')}</small><strong class="hp-rating-place"></strong><span>${t('Заработано за смену')} <b class="hp-rating-money"></b></span></div><div class="hp-rating-rows"></div></section>
-        <div class="hp-order-modal" hidden><div class="hp-order-dialog" role="dialog" aria-label="${t('Новый заказ')}"><div class="hp-order-title"><small>${t('Птица Пицца')}</small><b>${t('Новый заказ')} <span class="hp-order-no"></span></b></div><div class="hp-order-list"><div class="hp-order-recipient"><span class="hp-order-avatar"><img alt="" hidden></span><div><small>${t('получатель')}</small><b class="hp-order-name"></b></div></div><div class="hp-order-map"><canvas width="520" height="214"></canvas><i aria-hidden="true"></i></div><div class="hp-order-details"></div></div><div class="hp-order-go"><kbd>W</kbd><span>${t('поехать — принять заказ')}</span></div></div></div>
+        <div class="hp-order-modal" hidden><div class="hp-order-dialog" role="dialog" aria-label="${t('Новый заказ')}"><div class="hp-order-title"><small>${t('Птица Пицца')}</small><b>${t('Новый заказ')} <span class="hp-order-no"></span></b></div><div class="hp-order-list"><div class="hp-order-recipient"><span class="hp-order-avatar"><img alt="" hidden></span><div><small>${t('получатель')}</small><b class="hp-order-name"></b></div></div><div class="hp-order-map"><canvas width="520" height="214"></canvas></div><div class="hp-order-details"></div></div><div class="hp-order-go"><kbd>W</kbd><span>${t('поехать — принять заказ')}</span></div></div></div>
       </div><button class="hp-home-button" type="button" aria-label="${t('домой')}"></button>
     </div>`;
   (document.getElementById('game') || document.body).appendChild(root);
@@ -105,7 +108,7 @@ export function init ({ visible = false } = {}) {
   H.banner = root.querySelector('.hp-banner'); H.modal = root.querySelector('.hp-order-modal');
   root.addEventListener('click', e => {
     if (!H.modal.hidden) return;
-    if (e.target.closest('.hp-banner')) { root.classList.remove('hp-notifying'); open('messages'); return; }
+    if (e.target.closest('.hp-banner')) { root.classList.remove('hp-notifying'); showLatestMessage(); return; }
     const b = e.target.closest('[data-open]');
     if (b) { H.modal.hidden = true; open(b.dataset.open); return; }
     if (e.target.closest('.hp-home-button')) { H.modal.hidden = true; if (H.app === 'home') dock(); else open('home'); return; }
@@ -177,13 +180,44 @@ export function hasOrder () { return !!H.order; }
 export function clearOrder () { if (!H.root) return; H.order = null; H.modal.hidden = true; document.body.classList.remove('hp-order-open'); $('.hp-order-details').replaceChildren(); }
 export function receive (o) {
   if (!active()) return false;
-  addMessage(o); banner(o.name, o.text);
-  open('messages');
-  H.root.classList.add('hp-new-message');
-  H.shrink = setTimeout(dock, Math.max(8500, Math.min(15000, 6200 + String(o.text).length * 55)));
+  clearTimeout(H.shrink); clearTimeout(H.messageTimer);
+  addMessage(o);
+  setApp('courier');
+  H.root.classList.add('hp-expanded');
+  H.root.classList.remove('hp-new-message', 'hp-focus-latest', 'hp-app-launching', 'hp-paid');
+  banner(o.name, o.text);
+  H.messageTimer = setTimeout(showLatestMessage, 1900);
   return true;
 }
-export function showRating ({ rows, money }) {
+function showLatestMessage () {
+  if (!H.root || !H.visible) return;
+  clearTimeout(H.messageTimer); clearTimeout(H.bannerTimer);
+  H.root.classList.remove('hp-notifying');
+  setApp('messages');
+  H.root.classList.add('hp-expanded', 'hp-focus-latest', 'hp-new-message', 'hp-app-launching');
+  requestAnimationFrame(() => { H.thread.scrollTop = H.thread.scrollHeight; });
+  H.messageTimer = setTimeout(() => H.root?.classList.remove('hp-app-launching'), 550);
+  const latest = H.thread.querySelector('.hp-message.latest p')?.textContent || '';
+  H.shrink = setTimeout(dock, Math.max(9000, Math.min(16000, 7000 + latest.length * 65)));
+}
+export function rank ({ place = 1, total = 1 } = {}) {
+  if (!H.root) return;
+  const key = place + '/' + total;
+  if (key === H.rankKey) return;
+  H.rankKey = key;
+  $('.hp-rank-place').textContent = t('место {i} из {n}', { i: place, n: total });
+  $('.hp-rank-medal').textContent = place === 1 ? '★' : String(place);
+  $('.hp-competition').classList.toggle('hp-first', place === 1 && total > 1);
+}
+export function paid ({ amount, money }) {
+  if (!active()) return;
+  clearTimeout(H.shrink); clearTimeout(H.messageTimer);
+  setApp('courier'); H.root.classList.add('hp-expanded', 'hp-paid');
+  $('.hp-earned').textContent = money;
+  $('.hp-shift-earn').dataset.gain = '+' + amount;
+  H.shrink = setTimeout(dock, 4200);
+}
+export function showRating ({ rows, money }, autoOpen = true) {
   if (!active() || !rows?.length) return false;
   const me = rows.findIndex(r => r.me);
   if (me < 0) return false;
@@ -200,21 +234,23 @@ export function showRating ({ rows, money }) {
     const details = document.createElement('small'); details.textContent = t('{n} зак.', { n: r.d || 0 }) + ' · ' + (r.money || '');
     row.append(num, name, details); list.appendChild(row);
   });
-  open('rating');
+  rank({ place: me + 1, total: rows.length });
+  if (autoOpen) open('rating');
   return true;
 }
 export function hideRating () { if (H.root && H.app === 'rating') dock(); }
 export function reset () {
   if (!H.root) return;
-  clearTimeout(H.shrink); clearTimeout(H.bannerTimer);
+  clearTimeout(H.shrink); clearTimeout(H.bannerTimer); clearTimeout(H.messageTimer);
   H.root.classList.remove('hp-notifying', 'hp-new-message');
-  H.thread.replaceChildren(); H.messages = []; H.rating = null; clearOrder(); dock(); H.resourcesKey = '';
+  H.thread.replaceChildren(); H.messages = []; H.rating = null; clearOrder(); dock(); H.resourcesKey = ''; H.rankKey = '';
   $('.hp-last-rating').hidden = true;
 }
 /* Песочница: фиксированные состояния для сравнимых скриншотов без ожидания таймеров. */
 export function demo (phase = 'dock', text = 'Клиент уже ждёт. Ты где?') {
   reset(); setVisible(true);
   resources({ hp: 5.5, hpMax: 6, money: '3 200 ₽', order: { title: t('Заказ № 0007'), address: t('ул. Царевского, 2') }, time: '02:15' });
+  rank({ place: 3, total: 8 });
   addMessage({ name: t('Ирина Сергеевна'), role: t('управляющая'), text: t('Женя, новый заказ. Забери пиццу и выезжай.') });
   addMessage({ name: t('Ирина Сергеевна'), role: t('управляющая'), text });
   if (phase === 'order') showOrder({ number: 7, name: 'Света Т.', html: '<table class="oc-inv"><tbody><tr data-k="who"><th>' + t('получатель') + '</th><td><b>Света Т.</b></td></tr><tr data-k="addr"><th>' + t('адрес') + '</th><td><b>' + t('ул. Царевского, 2') + '</b></td></tr><tr data-k="items"><th>' + t('заказ') + '</th><td><b>' + t('Пепперони') + ' × 1</b></td></tr><tr data-k="pay"><th>' + t('оплата') + '</th><td><b class="oc-pay">3 200 ₽</b></td></tr></tbody></table>' });
@@ -222,5 +258,6 @@ export function demo (phase = 'dock', text = 'Клиент уже ждёт. Ты
   else if (phase === 'home') open('home');
   else if (phase === 'message' || phase === 'banner' || phase === 'big') { open('messages'); H.root.classList.add('hp-new-message'); if (phase === 'banner') banner(t('Ирина Сергеевна'), text); }
   else if (phase === 'courier') open('courier');
+  else if (phase === 'paid') paid({ amount: '850 ₽', money: '3 200 ₽' });
   else dock();
 }

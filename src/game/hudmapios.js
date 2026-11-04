@@ -3,6 +3,7 @@ import './hudmapios.css';
 import { t } from '../i18n/index.js';
 
 let bars = null;
+let paidTimer = 0;
 const point = p => Array.isArray(p) ? p : [p?.x, p?.z];
 
 /* Обзор заказа: масштаб считается по всему пути, включая машину и адрес. */
@@ -11,7 +12,8 @@ export function overview (canvas, { route = [], roads = [], origin, target } = {
   const path = route.map(point).filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
   if (path.length < 2) return false;
   const start = point(origin || path[0]), end = point(target || path[path.length - 1]);
-  const all = [...path, start, end];
+  const fullPath = [start, ...path, end];
+  const all = fullPath;
   const xs = all.map(p => p[0]), zs = all.map(p => p[1]);
   const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
   const W = canvas.width, H = canvas.height, margin = 26;
@@ -33,14 +35,16 @@ export function overview (canvas, { route = [], roads = [], origin, target } = {
     ctx.beginPath(); pts.forEach((p, i) => { const a = at(p); i ? ctx.lineTo(...a) : ctx.moveTo(...a); });
     ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
   };
-  trace(path, '#fffdf4', 13); trace(path, '#3185b6', 7);
-  ctx.setLineDash([5, 5]);
-  trace([start, path[0]], '#3185b6', 3); trace([path[path.length - 1], end], '#3185b6', 3);
-  ctx.setLineDash([]);
+  trace(fullPath, '#fffdf4', 13); trace(fullPath, '#3185b6', 7);
   const a = at(start), b = at(end);
-  ctx.beginPath(); ctx.arc(...a, 8, 0, Math.PI * 2); ctx.fillStyle = '#2584c9'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
-  ctx.beginPath(); ctx.arc(...b, 10, 0, Math.PI * 2); ctx.fillStyle = '#d95037'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
-  ctx.beginPath(); ctx.arc(...b, 3, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
+  // Синяя машина стоит в точном положении игрока; красный пин — у двери клиента.
+  ctx.beginPath(); ctx.arc(...a, 12, 0, Math.PI * 2); ctx.fillStyle = '#267db4'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.fillRect(a[0] - 6, a[1] - 2, 12, 6);
+  ctx.fillRect(a[0] - 4, a[1] - 5, 8, 4);
+  ctx.fillStyle = '#267db4'; ctx.fillRect(a[0] - 4, a[1] - 1, 3, 2); ctx.fillRect(a[0] + 1, a[1] - 1, 3, 2);
+  ctx.beginPath(); ctx.arc(b[0], b[1] - 3, 10, 0, Math.PI * 2); ctx.fillStyle = '#d95037'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(b[0] - 7, b[1] + 3); ctx.lineTo(b[0], b[1] + 13); ctx.lineTo(b[0] + 7, b[1] + 3); ctx.fillStyle = '#d95037'; ctx.fill();
+  ctx.beginPath(); ctx.arc(b[0], b[1] - 3, 3, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
   return true;
 }
 
@@ -64,6 +68,25 @@ export function fuel (value) {
   const count = Math.ceil(Math.max(0, Math.min(1, value)) * bars.length);
   bars.forEach((bar, i) => bar.classList.toggle('on', i < count));
 }
+
+export function payment ({ name = '', avatar = '', amount = '', money = '' } = {}) {
+  let card = document.getElementById('hios-paid');
+  if (!card) {
+    card = document.createElement('div'); card.id = 'hios-paid';
+    card.innerHTML = '<div class="hios-paid-confetti" aria-hidden="true">' + '<i></i>'.repeat(14) + '</div><span class="hios-paid-avatar"></span><div class="hios-paid-copy"><b class="hios-paid-name"></b><strong class="hios-paid-status">✓ ' + t('Доставлено') + '</strong><small class="hios-paid-gain"></small><small class="hios-paid-total"></small></div>';
+    (document.getElementById('game') || document.body).appendChild(card);
+  }
+  const face = card.querySelector('.hios-paid-avatar');
+  if (avatar) { const img = document.createElement('img'); img.src = avatar; img.alt = ''; face.replaceChildren(img); }
+  else face.textContent = (name || t('клиент')).slice(0, 1).toUpperCase();
+  card.querySelector('.hios-paid-name').textContent = name || t('клиент');
+  card.querySelector('.hios-paid-gain').textContent = '+' + amount;
+  card.querySelector('.hios-paid-total').textContent = t('За смену') + ': ' + money;
+  clearTimeout(paidTimer);
+  card.classList.remove('on'); void card.offsetWidth; card.classList.add('on');
+  paidTimer = setTimeout(() => { card.classList.remove('on'); setTimeout(() => card.remove(), 450); }, 4300);
+}
+export function hidePayment () { clearTimeout(paidTimer); document.getElementById('hios-paid')?.remove(); }
 
 /* Макет внешней карты для изолированного просмотра телефона в ui.html. */
 export function demoMap () {

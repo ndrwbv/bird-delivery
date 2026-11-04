@@ -105,7 +105,6 @@
 #hud-phone .hp-order-map { position: relative; width: 100%; height: 102px; margin-bottom: 7px; overflow: hidden; border: 1px solid #bf8649; border-radius: 7px; background: #f4ebd2; box-shadow: inset 0 0 0 1px #fff8, 0 2px 4px #0003; }
 #hud-phone .hp-order-map canvas, #hud-phone .hp-order-map svg { width: 100%; height: 100%; display: block; }
 #hud-phone .hp-order-map svg { position: absolute; inset: 0; }
-#hud-phone .hp-order-map i { position: absolute; left: calc(50% - 5px); top: calc(50% - 7px); width: 10px; height: 14px; background: #ec5140; clip-path: polygon(50% 0, 100% 100%, 50% 75%, 0 100%); filter: drop-shadow(0 1px 1px #0008); }
 #hud-phone .hp-order-modal:not(.hp-order-many) .hp-order-details .oc-inv tr[data-k="who"] { display: none; }
 #hud-phone .hp-order-details .oc-photos { display: none; }
 #hud-phone .hp-order-details .oc-sheet { display: block; }
@@ -157,7 +156,37 @@
 #hud-phone .hp-rating-head strong { color: #8c5b47; }
 #hud-phone .hp-thread { background: repeating-linear-gradient(0deg, #e5f0e5 0 2px, #edf6ed 2px 4px); }
 #hud-phone .hp-banner { background: linear-gradient(#779b83, #4f7961 55%, #345c46); border-color: #31533f; }
+/* Курьерское приложение: дерево в шапке, кожа под карточками и тёплая бумага. */
+#hud-phone .hp-courier-app { background: linear-gradient(#24140824, #24140824), url('/textures/phone-leather.svg') repeat; background-size: auto, 128px 128px; }
+#hud-phone .hp-courier-app .hp-nav, #hud-phone .hp-rating-app .hp-nav { background: linear-gradient(#fff5 0%, #fff0 42%, #20100666 52%, #12090388 100%), url('/textures/phone-wood.svg') repeat-x; background-size: auto, auto 100%; border-bottom-color: #56341e; }
+#hud-phone .hp-courier-app .hp-nav b { color: #fff7df; text-shadow: 0 1px 2px #2e170e, 0 -1px #fff5; }
+#hud-phone .hp-courier-scroll { padding: 9px 10px 16px; }
+#hud-phone .hp-competition { width: 100%; min-height: 70px; padding: 7px 9px; display: flex; align-items: center; gap: 9px; text-align: left; border: 1px solid #e2b968; border-radius: 7px; background: linear-gradient(120deg, #fff8dd, #e9c781 59%, #c2914a); box-shadow: inset 0 1px #fff9, inset 0 -2px #94653666, 0 3px 7px #26140780; color: #57331b; }
+#hud-phone .hp-rank-medal { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 50%; border: 2px solid #fff0bc; background: radial-gradient(circle at 35% 25%, #fff5bb, #d78c32 60%, #92511d); box-shadow: inset 0 1px 3px #fff8, 0 2px 3px #49251388; color: #fff7d4; font: 700 25px/1 Georgia, serif; text-shadow: 0 1px #8a491b; }
+#hud-phone .hp-rank-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+#hud-phone .hp-rank-copy small { color: #825326; font-size: 10px; font-weight: 800; letter-spacing: .06em; }
+#hud-phone .hp-rank-copy b { font-size: 17px; white-space: nowrap; text-shadow: 0 1px #fff7; }
+#hud-phone .hp-rank-arrow { color: #80552d; font-size: 27px; line-height: 1; }
+#hud-phone .hp-competition.hp-first .hp-rank-medal { background: radial-gradient(circle at 35% 25%, #fffbc2, #f1bb38 60%, #ad7018); }
+#hud-phone .hp-shift-earn, #hud-phone .hp-current, #hud-phone .hp-last-rating { position: relative; background: linear-gradient(#ffffff75, #ffffff00 48%), repeating-linear-gradient(0deg, #fbf3df 0 2px, #f5e8cf 2px 4px); border-color: #cfb78d; box-shadow: inset 0 1px #fff, 0 3px 7px #21140670; }
+#hud-phone .hp-shift-earn { margin-top: 10px; }
+#hud-phone .hp-shift-earn::before, #hud-phone .hp-current::before { content: ''; position: absolute; inset: 4px; border: 1px dashed #bd966153; border-radius: 5px; pointer-events: none; }
+#hud-phone.hp-paid .hp-shift-earn { animation: hp-earn-glow 1.1s ease-out 2; }
+#hud-phone.hp-paid .hp-shift-earn::after { content: attr(data-gain); position: absolute; top: 11px; right: 10px; color: #3c854d; font-size: 13px; font-weight: 800; animation: hp-gain-up 2.8s ease-out both; }
+@keyframes hp-earn-glow { 50% { box-shadow: inset 0 1px #fff, 0 0 0 4px #e2c552, 0 4px 12px #21140670; } }
+@keyframes hp-gain-up { 0% { transform: translateY(12px) scale(.75); opacity: 0; } 18%, 75% { transform: none; opacity: 1; } 100% { transform: translateY(-8px); opacity: 0; } }
+#hud-phone .hp-order-list { background: linear-gradient(#fffef8e6, #fffef8e6), repeating-linear-gradient(0deg, #e2cdac 0 1px, #f6e6cc 1px 4px); }
+#hud-phone .hp-order-title { background: linear-gradient(#fff4 0%, #12090355 52%, #12090388), url('/textures/phone-wood.svg') repeat-x; background-size: auto, auto 100%; }
+#hud-phone .hp-rating-app { background: url('/textures/phone-leather.svg') repeat; }
+#hud-phone .hp-rating-row { background: #fff7e7; border-bottom-color: #c8aa7a; }
+#hud-phone .hp-rating-row:nth-child(even) { background: #f2e1c5; }
+#hud-phone .hp-rating-row.me { background: #f9d999; }
+#hud-phone .hp-thread { background: linear-gradient(#ffffff66, #ffffff00), repeating-linear-gradient(0deg, #d7e6d2 0 1px, #e8f0e2 1px 4px); }
+#hud-phone.hp-focus-latest .hp-message:not(.latest) { display: none; }
+#hud-phone.hp-app-launching .hp-messages { animation: hp-app-open .5s cubic-bezier(.17,.89,.32,1.15) both; transform-origin: 85% 8%; }
+@keyframes hp-app-open { from { opacity: .45; transform: scale(.38); filter: blur(3px); } to { opacity: 1; transform: scale(1); filter: none; } }
 body.hud-phone-active #hearts, body.hud-phone-active #cash, body.hud-phone-active #phone { visibility: hidden !important; }
 body.hud-phone-active #chat { display: none !important; }
+body.hud-phone-active #payfx { opacity: 0 !important; pointer-events: none; }
 @media (max-height: 690px) { #hud-phone.hp-expanded .hp-device { top: calc(100% - 306px); transform: translate(-50%, -50%) scale(.87) rotate(0deg); } }
 @media (prefers-reduced-motion: reduce) { #hud-phone .hp-device, #hud-phone .hp-banner, #hud-phone .hp-backdrop { transition-duration: .01ms; animation-duration: .01ms; } }
