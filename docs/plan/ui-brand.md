@@ -2,7 +2,7 @@
 
 [← план](../IDEAS.md)
 
-**Статус:** [итог доставки в игровом HUD №8-8](../IDEAS-ARCHIVE.md#ui-phone-delivery-result), [деньги и чаевые летят в телефон №8-7](../IDEAS-ARCHIVE.md#ui-phone-payout), [тройка лидеров №8-6](../IDEAS-ARCHIVE.md#ui-phone-leaders) и прежние шаги телефона готовы.
+**Статус:** [сообщение у нижнего края №8-9](../IDEAS-ARCHIVE.md#ui-phone-chat-spacing), [итог доставки в игровом HUD №8-8](../IDEAS-ARCHIVE.md#ui-phone-delivery-result), [деньги и чаевые летят в телефон №8-7](../IDEAS-ARCHIVE.md#ui-phone-payout), [тройка лидеров №8-6](../IDEAS-ARCHIVE.md#ui-phone-leaders) и прежние шаги телефона готовы.
 
 <details><summary><b>Решения</b> (что уже решено и почему)</summary>
 

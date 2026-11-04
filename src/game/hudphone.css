@@ -63,12 +63,14 @@
 #hud-phone .hp-current-time { color: #3c6490; font-weight: 700; }
 #hud-phone .hp-courier-nav { height: 43px; flex: none; display: flex; align-items: center; gap: 5px; padding: 5px 6px; border-top: 1px solid #7f8c9f; background: linear-gradient(#dfe5ec, #a6b4c6); box-shadow: inset 0 1px #fff; }
 #hud-phone .hp-courier-nav button { flex: 1; height: 30px; border: 1px solid #687e9c; border-radius: 5px; background: linear-gradient(#f8fafd, #c6d0dd); color: #354d6a; font-size: 11px; font-weight: 700; text-shadow: 0 1px #fff; box-shadow: inset 0 1px #fff, 0 1px 1px #536880; }
-#hud-phone .hp-thread { flex: 1; min-height: 0; overflow: auto; padding: 12px 10px 16px; scrollbar-width: none; background: repeating-linear-gradient(0deg, #e3e5e8 0 2px, #e9eaed 2px 4px); }
-#hud-phone .hp-message { display: flex; align-items: flex-start; flex-direction: column; margin-bottom: 12px; }
+#hud-phone .hp-thread { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; padding: 12px 10px 8px; scrollbar-width: none; background: repeating-linear-gradient(0deg, #e3e5e8 0 2px, #e9eaed 2px 4px); }
+#hud-phone .hp-thread::before { content: ''; flex: 1 0 0; }
+#hud-phone .hp-message { flex: none; display: flex; align-items: flex-start; flex-direction: column; margin-bottom: 10px; }
+#hud-phone .hp-message:last-child { margin-bottom: 0; }
 #hud-phone .hp-message-meta { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; color: #515d69; }
 #hud-phone .hp-message-meta img { width: 30px; height: 30px; border: 1px solid #858c94; border-radius: 5px; object-fit: cover; }
 #hud-phone .hp-message-meta span { display: flex; flex-direction: column; }
-#hud-phone .hp-message-meta b { font-size: 11px; }
+#hud-phone .hp-message-meta b { font-size: 10px; }
 #hud-phone .hp-message-meta small { font-size: 9px; }
 #hud-phone .hp-message p { position: relative; max-width: 96%; margin: 0 0 0 5px; padding: 10px 12px; border: 1px solid #66a654; border-radius: 14px; background: linear-gradient(#f5fff1, #d6f3c7 55%, #b8e89d); box-shadow: inset 0 1px #fff, 0 2px 2px #0002; color: #171b22; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
 #hud-phone .hp-message p::before { content: ''; position: absolute; left: -7px; bottom: 7px; width: 11px; height: 11px; border-left: 1px solid #66a654; border-bottom: 1px solid #66a654; background: #b8e89d; transform: rotate(45deg); }
@@ -81,7 +83,7 @@
 #hud-phone .hp-banner-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 #hud-phone .hp-banner-head { display: flex; align-items: center; justify-content: space-between; gap: 5px; }
 #hud-phone .hp-banner-copy em { font-size: 10px; font-weight: normal; font-style: normal; color: #c6e1d1; white-space: nowrap; }
-#hud-phone .hp-banner-copy strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+#hud-phone .hp-banner-copy strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 #hud-phone .hp-banner-text { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 #hud-phone .hp-order-modal { position: absolute; z-index: 14; inset: 20px 0 0; display: flex; }
 #hud-phone .hp-order-dialog { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; background: #f4f5f4; box-shadow: inset 0 1px #fff; }
