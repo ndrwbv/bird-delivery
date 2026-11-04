@@ -78,6 +78,7 @@ export function init ({ mapElement = null, radarElement = null, onRadarMove = nu
   const root = document.createElement('div'); root.id = 'hud-phone';
   root.innerHTML = `<div class="hp-backdrop"></div>
     <div class="hp-device" role="group" aria-label="${t('телефон курьера')}">
+      <i class="hp-mute-switch" aria-hidden="true"></i><i class="hp-volume hp-volume-up" aria-hidden="true"></i><i class="hp-volume hp-volume-down" aria-hidden="true"></i>
       <div class="hp-camera"></div><div class="hp-speaker"></div>
       <div class="hp-glass">
         <div class="hp-status"><span class="hp-health">♥ 6/6</span><span class="hp-clock">9:41</span><span class="hp-money-slot"><span class="hp-money-fallback">0 ₽</span></span></div>
