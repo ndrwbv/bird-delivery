@@ -11893,14 +11893,15 @@ let routePts = [];
      назад, против хода машины, — на 20 м «дороже», чтобы без нужды не
      разворачивал;
    — конец — точка на дороге у клиента: выбираем по сумме «путь по дороге +
-     пешком до клиента вдвое дороже», а если отрезок к клиенту проходит сквозь
+     пешком до клиента впятеро дороже», а если отрезок к клиенту проходит сквозь
      дом — штраф 400 м: двор с другой стороны квартала не берём. Последний
      отрезок к клиенту — единственный не по асфальту (ждут во дворах);
    — прямая к клиенту (или от машины во дворе до улицы) режет дом — этот
      кусок ищется по клеткам 2 м вокруг, дома и заборы — стены (routeyard.js,
      docs/CAREER.md «Куда ведёт маршрут»).
    Куски улиц разложены по клеткам 40 м — свои, только для маршрута. */
-const RE_CELL = 40, RE_BACK = 20, RE_ONEWAY = 1.35;   // RE_ONEWAY — против односторонней (половина проспекта навстречу) метр дороже на 35 % (18.10.2026): своя половина рядом всегда дешевле, а где в карте ошибка — крюк не больше трети
+const RE_CELL = 40, RE_BACK = 20, RE_WALK = 5, RE_WALK_MAX = 60;   // остановка ближе к двери выгоднее, но только если к ней можно доехать по ходу движения
+const routeAllowed = e => e.ok || e.two;         // односторонний тупик, открытый для разворота (deadends.js), допускает оба хода
 let RE = null;                                    // { a, b: узлы кусков; grid: клетка → номера кусков }
 const reKey = (i, j) => (i + 20000) * 40000 + (j + 20000);
 function routeEdges () {
@@ -12037,7 +12038,7 @@ function routeTail (x, z) {
       if (NODES[a].fx && NODES[a].fx.has(b)) return;   // проезд сквозь фестиваль закрыт блоками (festivals.js)
       if (seen) { const key = ptKey(px, pz); if (seen.has(key)) return; seen.add(key); }   // плавные улицы: та же точка с соседнего куска (ptKey)
       const cut = d > 4 && (throughHouse(px, pz, x, z) || YMAZE.segHits(px, pz, x, z) || YFILL.segGarage(px, pz, x, z));   // и сквозь твёрдый забор, клумбу, лесок (yardmaze.js), ракушки (yardfill.js)
-      RT.cand.push({ a, b, x: px, z: pz, d, cut, c: d * 2 + (cut ? 400 : 0) });
+      RT.cand.push({ a, b, x: px, z: pz, d, cut, c: d * RE_WALK + (cut ? 400 : 0) });
     });
     if (RT.cand.length) break;
   }
@@ -12046,7 +12047,7 @@ function routeTail (x, z) {
   // Точки дальше окна сетки, к которым прямая чистая, остаются как были
   let dmin = Infinity, anyCut = false;
   for (const q of RT.cand) { dmin = Math.min(dmin, q.d); if (q.cut) anyCut = true; }
-  if (anyCut && !RYARD.RY.OFF) {
+  if ((anyCut || dmin > 8) && !RYARD.RY.OFF) {
     tailJob(x, z, clamp(dmin + RG_TAIL.PAD, RG_TAIL.R0, RYARD.RY.RMAX));
     if (RT.sync) while (RT.job) { RT.job.step(); tailFromJob(); }
   }
@@ -12064,7 +12065,7 @@ function tailFromJob () {
   if (!F) return;
   for (let i = 0; i < S0.length; i += 4) {
     const w = F.at(S0[i + 2], S0[i + 3]);
-    if (w < Infinity) gc.push({ a: S0[i], b: S0[i + 1], x: S0[i + 2], z: S0[i + 3], d: w, cut: false, grid: true, c: w * 2 });
+    if (w < Infinity) gc.push({ a: S0[i], b: S0[i + 1], x: S0[i + 2], z: S0[i + 3], d: w, cut: false, grid: true, c: w * RE_WALK });
   }
   // до улиц в окне не дойти (ближняя улица — за стеной, проезд к ней дальше окна) — окно в 2,5 раза шире, до RMAX;
   // и так нет — клиент заперт стенами, остаётся прямая
@@ -12077,9 +12078,11 @@ function tailMap () {
   RT.tail = new Map();
   RT.cand.forEach((q, i) => {
     for (const n of [q.a, q.b]) {
+      const along = Math.hypot(NODES[n].x - q.x, NODES[n].z - q.z);
+      if (along > 0.05 && !routeAllowed(edgeOf(n, n === q.a ? q.b : q.a))) continue;
       // дворовый проезд в карте нарисован сквозь дом (2071,638 — 2082,549) — к точке с этой стороны не подъезжаем (18.10.2026)
       if (segHouse(NODES[n].x, NODES[n].z, q.x, q.z, 0.5)) continue;
-      const c = Math.hypot(NODES[n].x - q.x, NODES[n].z - q.z) + q.c, t = RT.tail.get(n);
+      const c = along + q.c, t = RT.tail.get(n);
       if (!t || c < t.c) RT.tail.set(n, { c, i });
     }
   });
@@ -12215,7 +12218,10 @@ function roadPath (x0, z0, x1, z1, h, deck, drivingOnly = false) {
     let best = Infinity, bn = -1, bi = -1, cn = -1, ch = Infinity;
     RT.cand.forEach((q, i) => {
       if (!((q.a === sa && q.b === sb) || (q.a === sb && q.b === sa))) return;
-      const c = Math.hypot(q.x - spx, q.z - spz) + q.c;
+      const e = edgeOf(sa, sb), from = Math.hypot(spx - NODES[sa].x, spz - NODES[sa].z), to = Math.hypot(q.x - NODES[sa].x, q.z - NODES[sa].z);
+      if (to > from + 0.01 && !routeAllowed(e)) return;
+      if (from > to + 0.01 && !routeAllowed(edgeOf(sb, sa))) return;
+      const c = Math.abs(to - from) + q.c;
       if (c < best) { best = c; bi = i; bn = -1; }
     });
     const relax = (n, g, p) => {
@@ -12225,7 +12231,9 @@ function roadPath (x0, z0, x1, z1, h, deck, drivingOnly = false) {
     };
     for (const n of [sa, sb]) {
       const N = NODES[n], dx = N.x - spx, dz = N.z - spz, e = edgeOf(n === sa ? sb : sa, n);
-      relax(n, Math.hypot(dx, dz) * (e.ok || e.two ? 1 : RE_ONEWAY) + (dx * hx + dz * hz < -1 ? RE_BACK : 0), -1);
+      const along = Math.hypot(dx, dz);
+      if (along > 0.05 && !routeAllowed(e)) continue;
+      relax(n, along + (dx * hx + dz * hz < -1 ? RE_BACK : 0), -1);
     }
     let viaB = null, viaC = null;                 // плавные улицы (RC): лучший конец или ближний к цели узел — внутри цепочки
     const rc = RC && !RT.norc;                    // RT.norc — отладка: по узлам, как без цепочек (сравнить пути)
@@ -12256,7 +12264,7 @@ function roadPath (x0, z0, x1, z1, h, deck, drivingOnly = false) {
             if (U.fx && U.fx.has(v)) continue;
             if (RL.NAVX.size && RL.NAVX.has(u * 100000 + v)) continue;
             const e = o.e;
-            relaxC(v, g + (e.ok || e.two ? e.len : e.len * RE_ONEWAY), u, null);
+            if (routeAllowed(e)) relaxC(v, g + e.len, u, null);
             continue;
           }
           const S = RC.SEQ[o.c], E = o.dir > 0 ? RC.EF[o.c] : RC.EB[o.c], tc = RT.tch.has(o.c);
@@ -12267,7 +12275,8 @@ function roadPath (x0, z0, x1, z1, h, deck, drivingOnly = false) {
             if (P.fx && P.fx.has(v)) { ok = false; break; }
             if (navx && RL.NAVX.has(pv * 100000 + v)) { ok = false; break; }
             const e = E[o.dir > 0 ? k - 1 : k];
-            gg += e.ok || e.two ? e.len : e.len * RE_ONEWAY;
+            if (!routeAllowed(e)) { ok = false; break; }
+            gg += e.len;
             if (k === o.end) break;
             // внутри цепочки — хвост к клиенту (RT.tch — в каких цепочках он есть) и, во втором заходе, ближний к цели узел
             if (tc) { const tv = RT.tail.get(v); if (tv && gg + tv.c < best) { best = gg + tv.c; bn = v; bi = tv.i; viaB = { u, o, q: k }; } }
@@ -12292,7 +12301,7 @@ function roadPath (x0, z0, x1, z1, h, deck, drivingOnly = false) {
         if (U.fx && U.fx.has(v)) continue;           // сквозь фестиваль — блоки (festivals.js)
         if (RL.NAVX.size && RL.NAVX.has(u * 100000 + v)) continue;   // перекрытие на обратном пути (backblock.js)
         const e = edgeOf(u, v);
-        relax(v, g + (e.ok || e.two ? e.len : e.len * RE_ONEWAY), u);   // против односторонней — дороже: по своей половине проспекта
+        if (routeAllowed(e)) relax(v, g + e.len, u);
       }
     }
     if (bi < 0 && !free) continue;
@@ -12306,7 +12315,15 @@ function roadPath (x0, z0, x1, z1, h, deck, drivingOnly = false) {
     }
     // Автомобильная линия заканчивается на дороге: пин и вручение остаются у клиента.
     const start = drivingOnly ? [[spx, spz]] : head || [[x0, z0], [spx, spz]];
-    if (q) return [...start, ...mid, ...(drivingOnly ? [[q.x, q.z]] : tailOf(bi, q, x1, z1))];
+    if (q) {
+      const road = [...start, ...mid, ...(drivingOnly ? [[q.x, q.z]] : tailOf(bi, q, x1, z1))];
+      if (drivingOnly) {
+        road.offroad = tailOf(bi, q, x1, z1);
+        road.offroadSafe = !q.cut && polyLen(road.offroad) <= RE_WALK_MAX;
+        if (sd > edgeOf(sa, sb).w / 2 + 0.3) road.offroadStart = head || [[x0, z0], [spx, spz]];
+      }
+      return road;
+    }
     if (drivingOnly) return [...start, ...mid];     // только достижимая дорога, без прямой к несвязанной цели
     // до улицы клиента не доехать: от ближайшего узла — по клеткам, если он в окне проезда
     const last = mid[mid.length - 1], gp = RT.F && last ? RT.F.path(last[0], last[1]) : null;
@@ -12397,9 +12414,12 @@ function rebuildRoutePath (force) {
   if (!tgt) { routePts = []; RP.cur = null; return; }
   const raw = roadPath(V.x, V.z, tgt.x, tgt.z, V.h, V.y - groundH(V.x, V.z) > 2.5, true);
   // Сохраняем каждый излом дорожной сети: прореживание коротких кусков срезало дуги.
-  // В routePts нет прямой от машины на газоне или пешего хвоста к двери.
+  // Автомобильная полоса остаётся на дороге; пеший остаток к двери рисуется отдельно пунктиром.
   const pts = raw.filter((p, i) => !i || Math.hypot(p[0] - raw[i - 1][0], p[1] - raw[i - 1][1]) > 0.01);
-  if (pts.length < 2) { routePts = []; RP.cur = null; RP.gen++; return; }
+  pts.offroad = raw.offroad;
+  pts.offroadSafe = raw.offroadSafe;
+  pts.offroadStart = raw.offroadStart;
+  if (pts.length < 2) { routePts = []; routePts.offroad = raw.offroad; routePts.offroadSafe = raw.offroadSafe; routePts.offroadStart = raw.offroadStart; RP.cur = null; RP.gen++; return; }
   const key = Math.round(tgt.x * 2) * 1e6 + Math.round(tgt.z * 2), C = RP.cur, now = RP.clock;
   const blk = RP.blk;                              // впереди перекрыли улицу (backblock.js) — другой путь сразу
   RP.blk = 0;
@@ -12418,6 +12438,9 @@ function rebuildRoutePath (force) {
     const t = clamp(((V.x - ax) * dx + (V.z - az) * dz) / (dx * dx + dz * dz || 1), 0, 1), px = ax + dx * t, pz = az + dz * t;
     const keep = [[px, pz]];                      // начало остаётся на дороге, даже если машина во дворе
     for (let i = bi + 1; i < C.length; i++) keep.push(C[i]);
+    keep.offroad = C.offroad;
+    keep.offroadSafe = C.offroadSafe;
+    keep.offroadStart = raw.offroadStart && Math.hypot(raw[0][0] - keep[0][0], raw[0][1] - keep[0][1]) < 3 ? raw.offroadStart : null;
     const off = Math.sqrt(bd), lold = polyLen(keep), lnew = polyLen(pts);
     RP.off = off; RP.lold = lold; RP.lnew = lnew;
     // тот же путь (машина едет, пересчёт уточнил хвост) — новый молча, без смены
@@ -12425,7 +12448,7 @@ function rebuildRoutePath (force) {
       RP.cur = pts; RP.k = 0; RP.offT = RP.betterT = -1; RP.same++; routePts = pts;
       return;
     }
-    if (force === true && pathCuts(keep)) why = 'force';   // досчитан проезд во двор, а прежний режет дом — сразу
+    if (force === true && (pathCuts(keep) || !samePath(pts.offroad || [], C.offroad || [], 3))) why = 'force';   // готовый подход к двери берём без задержки
     if (off > RP.OFF) { if (RP.offT < 0) RP.offT = now; if (now - RP.offT >= RP.OFF_T) why = why || 'off'; } else RP.offT = -1;
     if (lold - lnew > Math.max(RP.BETTER_K * lold, RP.BETTER_M)) { if (RP.betterT < 0) RP.betterT = now; if (now - RP.betterT >= RP.BETTER_T) why = why || 'better'; } else RP.betterT = -1;
     if (blk) why = why || 'block';
@@ -13811,6 +13834,14 @@ function drawRadar () {
     rctx.strokeStyle = routeHex(); rctx.lineWidth = 3.6; rctx.stroke();
     rctx.lineCap = 'butt';
   }
+  for (const walk of [routePts.offroadStart, routePts.offroad]) if (walk && walk.length > 1) {
+    rctx.setLineDash([6, 5]); rctx.lineJoin = 'round'; rctx.lineCap = 'round';
+    rctx.beginPath();
+    walk.forEach((p, i) => (i ? rctx.lineTo(qx(p[0], p[1]), qy(p[0], p[1])) : rctx.moveTo(qx(p[0], p[1]), qy(p[0], p[1]))));
+    rctx.strokeStyle = 'rgba(70, 30, 6, 0.6)'; rctx.lineWidth = 5; rctx.stroke();
+    rctx.strokeStyle = routeHex(); rctx.lineWidth = 3; rctx.stroke();
+    rctx.setLineDash([]); rctx.lineCap = 'butt';
+  }
   // за краем карты — затемнение: туда не проехать
   {
     const [ax, ay] = tr(BOUNDS.x0, BOUNDS.z0), [bx, by] = tr(BOUNDS.x1, BOUNDS.z0);
@@ -14327,6 +14358,13 @@ function drawFullMap () {
     routePts.forEach((p, i) => (i ? x.lineTo(fmX(p[0]), fmZ(p[1])) : x.moveTo(fmX(p[0]), fmZ(p[1]))));
     x.lineWidth = clamp(4 * s, 3.5 * u, 7 * u); x.strokeStyle = routeHex(); x.lineJoin = 'round'; x.lineCap = 'round'; x.stroke();
   }
+  for (const walk of [routePts.offroadStart, routePts.offroad]) if (walk && walk.length > 1) {
+    x.setLineDash([Math.max(4 * u, 6 * s), Math.max(3 * u, 5 * s)]);
+    x.beginPath();
+    walk.forEach((p, i) => (i ? x.lineTo(fmX(p[0]), fmZ(p[1])) : x.moveTo(fmX(p[0]), fmZ(p[1]))));
+    x.lineWidth = clamp(3.5 * s, 3 * u, 6 * u); x.strokeStyle = routeHex(); x.lineJoin = 'round'; x.lineCap = 'round'; x.stroke();
+    x.setLineDash([]);
+  }
   for (const g of SIG_GROUPS) {
     const st = lightOf(0);
     x.fillStyle = st === 'g' ? '#3fd15e' : st === 'y' ? '#ffc63d' : '#e8323c';
@@ -14570,6 +14608,44 @@ const ROUTE_LINE = (() => {
   return L0;
 })();
 
+// От точки остановки до двери — короткие отдельные штрихи по земле, без широкой автомобильной полосы на газоне.
+const ROUTE_WALK = [null, null];                // меши создаём после старта, чтобы UUID Three не сдвигали зерно города
+function makeRouteWalk () {
+    const MAX = 512, pos = new Float32Array(MAX * 12), idx = new Uint16Array(MAX * 6);
+    for (let i = 0; i < MAX; i++) { const v = i * 4, k = i * 6; idx[k] = v; idx[k + 1] = v + 1; idx[k + 2] = v + 2; idx[k + 3] = v + 1; idx[k + 4] = v + 3; idx[k + 5] = v + 2; }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1)); geo.setDrawRange(0, 0);
+    const mat = new THREE.MeshBasicMaterial({ color: ROUTE_HEX.client, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide,
+      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+    const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; mesh.renderOrder = 3; mesh.visible = false; scene.add(mesh);
+    return { MAX, pos, geo, mat, mesh, src: null, n: 0 };
+}
+function buildRouteWalk (P, W) {
+  W.src = P; W.n = 0;
+  if (!P || P.length < 2) { W.geo.setDrawRange(0, 0); return; }
+  let acc = 0;
+  for (let i = 1; i < P.length && W.n < W.MAX; i++) {
+    const [ax, az] = P[i - 1], [bx, bz] = P[i], dx = bx - ax, dz = bz - az, len = Math.hypot(dx, dz);
+    if (len < 0.01) continue;
+    const nx = -dz / len * 0.38, nz = dx / len * 0.38;
+    for (let d = Math.floor(acc / 3.5) * 3.5; d < acc + len && W.n < W.MAX; d += 3.5) {
+      const a = Math.max(0, d - acc), b = Math.min(len, d + 2.1 - acc);
+      if (b - a < 0.12) continue;
+      const x0 = ax + dx * a / len, z0 = az + dz * a / len, x1 = ax + dx * b / len, z1 = az + dz * b / len;
+      const y0 = groundH(x0, z0) + curbAt(x0, z0) + 0.18, y1 = groundH(x1, z1) + curbAt(x1, z1) + 0.18;
+      const p = W.n++ * 12, A = W.pos;
+      A[p] = x0 + nx; A[p + 1] = y0; A[p + 2] = z0 + nz;
+      A[p + 3] = x0 - nx; A[p + 4] = y0; A[p + 5] = z0 - nz;
+      A[p + 6] = x1 + nx; A[p + 7] = y1; A[p + 8] = z1 + nz;
+      A[p + 9] = x1 - nx; A[p + 10] = y1; A[p + 11] = z1 - nz;
+    }
+    acc += len;
+  }
+  W.geo.attributes.position.needsUpdate = true;
+  W.geo.setDrawRange(0, W.n * 6);
+}
+
 /* проезжая часть рядом с точкой: кусок улицы графа, у которого точка ближе всего к краю полотна
    (out — сколько метров за краем, ≤ 0 — на полотне). Один объект на все вызовы — без мусора */
 const RWY = { out: 0, d: 0, w: 0, x: 0, z: 0, ux: 0, uz: 0 };
@@ -14711,6 +14787,14 @@ function updateRouteLine (dt) {
   // опыт читаем, только когда маршрут пересчитан (раз в 0,35 с), а не каждый кадр
   if (L.xpSrc !== routePts) { L.xpSrc = routePts; L.tut = RASK.wanted(getXP()); }   // первая смена — всегда, дальше — настройка (routeask.js)
   const on = L.tut && !S.ride && (S.state === 'drive' || S.state === 'back' || S.state === 'side') && routePts.length > 1;
+  for (let i = 0; i < ROUTE_WALK.length; i++) {
+    const foot = i ? routePts.offroadStart : routePts.offroad;
+    const W = ROUTE_WALK[i] || (foot && L.tut && (ROUTE_WALK[i] = makeRouteWalk()));
+    if (!W) continue;
+    if (W.src !== foot) buildRouteWalk(foot, W);
+    W.mesh.visible = !!(L.tut && !S.ride && foot && W.n && Math.hypot(V.x - foot[0][0], V.z - foot[0][1]) < ROUTE_LEN);
+    if (W.mesh.visible) { W.mat.color.set(routeHex()); W.mat.opacity = 0.8 * lerp(1, 0.6, ENV.night); }
+  }
   let R = L.slots[L.cur];
   if (on && R.src !== routePts) {
     if (L.gen !== RP.gen) {
@@ -16029,8 +16113,11 @@ function checkArrival (dt) {
     const storyArrival = !!(story && STORY.interiorFor(story) && !story.interiorDone);
     const storyParked = !!(story?.interiorDone && story.parking &&
       Math.hypot(V.x - story.parking.x, V.z - story.parking.z) < 1.5);
+    const stop = routePts.offroad && routePts.offroad[0];
+    const roadArrival = !story && routePts.offroadSafe && stop &&
+      Math.hypot(V.x - stop[0], V.z - stop[1]) <= Math.max(6, arrivalStop.reach || 6);
     // Сюжет перехватывает руль ещё на подъезде к дому: угол и скорость въезда не влияют на выход курьера.
-    if ((!storyParked && d > (storyArrival ? STORY_PARK_AREA : (arrivalStop.reach || 6))) || (!storyArrival && speed > 6)) return;
+    if ((!storyParked && !roadArrival && d > (storyArrival ? STORY_PARK_AREA : (arrivalStop.reach || 6))) || (!storyArrival && speed > 6)) return;
     if (FLYC.blocksHand()) return;                 // летающий родстер: вручить — только на земле (flycar.js)
     const o = arrivalOrder;
     const st = arrivalStop;
