@@ -41,6 +41,7 @@ import {createLandPackageReader} from './landdata/land-package-reader.js';
 import {createLandPackageExporter} from './landdata/land-package-export.js';
 import {LAND_PACKAGE_LIMITS} from './landdata/land-package-config.js';
 import {createLandStream,streamedGroundMaterial} from './landstream.js';
+import {createTileGpu} from './tilegpu.js';
 import {clippedMesher} from './landclip.js';
 let LAND_STREAM = null, LAND_ENTERING = false;
 const LAND_READ17 = new URLSearchParams(location.search).has('landcache') ? createLandReader({
@@ -6259,6 +6260,7 @@ function buildCity () {
   let groundMat=litMat,groundStreamMask=null;
   if (RLAND.ON && LATE.busy() && !new URLSearchParams(location.search).has('fullterrain')) {
     const disposeLand=g=>{if(g){g.removeFromParent();g.traverse(m=>m.geometry?.dispose());}};
+    const landGpu=createTileGpu({renderer,scene,cam,keep:()=>WARM.keep()});
     LAND_STREAM=createLandStream({terrain:TER,build:function* (bounds) {
       LAND_READ17?.assertReady();
       landPackageUsable();
@@ -6284,13 +6286,14 @@ function buildCity () {
         // first, then releases unpublished buffers and geometries here.
         if(!transferred){M.discard();disposeLand(g);}
       }
-    },dispose:disposeLand,visible:b=>{
+    },upload:function* (g){yield* landGpu.upload(g);g.userData.landGpuUploaded=true;},warm:landGpu.warm,dispose:disposeLand,visible:b=>{
       const x=(b[0]+b[2])/2,z=(b[1]+b[3])/2;
       return CULL.inView(x,terrainH(x,z),z,Math.hypot(b[2]-b[0],b[3]-b[1])/2);
     },publish(id,g) {
       STARTUP.geometry('land.surfacePublished', g);
       scene.add(g);CULL.register(g);groundStreamMask.update();groups.push(g);
     }});
+    LAND_STREAM.stats.gpu=landGpu.stats;
     groundStreamMask=streamedGroundMaterial(THREE,litMat,LAND_STREAM);
     groundMat=groundStreamMask.material;
   }
@@ -6390,6 +6393,7 @@ function buildCity () {
       renderer.setRenderTarget(rt); renderer.render(tmp, cam); renderer.setRenderTarget(null);
     };
     for (const g of groups) {
+      if(g.userData.landGpuUploaded)continue;
       if (g.parent !== scene) scene.add(g);
       let b = [], v = 0;
       const flushB = () => { const par = g; shot(b); for (const m of b) { m.frustumCulled = true; par.add(m); } b = []; v = 0; };
@@ -16941,11 +16945,14 @@ function reviveTick (dt) {
 }
 
 function startRun (ride) {
-  if (RESET_LOCKED || LAND_READ17?.failed || LAND_PACKAGE?.fatal || ADDRESS_PREPARED17?.meta().fatal) return;
+  if (LAND_ENTERING || RESET_LOCKED || LAND_READ17?.failed || LAND_PACKAGE?.fatal || ADDRESS_PREPARED17?.meta().fatal) return;
   STARTUP.request({ ride: !!ride, district: DIST.cur() });
+  CL.transFor('начало смены', 3000);             // метка перехода (crashlog.js, 0п48): оборвётся — следующий запуск запишет
+  LATE.flush();                                   // город ещё достраивался за меню — сначала достроить (latebuild.js)
+  if(LAND_READ17){try{LAND_READ17.assertReady();}catch{return;}}
+  if(LAND_PACKAGE?.fatal||ADDRESS_PREPARED17?.meta().fatal)return;
   const place=PIZZERIAS[DIST.cur()]||PIZZA;
-  if (LAND_STREAM && !LATE.busy() && !LAND_STREAM.readyAt(place.bx,place.bz,640)) {
-    if (LAND_ENTERING) return;
+  if (LAND_STREAM && !LAND_STREAM.gpuReadyAt(place.bx,place.bz,640)) {
     LAND_ENTERING=true;
     const boot=document.createElement('div');boot.id='boot';boot.className='late-wait';
     boot.innerHTML='<img src="./brand/logo-px.png" alt=""><div class="boot-bar"><i></i></div>';document.body.appendChild(boot);
@@ -16959,10 +16966,6 @@ function startRun (ride) {
     };
     requestAnimationFrame(()=>setTimeout(advance,0));return;
   }
-  CL.transFor('начало смены', 3000);             // метка перехода (crashlog.js, 0п48): оборвётся — следующий запуск запишет
-  LATE.flush();                                   // город ещё достраивался за меню — сначала достроить (latebuild.js)
-  if(LAND_READ17){try{LAND_READ17.assertReady();}catch{return;}}
-  if(LAND_PACKAGE?.fatal||ADDRESS_PREPARED17?.meta().fatal)return;
   S.ride = !!ride;
   DIRECTOR.shiftStart(S.ride);                   // режиссёр событий: смена сессии (director.js) — до погоды и фестиваля
   WTH.shiftStart(S.ride);                         // смена карьеры: сезон и погода жребием — жара, гроза, снежная зима… (weather.js)
@@ -19011,7 +19014,7 @@ function frameStep (now) {
       !DOOR.on() && !DLG.isOpen() && !HCAM.busy() && !FPD.busy() && !ST3.on() && !REPLAY.on() &&
       (!CAREER || !CAREERM.covered()) && !LATE.busy() && !LAND_ENTERING && !document.hidden &&
       !document.body.classList.contains('booting') && !document.querySelector('.late-wait') &&
-      (!LAND_STREAM || LAND_STREAM.readyAt(V.x, V.z, 640)) && (!RLAND.ON || RLAND.ST.supportReady)) {
+      (!LAND_STREAM || LAND_STREAM.gpuReadyAt(V.x, V.z, 640)) && (!RLAND.ON || RLAND.ST.supportReady)) {
     STARTUP.control({ guardVersion: 2, state: S.state, paused: S.paused || EXT.paused, mapOpen: FM.open,
       held: DOOR.on() || DLG.isOpen() || HCAM.busy() || FPD.busy() || ST3.on(), localReady: true, supportReady: !RLAND.ON || !!RLAND.ST.supportReady,
       x: V.x, z: V.z, gas: IN.gas, readyTiles: LAND_STREAM?.stats.ready ?? null });
@@ -19074,6 +19077,7 @@ WARM.init({ THREE, renderer, scene, cam, drop: dropMesh, variants: objs => SUNSH
   } });
 LATE.add('warm', WARM.compile);
 LATE.add('warmUse', WARM.ready);
+LATE.add('landReady', function* () { if(LAND_STREAM)yield* LAND_STREAM.warmPublished(); });
 LATE.add('freeze', () => CULL.freeze(scene, cam, PROPS));   // город собран: неподвижное — в заморозку и отсечение
 /* шаблоны лёгких такси (liteTemplate: полная модель и склейка, ~1,5 мс, на Деке 4—5) — за меню, по одному за шаг (23.10.2026:
    строились в смене при первом такси своей модели — шаг потока 6—8 мс на Деке). Последним куском: Math.random (uuid three.js) —

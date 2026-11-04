@@ -3,29 +3,42 @@ import { createTileQueue } from './tilequeue.js';
 /* Подробная поверхность нужна вокруг камеры, а не сразу во всём городе.
    Опора и правила движения уже готовы; до замены остаётся исходная земля.
    Готовый участок публикуется целиком, затем скрывается его старый слой. */
-export function createLandStream({terrain,build,publish=()=>{},dispose=()=>{},visible=()=>false,radius=832,now=()=>performance.now()}) {
+export function createLandStream({terrain,build,upload=null,warm=null,publish=()=>{},dispose=()=>{},visible=()=>false,radius=832,now=()=>performance.now()}) {
   const size=terrain.g*16,x0=terrain.x0,z0=terrain.z0;
   const nx=Math.ceil((terrain.nx-1)/16),nz=Math.ceil((terrain.nz-1)/16);
-  const ready=new Uint8Array(nx*nz),failed=new Set();
-  const stats={ready:0,total:nx*nz,steps:0,maxStep:0,ms:0,failed:0};
+  const ready=new Uint8Array(nx*nz),uploaded=new Uint8Array(nx*nz),warmed=new Uint8Array(nx*nz),failed=new Set(),cells=new Map();
+  const stats={ready:0,uploaded:0,warmed:0,total:nx*nz,steps:0,maxStep:0,ms:0,failed:0};
   let visualSeed=0x5a17,focus=null,lastPlan=null;
   // UUID мешей three.js используют Math.random. Догрузка рисунка не
   // должна менять случайные события и поведение людей во время смены.
   const quiet=fn=>{const previous=Math.random;Math.random=()=>((visualSeed=(Math.imul(visualSeed,1664525)+1013904223)>>>0)/4294967296);try{return fn();}finally{Math.random=previous;}};
   const bounds=id=>{const i=id%nx,j=Math.floor(id/nx);return [x0+i*size,z0+j*size,Math.min(x0+(i+1)*size,x0+(terrain.nx-1)*terrain.g),Math.min(z0+(j+1)*size,z0+(terrain.nz-1)*terrain.g)];};
-  function nearest(x,z,r,includeFailed=false) {
+  function nearest(x,z,r,includeFailed=false,state=ready) {
     let best=null,distance=Infinity;
     for(let j=Math.max(0,Math.floor((z-r-z0)/size));j<=Math.min(nz-1,Math.floor((z+r-z0)/size));j++)
       for(let i=Math.max(0,Math.floor((x-r-x0)/size));i<=Math.min(nx-1,Math.floor((x+r-x0)/size));i++){
-        const id=j*nx+i;if(ready[id]||!includeFailed&&failed.has(id))continue;
+        const id=j*nx+i;if(state[id]||!includeFailed&&failed.has(id))continue;
         const b=bounds(id),dx=Math.max(b[0]-x,0,x-b[2]),dz=Math.max(b[1]-z,0,z-b[3]),d=dx*dx+dz*dz;
         if(d<=r*r&&d<distance){distance=d;best=id;}
       }
     return best;
   }
-  const queue=createTileQueue({build:id=>build(bounds(id)),dispose,
+  function* buildTile(id) {
+    let value,owned=false;
+    try {
+      value=yield* build(bounds(id));owned=true;
+      if(upload)yield* upload(value);
+      if(warm)yield* warm(value);
+      owned=false;return value;
+    } finally {if(owned)dispose(value);}
+  }
+  const queue=createTileQueue({build:buildTile,dispose,
     onError:id=>failed.add(id),
-    onRequest:()=>STARTUP.count('land.cellsRequested'),publish(id,value){publish(id,value);ready[id]=255;stats.ready++;}});
+    onRequest:()=>STARTUP.count('land.cellsRequested'),publish(id,value){
+      publish(id,value);cells.set(id,value);ready[id]=255;stats.ready++;
+      if(upload){uploaded[id]=255;stats.uploaded++;STARTUP.count('land.cellsUploaded');}
+      if(warm){warmed[id]=255;stats.warmed++;STARTUP.count('land.cellsWarmed');}
+    }});
   stats.queue=queue.stats;
   function request(x,z,r,{heading=0,speed=0,route=null,routeIndex=0,initial=false}={}) {
     const requests=new Map(),hx=Math.sin(heading),hz=Math.cos(heading);
@@ -66,8 +79,30 @@ export function createLandStream({terrain,build,publish=()=>{},dispose=()=>{},vi
       stats.failed++;throw error;
     } finally {const ms=now()-t;stats.ms+=ms;stats.maxStep=Math.max(stats.maxStep,ms);stats.steps++;}
   }
-  return {ready,stats,size,nx,nz,x0,z0,x1:x0+(terrain.nx-1)*terrain.g,z1:z0+(terrain.nz-1)*terrain.g,bounds,
-    *prepare(x,z,r=640){lastPlan=null;quiet(()=>request(x,z,r,{initial:true}));while(advance())yield 'земля рядом';if(nearest(x,z,r,true)!==null)throw Error('Участок земли не построен');},
+  function* warmCell(id,value) {
+    const it=warm(value);let result;
+    try{while(!(result=quiet(()=>it.next())).done)yield result.value;}
+    finally{if(!result?.done)quiet(()=>it.return?.());}
+    if(!warmed[id]){warmed[id]=255;stats.warmed++;}
+  }
+  const gpuReadyAt=(x,z,r=0)=>nearest(x,z,r,true)===null&&nearest(x,z,r,true,uploaded)===null&&nearest(x,z,r,true,warmed)===null;
+  return {ready,published:ready,uploaded,warmed,stats,size,nx,nz,x0,z0,x1:x0+(terrain.nx-1)*terrain.g,z1:z0+(terrain.nz-1)*terrain.g,bounds,
+    *prepare(x,z,r=640){
+      lastPlan=null;quiet(()=>request(x,z,r,{initial:true}));while(advance())yield 'земля рядом';
+      if(nearest(x,z,r,true)!==null)throw Error('Участок земли не построен');
+      if(upload&&warm){
+        let id;while((id=nearest(x,z,r,true,warmed))!==null)yield* warmCell(id,cells.get(id));
+        if(!gpuReadyAt(x,z,r))throw Error('Участок земли не готов в GPU');
+      }
+    },
+    // The initial cells predate the final light/shadow setup. Recompile for
+    // that setup before opening the global startup barrier, including cells
+    // which CULL has detached or masked in the meantime.
+    *warmPublished(){
+      if(!warm)return;
+      warmed.fill(0);stats.warmed=0;
+      for(const [id,value] of cells)yield* warmCell(id,value);
+    },
     step(x,z,budget=.75,options={}){
       const t=now(),heading=options.heading||0,speed=options.speed||0;
       if(!lastPlan||t-lastPlan.at>=200||Math.hypot(x-lastPlan.x,z-lastPlan.z)>32||
@@ -79,9 +114,12 @@ export function createLandStream({terrain,build,publish=()=>{},dispose=()=>{},vi
       // step may still exceed it, as before. Do not claim a hard time cap.
       while(now()-t<budget&&advance()){}
     },
-    // Publication only. GPU upload/warm and supportReady remain separate
-    // startup barriers; this must not be used to bypass LATE.
-    readyAt(x,z,r=0){return nearest(x,z,r,true)===null;}
+    // Keep publication separate from GPU readiness. Neither removes the
+    // global builders/supportReady barriers before stage 17г.
+    readyAt(x,z,r=0){return nearest(x,z,r,true)===null;},
+    uploadedAt(x,z,r=0){return nearest(x,z,r,true,uploaded)===null;},
+    warmedAt(x,z,r=0){return nearest(x,z,r,true,warmed)===null;},
+    gpuReadyAt
   };
 }
 
