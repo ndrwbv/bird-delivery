@@ -5892,5 +5892,15 @@
  "НАКЛАДНАЯ": "DELIVERY NOTE",
  "Заказ № 0007": "Order No. 0007",
  "ул. Царевского, 2": "2 Tsarevskogo St.",
- "Пепперони": "Pepperoni"
+ "Пепперони": "Pepperoni",
+ "Новое сообщение": "New message",
+ "ЗАРАБОТАНО ЗА СМЕНУ": "EARNED THIS SHIFT",
+ "РЕЙТИНГ ПОСЛЕ ЗАКАЗА": "RANK AFTER DELIVERY",
+ "Рейтинг смены": "Shift ranking",
+ "ПОСЛЕ ЗАКАЗА": "AFTER DELIVERY",
+ "Заработано за смену": "Earned this shift",
+ "Новый заказ": "New order",
+ "Принять заказ": "Accept order",
+ "Смена": "Shift",
+ "поехать — принять заказ": "Drive to accept the order"
 }

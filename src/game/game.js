@@ -202,6 +202,7 @@ import * as HAV from './havoc.js';             // Толик считает ра
 import * as FAHEAD from './faceahead.js';       // портреты заранее: получатель заказа, Толик, герои катсцен (в спокойные кадры)
 import * as CHAT from './chat.js';             // «Толик управляющий» пишет справа сверху, как в iMessage (похвала, ругань, вычет за опоздание)
 import * as HUDFONE from './hudphone.js';       // телефон курьера: сообщения и карта как приложения в HUD
+import * as HUDMAP from './hudmapios.js';        // карта и запас нитро слева от телефона
 import { PHONE_MAP, phoneBuildingColor } from './maptheme2gis.js';
 import * as CREWC from './crewcast.js';        // свои люди в каждой пиццерии: состав, характеры, машины с наклейками (crewcast.js)
 import * as CREWR from './crewrank.js';        // рейтинг смены: вспышка и стрелка «место N из M» на хаде, коллеги и Толик пишут в чат, кто кого обогнал (crewrank.js)
@@ -14389,7 +14390,6 @@ function setFullMap (on) {
   const toPause = !on && FM.open && FM.fromPause;   // открыли из паузы — «закрыть» возвращает в паузу, а не в езду
   FM.fromPause = false;
   FM.open = on;
-  if (!TOUCH) HUDFONE.showMap(on);
   elFull.hidden = !on;
   if (isPlaying() && !S.paused) { if (on) Platform.gameplayStop(); else Platform.gameplayStart(); }
   for (const k in FM.keys) FM.keys[k] = 0;
@@ -14909,6 +14909,7 @@ function dashState () {
 
 const elFx = $('fxs'), elRadarBox = $('radar');
 NFRAME.init([elRadarBox, elFull.querySelector('.fm-view')]);
+HUDMAP.init(elRadarBox);
 const TOUCH_NOS = document.querySelector('#touchpad .tp-nos');
 let toastT = 0;
 /* строка внизу — в общей очереди уведомлений (notifyq.js): ждёт, пока уйдёт то, что на экране; держит экран
@@ -14980,6 +14981,7 @@ function hudStep (dt) {
     HUDC.nos = nq;
     const nv = (nq / 1000).toFixed(3);
     NFRAME.update(NOS.tank, NOS.burn, $t('нитро'));
+    HUDMAP.fuel(NOS.tank);
     elRadarBox.style.setProperty('--nos', nv);
     if (TOUCH_NOS) TOUCH_NOS.style.setProperty('--nos', nv);   // на телефоне бак — кольцом по краю кнопки нитро
   }
@@ -15367,7 +15369,14 @@ function showOrderCard (order) {
   elPhone.classList.remove('drop');
   elPhone.classList.add('on');
   document.body.classList.add('brief');
-  HUDFONE.showOrder({ number: S.orders, html: elPhList.innerHTML });
+  const ik = inputKind();
+  const recipient = order.stops[0] && order.stops[0].persons && order.stops[0].persons[0];
+  const routeOverview = { route: routePts, roads: RSEG, origin: [V.x, V.z], target: S.target && [S.target.x, S.target.z] };
+  if (HUDFONE.active()) HUDMAP.routePreview($('radar'), routeOverview);
+  HUDFONE.showOrder({ number: S.orders, html: elPhList.innerHTML,
+    name: recipient ? NICK.label(recipient, $t('клиент')) : $t('клиент'), avatar: recipient ? NICK.avatar(recipient) : '',
+    many: order.stops.length > 1, routeOverview,
+    driveKey: ik.kind === 'pad' ? (ik.family === 'ps' ? 'R2' : 'RT') : 'W' });
   phoneT = 0;
   BRIEF.t = 0; BRIEF.gasUp = !IN.gas;           // газ зажат с прошлого заказа — не считается, нужен новый нажим
 }
@@ -15392,6 +15401,11 @@ function briefStep (dt) {
   if (!briefShown() || (S.state !== 'brief' && S.state !== 'loading' && S.state !== 'drive')) return;
   if (S.paused || FM.open || DLG.isOpen() || (CAREER && CAREERM.padRoot())) return;
   if (S.state === 'brief') startLoad();          // показалась — коробка сразу в багажник, руль свободен
+  if (HUDFONE.active()) {
+    if (!IN.gas) BRIEF.gasUp = true;
+    if (BRIEF.gasUp && IN.gas) acceptOrder();      // телефон и накладная уходят только на новый нажим газа
+    return;
+  }
   BRIEF.t += dt;
   const moving = Math.hypot(V.vx, V.vz) > BRIEF.V;
   if (BRIEF.t >= (moving ? BRIEF.MOVE : S.order && S.order.tut ? BRIEF.TUT : BRIEF.T)) acceptOrder();
@@ -17107,7 +17121,7 @@ addEventListener('keydown', e => {
   }
   if (CH.pause) return;
   // накладная: Enter — свернуть сразу, как A на геймпаде (без кнопки она и так свернётся сама)
-  if (briefShown() && (e.code === 'Enter' || e.code === 'NumpadEnter') && !S.paused && !FM.open && !DLG.isOpen() && !(CAREER && CAREERM.padRoot())) {
+  if (!HUDFONE.active() && briefShown() && (e.code === 'Enter' || e.code === 'NumpadEnter') && !S.paused && !FM.open && !DLG.isOpen() && !(CAREER && CAREERM.padRoot())) {
     e.preventDefault();
     if (!e.repeat && elPhone.classList.contains('on')) acceptOrder();
     return;
@@ -17406,11 +17420,11 @@ REALCAR.preloadTraffic(() => {
   for (const t of TRAFFIC) if (!(Math.hypot(t.x - V.x, t.z - V.z) < 60 && CULL.inView(t.x, 1.2, t.z, 3))) realSwap(t);   // на глазах не подменяем
 });
 HAV.init({ S, adult: ADULT });                   // счёт разрушений за смену для Толика (havoc.js)
-CREWR.init({ adult: ADULT, money, face: faceDataURL });   // money — суммы как у игрока, face — лица в таблице после вручения
+CREWR.init({ adult: ADULT, money, face: faceDataURL, phone: HUDFONE });   // деньги и рейтинг после вручения — в телефоне
 CREWC.init({ THREE, ADULT, makePerson, faceDataURL, put, mergeGeos, spec: m => CAR_SPEC[m] || CAR_SPEC.sedan, districtId: i => (DIST.list()[i] || {}).id });
 CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x1a1a5e, fem: true }), face: (p, size) => faceDataURL(p, size), blip: (f, d, ty, v) => Snd.blip(f, d, ty, v), fx: (n, synth) => Snd.fx(n, synth),
   speed: () => Math.hypot(V.vx || 0, V.vz || 0) });   // телефон: едешь — прочитанные сообщения чата прозрачнее (chat.js PH)
-HUDFONE.init({ mapElement: elFull, radarElement: elRadarBox, onRadarMove: sizeRadar, closeMap: on => setFullMap(!!on), onMapZoom: k => fmZoom(k) });
+HUDFONE.init();
 CHAT.bindPhone(HUDFONE);
 /* заказы карьеры (orders.js): очередь, поручения, развоз смены — через это */
 if (CAREER) ORD.init({ S, V, CITY, MAP, THREE, Store, ADULT, SPOTS, LIFE, Snd, get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get DAY_LEN () { return DAY_LEN; }, lang: curLang,
@@ -18482,7 +18496,7 @@ function padStep () {
     FM.padX = p.steer + p.rx; FM.padY = p.ly + p.ry; FM.padZ = p.gas - p.brake;
     if (p.menuBack || p.view) setFullMap(false);
   } else if (p.view && !screen && !S.paused && isPlaying()) CV.cycle(true);   // View / Back — вид камеры (camview.js)
-  if (p.accept && briefShown() && !S.paused && !FM.open && !DLG.isOpen() && !(CAREER && CAREERM.padRoot())) acceptOrder();   // A — свернуть накладную сразу
+  if (!HUDFONE.active() && p.accept && briefShown() && !S.paused && !FM.open && !DLG.isOpen() && !(CAREER && CAREERM.padRoot())) acceptOrder();   // A — свернуть прежнюю накладную вне телефона
   if (p.btnX && !screen && !S.paused && !FM.open && isPlaying() && GFX.offerYes()) p.btnX = false;   // X — «включить „среднюю“» на плашке «кадр не успевает» (gfx.js)
   if (p.sound) Snd.set(!Snd.on);
   if (p.dDown && !screen && !S.paused && !FM.open && isPlaying()) { if (RADIO.RAD.HIDDEN) MUS.next(); else RADIO.next(); }   // ↓ — следующий трек (пока радио скрыто) или станция

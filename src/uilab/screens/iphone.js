@@ -1,13 +1,15 @@
 /* Изолированные состояния телефона для просмотра и скриншотов без запуска города. */
-export default function iphoneScreens ({ HUDFONE, t, log }) {
+export default function iphoneScreens ({ HUDFONE, HUDMAP, t, log }) {
   return [{
     id: 'iphone', group: 'Телефон в HUD', name: 'iPhone 4 · iOS 5–6',
-    note: 'Телефон выходит из правого нижнего угла и туда же возвращается. Корпус и приложения оформлены в духе iPhone 4 и iOS 5–6. На уменьшенном экране видны карта, текущий заказ, деньги и жизни; сообщение и баннер — внутри телефона.',
+    note: 'Карта и заказ видны слева в HUD. Телефон выглядывает снизу справа: внутри сообщения, новая накладная, рейтинг и заработок за смену.',
     knobs: [
-      { k: 'phase', label: 'состояние', type: 'sel', def: 'dock', opts: [['dock', 'видно карту и заказ'], ['order', 'накладная в приложении'], ['banner', 'сообщение + уведомление'], ['big', 'переписка крупно'], ['map', 'приложение «Карты»'], ['home', 'домашний экран'], ['live', 'анимация от сообщения']] },
+      { k: 'phase', label: 'состояние', type: 'sel', def: 'dock', opts: [['dock', 'карта и телефон внизу'], ['order', 'новый заказ в телефоне'], ['message', 'новое сообщение'], ['rating', 'рейтинг после заказа'], ['courier', 'заработок за смену'], ['home', 'домашний экран'], ['live', 'анимация от сообщения']] },
       { k: 'text', label: 'текст сообщения', type: 'text', def: 'Клиент уже ждёт. Ты где?' },
     ],
     show (o) {
+      const map = HUDMAP.demoMap();
+      map.classList.toggle('hios-awaiting-order', o.phase === 'order' || o.phase === 'rating');
       HUDFONE.setVisible(true);
       if (o.phase === 'live') {
         HUDFONE.demo('dock', String(o.text || ''));

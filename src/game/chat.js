@@ -319,7 +319,7 @@ function sayNow (text, onShow, angry, who) {
     const big = !m.calm && !(C.hud && C.hud.active()) && grow(m) ? bigHold(text) : 0;
     if (big) m.t3 = setTimeout(() => shrink(m), big * 1000);
     m.t2 = setTimeout(() => drop(m), (big + hold(text)) * 1000);
-  }, TYPE_S * 1000);
+  }, C.hud && C.hud.active() ? 0 : TYPE_S * 1000);
   return m;
 }
 
