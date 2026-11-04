@@ -89,16 +89,16 @@ export function init ({ visible = false } = {}) {
           <div class="hp-app-grid"><button type="button" data-open="messages">${icon('messages')}<span>${t('Сообщения')}</span></button><button type="button" data-open="courier">${icon('courier')}<span>${t('Птица Пицца')}</span></button></div>
           <div class="hp-home-dock"><button type="button" data-open="courier">${icon('courier')}</button><button type="button" data-open="messages">${icon('messages')}</button></div>
         </div>
-        <section class="hp-app hp-courier-app" data-hp-app="courier"><header class="hp-nav"><b>${t('Птица Пицца')}</b><button type="button" data-open="messages" aria-label="${t('Сообщения')}">${icon('messages')}</button></header>
+        <section class="hp-app hp-courier-app" data-hp-app="courier"><header class="hp-nav"><b>${t('Птица Пицца')}</b></header>
           <div class="hp-courier-scroll">
-            <button class="hp-competition" type="button" data-open="rating"><span class="hp-rank-medal">★</span><span class="hp-rank-copy"><small>${t('РЕЙТИНГ СМЕНЫ')}</small><b class="hp-rank-place">${t('место {i} из {n}', { i: 1, n: 1 })}</b></span><span class="hp-rank-arrow">›</span></button>
+            <button class="hp-competition" type="button" data-open="rating"><span class="hp-rank-heading"><b>${t('ЛИДЕРЫ СМЕНЫ')}</b><span class="hp-rank-arrow">›</span></span><span class="hp-rank-list"></span></button>
             <div class="hp-shift-earn"><small>${t('ЗАРАБОТАНО ЗА СМЕНУ')}</small><strong class="hp-earned">0 ₽</strong></div>
             <div class="hp-current"><small>${t('ТЕКУЩИЙ ЗАКАЗ')}</small><b class="hp-current-title">${t('Нет активного заказа')}</b><span class="hp-current-address"></span><span class="hp-current-time"></span></div>
             <div class="hp-last-rating" hidden><small>${t('РЕЙТИНГ ПОСЛЕ ЗАКАЗА')}</small><b></b></div>
           </div>
           <nav class="hp-courier-nav"><button type="button" data-open="courier">${t('Смена')}</button><button type="button" data-open="messages">${t('Сообщения')}</button></nav>
         </section>
-        <section class="hp-app hp-messages" data-hp-app="messages" hidden><header class="hp-nav"><button type="button" data-open="courier" aria-label="${t('назад')}">‹ <span>${t('Птица Пицца')}</span></button><b>${t('Сообщения')}</b><span class="hp-nav-space"></span></header><div class="hp-thread"></div><div class="hp-compose"><span>＋</span><p>${t('Сообщение')}</p><span>◉</span></div></section>
+        <section class="hp-app hp-messages" data-hp-app="messages" hidden><header class="hp-nav"><button type="button" data-open="courier" aria-label="${t('назад')}">‹ <span>${t('Назад')}</span></button><b>${t('Сообщения')}</b><span class="hp-nav-space"></span></header><div class="hp-thread"></div></section>
         <section class="hp-app hp-rating-app" data-hp-app="rating" hidden><header class="hp-nav"><button type="button" data-open="courier" aria-label="${t('назад')}">‹ <span>${t('Смена')}</span></button><b>${t('Рейтинг смены')}</b><span class="hp-nav-space"></span></header><div class="hp-rating-head"><small>${t('ПОСЛЕ ЗАКАЗА')}</small><strong class="hp-rating-place"></strong><span>${t('Заработано за смену')} <b class="hp-rating-money"></b></span></div><div class="hp-rating-rows"></div></section>
         <div class="hp-order-modal" hidden><div class="hp-order-dialog" role="dialog" aria-label="${t('Новый заказ')}"><div class="hp-order-title"><small>${t('Птица Пицца')}</small><b>${t('Новый заказ')} <span class="hp-order-no"></span></b></div><div class="hp-order-list"><div class="hp-order-recipient"><span class="hp-order-avatar"><img alt="" hidden></span><div><small>${t('получатель')}</small><b class="hp-order-name"></b></div></div><div class="hp-order-map"><canvas width="520" height="214"></canvas></div><div class="hp-order-details"></div></div><div class="hp-order-go"><kbd>W</kbd><span>${t('поехать — принять заказ')}</span></div></div></div>
       </div><button class="hp-home-button" type="button" aria-label="${t('домой')}"></button>
@@ -200,14 +200,21 @@ function showLatestMessage () {
   const latest = H.thread.querySelector('.hp-message.latest p')?.textContent || '';
   H.shrink = setTimeout(dock, Math.max(9000, Math.min(16000, 7000 + latest.length * 65)));
 }
-export function rank ({ place = 1, total = 1 } = {}) {
+export function rank ({ place = 1, total = 1, rows = [] } = {}) {
   if (!H.root) return;
-  const key = place + '/' + total;
+  const top = rows.slice(0, 3);
+  const key = place + '/' + total + '/' + top.map(r => [r.n, r.d, r.money, r.me].join(':')).join('|');
   if (key === H.rankKey) return;
   H.rankKey = key;
-  $('.hp-rank-place').textContent = t('место {i} из {n}', { i: place, n: total });
-  $('.hp-rank-medal').textContent = place === 1 ? '★' : String(place);
-  $('.hp-competition').classList.toggle('hp-first', place === 1 && total > 1);
+  const list = $('.hp-rank-list'); list.replaceChildren();
+  top.forEach((r, i) => {
+    const line = document.createElement('span'); line.className = 'hp-rank-line' + (r.me ? ' me' : '');
+    const no = document.createElement('i'); no.textContent = String(i + 1);
+    const name = document.createElement('b'); name.textContent = r.n || t('ты');
+    const score = document.createElement('small'); score.textContent = t('{n} зак.', { n: r.d || 0 }) + (r.money ? ' · ' + r.money : '');
+    line.append(no, name, score); list.appendChild(line);
+  });
+  $('.hp-competition').setAttribute('aria-label', t('Рейтинг смены') + ': ' + t('место {i} из {n}', { i: place, n: total }));
 }
 export function paid ({ amount, money }) {
   if (!active()) return;
@@ -234,7 +241,7 @@ export function showRating ({ rows, money }, autoOpen = true) {
     const details = document.createElement('small'); details.textContent = t('{n} зак.', { n: r.d || 0 }) + ' · ' + (r.money || '');
     row.append(num, name, details); list.appendChild(row);
   });
-  rank({ place: me + 1, total: rows.length });
+  rank({ place: me + 1, total: rows.length, rows });
   if (autoOpen) open('rating');
   return true;
 }
@@ -250,7 +257,11 @@ export function reset () {
 export function demo (phase = 'dock', text = 'Клиент уже ждёт. Ты где?') {
   reset(); setVisible(true);
   resources({ hp: 5.5, hpMax: 6, money: '3 200 ₽', order: { title: t('Заказ № 0007'), address: t('ул. Царевского, 2') }, time: '02:15' });
-  rank({ place: 3, total: 8 });
+  rank({ place: 3, total: 8, rows: [
+    { n: t('Вася'), d: 4, money: '4 100 ₽' },
+    { n: t('Олег'), d: 3, money: '3 600 ₽' },
+    { n: t('ты'), d: 3, money: '3 200 ₽', me: true },
+  ] });
   addMessage({ name: t('Ирина Сергеевна'), role: t('управляющая'), text: t('Женя, новый заказ. Забери пиццу и выезжай.') });
   addMessage({ name: t('Ирина Сергеевна'), role: t('управляющая'), text });
   if (phase === 'order') showOrder({ number: 7, name: 'Света Т.', html: '<table class="oc-inv"><tbody><tr data-k="who"><th>' + t('получатель') + '</th><td><b>Света Т.</b></td></tr><tr data-k="addr"><th>' + t('адрес') + '</th><td><b>' + t('ул. Царевского, 2') + '</b></td></tr><tr data-k="items"><th>' + t('заказ') + '</th><td><b>' + t('Пепперони') + ' × 1</b></td></tr><tr data-k="pay"><th>' + t('оплата') + '</th><td><b class="oc-pay">3 200 ₽</b></td></tr></tbody></table>' });
