@@ -77,11 +77,11 @@ export function init ({ mapElement = null, radarElement = null, onRadarMove = nu
   if (H.root) return H.root;
   const root = document.createElement('div'); root.id = 'hud-phone';
   root.innerHTML = `<div class="hp-backdrop"></div>
-    <button class="hp-banner" type="button" aria-label="${t('открыть сообщение')}">${icon('messages')}<span class="hp-banner-copy"><b>${t('Сообщения')} <em>${t('сейчас')}</em></b><strong class="hp-banner-name"></strong><span class="hp-banner-text"></span></span></button>
     <div class="hp-device" role="group" aria-label="${t('телефон курьера')}">
       <div class="hp-camera"></div><div class="hp-speaker"></div>
       <div class="hp-glass">
         <div class="hp-status"><span class="hp-health">♥ 6/6</span><span class="hp-clock">9:41</span><span class="hp-money-slot"><span class="hp-money-fallback">0 ₽</span></span></div>
+        <button class="hp-banner" type="button" aria-label="${t('открыть сообщение')}">${icon('messages')}<span class="hp-banner-copy"><b>${t('Сообщения')} <em>${t('сейчас')}</em></b><strong class="hp-banner-name"></strong><span class="hp-banner-text"></span></span></button>
         <div class="hp-home"><div class="hp-wallpaper"></div><div class="hp-home-head">${t('Солнечный')}</div>
           <div class="hp-app-grid"><button type="button" data-open="messages">${icon('messages')}<span>${t('Сообщения')}</span></button><button type="button" data-open="map">${icon('map')}<span>${t('Карты')}</span></button><button type="button" data-open="courier">${icon('courier')}<span>${t('Курьер')}</span></button></div>
           <div class="hp-home-dock"><button type="button" data-open="glance">${icon('courier')}</button><button type="button" data-open="messages">${icon('messages')}</button><button type="button" data-open="map">${icon('map')}</button></div>
@@ -98,7 +98,7 @@ export function init ({ mapElement = null, radarElement = null, onRadarMove = nu
             <div class="hp-order-sheet"><div class="hp-order-title"><span>${t('НАКЛАДНАЯ')}</span><b class="hp-order-no">№ 0000</b></div><div class="hp-order-list">${t('Нет активного заказа')}</div></div></div>
           <nav class="hp-courier-nav"><button type="button" data-open="glance">${t('Сводка')}</button><button type="button" data-open="map">${t('Карта')}</button></nav>
         </section>
-      </div><button class="hp-home-button" type="button" aria-label="${t('домой')}"><i></i></button>
+      </div><button class="hp-home-button" type="button" aria-label="${t('домой')}"></button>
     </div>`;
   (document.getElementById('game') || document.body).appendChild(root);
   H.root = root; H.device = root.querySelector('.hp-device'); H.banner = root.querySelector('.hp-banner');
