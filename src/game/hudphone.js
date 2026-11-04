@@ -1,5 +1,5 @@
-/* iPhone 4 в HUD: сообщения, заказ и рейтинг живут на одном экране телефона.
-   Карта и текущая карточка заказа остаются снаружи, в левом углу игры. */
+/* iPhone 4 в HUD: текущий заказ, итог доставки, сообщения и рейтинг — в телефоне.
+   Снаружи слева остаются карта и запас нитро. */
 import './hudphone.css';
 import { t } from '../i18n/index.js';
 import * as HUDMAP from './hudmapios.js';
@@ -7,7 +7,7 @@ import * as HUDMAP from './hudmapios.js';
 const H = { root: null, device: null, thread: null, banner: null, modal: null,
   visible: false, app: 'courier', order: null, messages: [], rating: null,
   shrink: 0, bannerTimer: 0, messageTimer: 0, enterTimer: 0, resourcesKey: '', rankKey: '',
-  moneyElement: null, moneyParent: null };
+  moneyElement: null, moneyParent: null, payment: null, paymentModal: null };
 
 const icon = kind => '<span class="hp-icon hp-icon-' + kind + '" aria-hidden="true"><i></i></span>';
 const $ = s => H.root && H.root.querySelector(s);
@@ -24,11 +24,13 @@ function open (app = 'messages') {
   H.root.classList.remove('hp-focus-latest', 'hp-app-launching');
   setApp(app);
   H.root.classList.add('hp-expanded');
+  if (app === 'courier') $('.hp-courier-scroll').scrollTop = 0;
   if (app === 'messages') requestAnimationFrame(() => { H.thread.scrollTop = H.thread.scrollHeight; });
 }
 
 export function dock () {
   if (!H.root) return;
+  if (H.payment) return; // результат доставки остаётся раскрыт на время чтения
   clearTimeout(H.shrink);
   clearTimeout(H.messageTimer);
   H.modal.hidden = true;
@@ -90,9 +92,9 @@ export function init ({ visible = false } = {}) {
         </div>
         <section class="hp-app hp-courier-app" data-hp-app="courier"><header class="hp-nav"><b>${t('Птица Пицца')}</b></header>
           <div class="hp-courier-scroll">
+            <div class="hp-current"><small>${t('ТЕКУЩИЙ ЗАКАЗ')}</small><b class="hp-current-title">${t('Нет активного заказа')}</b><span class="hp-current-address"></span><span class="hp-current-time"></span></div>
             <button class="hp-competition" type="button" data-open="rating"><span class="hp-rank-heading"><b>${t('ЛИДЕРЫ СМЕНЫ')}</b><span class="hp-rank-arrow">›</span></span><span class="hp-rank-list"></span></button>
             <div class="hp-shift-earn"><small>${t('ЗАРАБОТАНО ЗА СМЕНУ')}</small><strong class="hp-earned">0 ₽</strong></div>
-            <div class="hp-current"><small>${t('ТЕКУЩИЙ ЗАКАЗ')}</small><b class="hp-current-title">${t('Нет активного заказа')}</b><span class="hp-current-address"></span><span class="hp-current-time"></span></div>
             <div class="hp-last-rating" hidden><small>${t('РЕЙТИНГ ПОСЛЕ ЗАКАЗА')}</small><b></b></div>
           </div>
           <nav class="hp-courier-nav"><button type="button" data-open="courier">${t('Смена')}</button><button type="button" data-open="messages">${t('Сообщения')}</button></nav>
@@ -106,6 +108,7 @@ export function init ({ visible = false } = {}) {
   H.root = root; H.device = root.querySelector('.hp-device'); H.thread = root.querySelector('.hp-thread');
   H.banner = root.querySelector('.hp-banner'); H.modal = root.querySelector('.hp-order-modal');
   root.addEventListener('click', e => {
+    if (H.payment) { if (e.target.closest('.hp-paid-close')) finishPayment(); return; }
     if (!H.modal.hidden) return;
     if (e.target.closest('.hp-banner')) { root.classList.remove('hp-notifying'); showLatestMessage(); return; }
     const b = e.target.closest('[data-open]');
@@ -181,6 +184,7 @@ export function receive (o) {
   if (!active()) return false;
   clearTimeout(H.shrink); clearTimeout(H.messageTimer);
   addMessage(o);
+  if (H.payment) { H.payment.message = o; return true; }
   setApp('courier');
   H.root.classList.add('hp-expanded');
   H.root.classList.remove('hp-new-message', 'hp-focus-latest', 'hp-app-launching');
@@ -190,6 +194,7 @@ export function receive (o) {
 }
 function showLatestMessage () {
   if (!H.root || !H.visible) return;
+  if (H.payment) return;
   clearTimeout(H.messageTimer); clearTimeout(H.bannerTimer);
   H.root.classList.remove('hp-notifying');
   setApp('messages');
@@ -198,6 +203,77 @@ function showLatestMessage () {
   H.messageTimer = setTimeout(() => H.root?.classList.remove('hp-app-launching'), 550);
   const latest = H.thread.querySelector('.hp-message.latest p')?.textContent || '';
   H.shrink = setTimeout(dock, Math.max(9000, Math.min(16000, 7000 + latest.length * 65)));
+}
+/* Один результат доставки вместо россыпи денег, перелёта и карточки слева.
+   Время игровое: пауза и сцены не съедают время чтения; отмена не начисляет деньги. */
+export function showPayment ({ name = '', avatar = '', mood = 'ok', amount = '', money = '', zero = '0 ₽', breakdown = [], done, touch, ready, duration = 5.5 } = {}) {
+  if (!active()) return false;
+  hidePayment();
+  clearTimeout(H.shrink); clearTimeout(H.messageTimer); clearTimeout(H.bannerTimer);
+  H.modal.hidden = true;
+  document.body.classList.remove('hp-order-open');
+  open('courier');
+  H.root.classList.remove('hp-notifying', 'hp-new-message');
+  if (!H.paymentModal) {
+    const modal = document.createElement('section'); modal.className = 'hp-paid-modal';
+    modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-label', t('Заказ доставлен!'));
+    modal.innerHTML = '<div class="hp-paid-confetti" aria-hidden="true">' + '<i></i>'.repeat(14) + '</div>' +
+      '<header class="hp-paid-head"><span aria-hidden="true">★</span><b>' + t('Заказ доставлен!') + '</b><strong class="hp-paid-praise"></strong></header>' +
+      '<div class="hp-paid-scroll"><div class="hp-paid-guest"><span class="hp-paid-avatar"></span><div><b class="hp-paid-name"></b><span class="hp-paid-reaction"></span></div></div>' +
+      '<div class="hp-paid-receipt"></div><div class="hp-paid-bottom"><span>' + t('Выплата') + '</span><strong class="hp-paid-gain"></strong></div>' +
+      '<div class="hp-paid-shift"><span>' + t('За смену') + '</span><b class="hp-paid-total"></b></div></div>' +
+      '<button type="button" class="hp-paid-close">' + t('Дальше') + '</button>';
+    modal.querySelectorAll('.hp-paid-confetti i').forEach((bit, i) => bit.style.setProperty('--i', i));
+    $('.hp-glass').appendChild(modal); H.paymentModal = modal;
+  }
+  const modal = H.paymentModal;
+  modal.querySelector('.hp-paid-praise').textContent = mood === 'angry' ? t('Заказ завершён') : t('Молодец!');
+  const face = modal.querySelector('.hp-paid-avatar');
+  if (avatar) { const img = document.createElement('img'); img.src = avatar; img.alt = ''; face.replaceChildren(img); }
+  else face.replaceChildren((name || t('клиент')).slice(0, 1).toUpperCase());
+  modal.querySelector('.hp-paid-name').textContent = name || t('клиент');
+  const reaction = modal.querySelector('.hp-paid-reaction');
+  reaction.textContent = mood === 'happy' ? '♥ ' + t('Клиент в восторге') : mood === 'angry' ? '✕ ' + t('Клиент недоволен') : '✓ ' + t('Нормально');
+  reaction.className = 'hp-paid-reaction ' + mood;
+  const receipt = modal.querySelector('.hp-paid-receipt'); receipt.replaceChildren();
+  const lines = breakdown.some(r => r.kind === 'tip') ? breakdown : [...breakdown, { label: t('чаевые'), amount: zero, kind: 'tip' }];
+  for (const line of lines) {
+    const row = document.createElement('div'); row.className = 'hp-paid-line ' + (line.kind || '');
+    const label = document.createElement('span'); label.textContent = line.label;
+    const value = document.createElement('b'); value.textContent = line.amount;
+    row.append(label, value); receipt.appendChild(row);
+  }
+  modal.querySelector('.hp-paid-gain').textContent = amount;
+  modal.querySelector('.hp-paid-total').textContent = money;
+  modal.classList.toggle('negative', amount.startsWith('−'));
+  modal.hidden = false;
+  modal.querySelector('.hp-paid-scroll').scrollTop = 0;
+  H.payment = { t: 0, duration, done, touch, ready, message: null };
+  return true;
+}
+function finishPayment () {
+  const payment = H.payment;
+  if (!payment || (payment.ready && !payment.ready())) return;
+  hidePayment();
+  payment.done?.();
+  if (payment.message) receiveAfterPayment(payment.message);
+  else dock();
+}
+function receiveAfterPayment (message) {
+  open('courier'); banner(message.name, message.text);
+  H.messageTimer = setTimeout(showLatestMessage, 1900);
+}
+export function hidePayment () {
+  H.payment = null;
+  if (H.paymentModal) H.paymentModal.hidden = true;
+}
+export function step (dt) {
+  const p = H.payment;
+  if (!p) return;
+  p.touch?.();
+  if (p.ready && !p.ready()) return;
+  p.t += dt;
+  if (p.t >= p.duration) finishPayment();
 }
 export function rank ({ place = 1, total = 1, rows = [] } = {}) {
   if (!H.root) return;
@@ -239,6 +315,7 @@ export function showRating ({ rows, money }, autoOpen = true) {
 export function hideRating () { if (H.root && H.app === 'rating') dock(); }
 export function reset () {
   if (!H.root) return;
+  hidePayment();
   clearTimeout(H.shrink); clearTimeout(H.bannerTimer); clearTimeout(H.messageTimer);
   H.root.classList.remove('hp-notifying', 'hp-new-message');
   H.thread.replaceChildren(); H.messages = []; H.rating = null; clearOrder(); dock(); H.resourcesKey = ''; H.rankKey = '';

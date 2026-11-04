@@ -14928,12 +14928,25 @@ function popPay (total, rows, title, face, delivery = false) {
     hide: (it, again) => { payHide(); if (!again) SC.settle(cash, false); }, drop: () => SC.settle(cash, false) });
 }
 function payHide () {
+  HUDFONE.hidePayment();
   const P = PAYFX;
   if (!P.el) return;
   PAYVIS.hide();
   P.el.classList.remove('on', 'fly'); P.el.hidden = true;
 }
 function payShow (total, rows, title, face, done, touch, delivery = false) {
+  if (delivery && HUDFONE.active()) {
+    PAYVIS.hide();
+    HUDFONE.showPayment({
+      name: face?.person ? NICK.label(face.person, $t('клиент')) : $t('клиент'),
+      avatar: face?.person ? NICK.avatar(face.person, 64, face.mood) : '', mood: face?.mood || 'ok',
+      amount: (total < 0 ? '−' : '+') + money(Math.abs(total)), money: money(S.money), zero: money(0),
+      breakdown: rows.map(r => ({ label: r[0], amount: (r[1] < 0 ? '−' : '+') + money(Math.abs(r[1])), kind: r[2] })),
+      ready: () => NQ.DEBUG.phase() === 'ride' && NQ.showing() === 'pay', done, touch,
+    });
+    Snd.coin();
+    return;
+  }
   const P = payFxEl();
   // лицо клиента (то же, что в карточке заказа) с настроением — payMood
   P.face.hidden = !(face && face.person);
@@ -14960,20 +14973,10 @@ function payShow (total, rows, title, face, done, touch, delivery = false) {
   P.sum.textContent = (total >= 0 ? '+' : '−') + money(Math.abs(total));
   P.sum.classList.toggle('late', rows.some(r => r[2] === 'neg'));
   P.chk.innerHTML = rows.map(r => '<p class="' + (r[2] || '') + '"><span>' + r[0] + '</span><b>' + (r[1] < 0 ? '−' : '') + money(Math.abs(r[1])) + '</b></p>').join('');
-  const phoneHud = HUDFONE.active();
-  if (phoneHud && (total > 0 || delivery)) HUDFONE.dock();
   Snd.coin();
   PAYVIS.show({ el: P.el, bits: P.bits, target: () => CAREER ? SC.DEBUG.el : elMoney,
     ready: () => NQ.DEBUG.phase() === 'ride' && NQ.showing() === 'pay',
-    done: () => {
-      if (phoneHud && delivery) HUDMAP.payment({
-        name: face?.person ? NICK.label(face.person, $t('клиент')) : $t('клиент'),
-        avatar: face?.person ? NICK.avatar(face.person, 64, face.mood) : '', mood: face?.mood,
-        amount: (total < 0 ? '−' : '+') + money(Math.abs(total)), money: money(S.money), zero: money(0),
-        breakdown: rows.map(r => ({ label: r[0], amount: (r[1] < 0 ? '−' : '+') + money(Math.abs(r[1])), kind: r[2] })),
-      });
-      if (done) done();
-    }, touch });
+    done, touch });
 }
 
 
@@ -16219,6 +16222,7 @@ function checkArrival (dt) {
     const paidOrder = { ...o };
     let deliveryReacted = false, completionBonus = 0;
     const showPay = done => {
+      const resultFace = { person: st.talk?.person && !st.talk.aborted ? st.talk.person : st.persons?.[0], mood: payMood(st, onTime, tier) };
       if (pp && !pp.story) {
         const rows = [[$t('заказ'), pp.fee, '']];
         if (pp.late) rows.push([$t('опоздал'), part - pp.fee + (pp.stairsGop || 0), 'neg']);   // гопникам отдал отдельно — строкой ниже
@@ -16226,11 +16230,10 @@ function checkArrival (dt) {
         if (pp.stairsGop) rows.push([$t('откупился от гопников'), -pp.stairsGop, 'neg']);
         if (completionBonus > 0) rows.push([$t('премия за развоз'), completionBonus, '']);
         payShow(part + completionBonus, rows, pp.late ? (CAREER ? $t('клиент недоволен') : '') : pp.rich ? $t('сдачи не надо!') : pp.tip ? $t('чаевые!') : '',
-          st.talk && st.talk.person && !st.talk.aborted ? { person: st.talk.person, mood: payMood(st, onTime, tier) }   // встреча-катсцена (encounters.js): лицо героя
-            : st.persons[0] ? { person: st.persons[0], mood: payMood(st, onTime, tier) } : null, done, null, true);
+          resultFace, done, null, true);
         if (!deliveryReacted) { deliveryReacted = true; bossOnDeliver(paidOrder, st, onTime, tier); }
       } else {
-        payShow(part, [[$t('заказ'), part, '']], '', null, done, null, true);
+        payShow(part, [[$t('заказ'), part, '']], '', resultFace, done, null, true);
       }
     };
     HANDOFF.payment(handoff, showPay);
@@ -17552,7 +17555,8 @@ if (CAREER) WRONG.init({ S, V, ADULT, CHAT, NICK, DIST, ZN, SPOTS, routeLen, rea
   shiftsDone: () => +Store.get('dlv-shifts', 0) || 0, onShiftStart: CAREERM.onShiftStart });   // клиент ошибся адресом (wrongaddr.js)
 if (CAREER) { elMoney.hidden = true; SC.init({ S, money }); HUDFONE.mountMoney(SC.DEBUG.el); }
 HANDOFF.init({
-  reserve: amount => CAREER ? SC.reserve(amount) : null, extend: SC.extend, settle: SC.settle, hidePay: payHide,
+  reserve: amount => CAREER ? SC.reserve(amount) : null, extend: SC.extend,
+  settle: (ticket, visible) => SC.settle(ticket, visible && !HUDFONE.active()), hidePay: payHide,
   cancelScene: list => HCAM.cancelHanded(list),
   alive: () => isPlaying() && S.state !== 'dying', trunk: setTrunk, reach: GPOSE.reach, lower: GPOSE.caught,
   sceneBusy: () => HCAM.busy() || FPD.busy() || DOOR.on() || DLG.isOpen() || STORY.active() || document.body.classList.contains('story-cut'),
@@ -18858,6 +18862,7 @@ function frameStep (now) {
   CL.step('hits', HITS.update, dt);
   CL.step('handover', HANDOFF.step, dt);
   CL.step('payfx', PAYVIS.step, dt);
+  CL.step('phone-result', HUDFONE.step, dt);
   CL.step('fly', updateFly, dt);
   CL.at.ph = 'nitro';
   updateNitro(dt);

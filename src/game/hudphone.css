@@ -174,6 +174,8 @@
 #hud-phone .hp-rank-line.me { padding: 0 3px; margin-left: -3px; width: calc(100% + 6px); border-radius: 3px; background: #f7cd7770; }
 #hud-phone .hp-shift-earn, #hud-phone .hp-current, #hud-phone .hp-last-rating { position: relative; background: linear-gradient(#ffffff75, #ffffff00 48%), repeating-linear-gradient(0deg, #fbf3df 0 2px, #f5e8cf 2px 4px); border-color: #cfb78d; box-shadow: inset 0 1px #fff, 0 3px 7px #21140670; }
 #hud-phone .hp-shift-earn { margin-top: 10px; }
+#hud-phone .hp-current { margin-top: 0; }
+#hud-phone .hp-competition { margin-top: 10px; }
 #hud-phone .hp-shift-earn::before, #hud-phone .hp-current::before { content: ''; position: absolute; inset: 4px; border: 1px dashed #bd966153; border-radius: 5px; pointer-events: none; }
 #hud-phone .hp-order-list { background: linear-gradient(#fffef8e6, #fffef8e6), repeating-linear-gradient(0deg, #e2cdac 0 1px, #f6e6cc 1px 4px); }
 #hud-phone .hp-order-title { background: linear-gradient(#fff4 0%, #12090355 52%, #12090388), url('/textures/phone-wood.svg') repeat-x; background-size: auto, auto 100%; }
@@ -189,5 +191,37 @@
 body.hud-phone-active #hearts, body.hud-phone-active #cash, body.hud-phone-active #phone { visibility: hidden !important; }
 body.hud-phone-active #chat { display: none !important; }
 body.hud-phone-active #payfx { z-index: 31; }
+/* Праздничный итог занимает только экран телефона, без денег и карточек снаружи. */
+#hud-phone .hp-paid-modal { position: absolute; z-index: 22; inset: 20px 0 0; display: flex; flex-direction: column; overflow: hidden; background: repeating-linear-gradient(0deg, #fff9e9 0 2px, #f9eed6 2px 4px); color: #583b25; animation: hp-paid-arrive .4s cubic-bezier(.18,.85,.35,1.12) both; }
+#hud-phone .hp-paid-head { flex: none; position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 13px 8px 15px; background: radial-gradient(ellipse at 50% 0, #a6d57a, #569654 65%, #35733f); border-bottom: 1px solid #31633b; box-shadow: inset 0 1px #e5ffca9c, 0 2px 4px #422b2244; color: #fffdf0; text-shadow: 0 1px 2px #28582f; }
+#hud-phone .hp-paid-head > span { color: #ffe391; font-size: 29px; line-height: 1; }
+#hud-phone .hp-paid-head b { font-size: 20px; line-height: 1.15; text-align: center; }
+#hud-phone .hp-paid-praise { color: #e6f6d0; font-size: 13px; }
+#hud-phone .hp-paid-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 13px 9px; }
+#hud-phone .hp-paid-guest { display: flex; align-items: center; gap: 9px; padding: 15px 0 12px; }
+#hud-phone .hp-paid-guest > div { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+#hud-phone .hp-paid-avatar { width: 52px; height: 52px; flex: none; display: grid; place-items: center; overflow: hidden; border: 2px solid #fff9; border-radius: 8px; background: linear-gradient(#ffe2bd, #c87952); box-shadow: 0 0 0 1px #a97848, 0 2px 4px #0003; color: #66381e; font: 700 25px Georgia, serif; }
+#hud-phone .hp-paid-avatar img { width: 100%; height: 100%; object-fit: cover; }
+#hud-phone .hp-paid-name { overflow-wrap: anywhere; color: #563622; font-size: 15px; }
+#hud-phone .hp-paid-reaction { color: #6c5941; font-size: 12px; font-weight: 700; }
+#hud-phone .hp-paid-reaction.happy { color: #3c8044; }
+#hud-phone .hp-paid-reaction.angry { color: #ad503d; }
+#hud-phone .hp-paid-receipt { border-top: 1px dashed #b89d76; }
+#hud-phone .hp-paid-line { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; font-size: 13px; }
+#hud-phone .hp-paid-line + .hp-paid-line { border-top: 1px dashed #d6c7ac; }
+#hud-phone .hp-paid-line b { white-space: nowrap; color: #62452d; }
+#hud-phone .hp-paid-line.tip b { color: #a97416; }
+#hud-phone .hp-paid-line.neg b { color: #bd5037; }
+#hud-phone .hp-paid-bottom { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 11px 0 9px; border-top: 2px solid #b5976a; font-size: 13px; font-weight: 800; }
+#hud-phone .hp-paid-gain { color: #3d8145; font: 800 27px/1 Georgia, serif; text-shadow: 0 1px #fff; }
+#hud-phone .hp-paid-modal.negative .hp-paid-gain { color: #bd5037; }
+#hud-phone .hp-paid-shift { display: flex; justify-content: space-between; gap: 8px; padding: 8px; border-radius: 5px; background: #e8d4af; font-size: 12px; }
+#hud-phone .hp-paid-close { flex: none; min-height: 38px; margin: 0 13px 13px; border: 1px solid #397140; border-radius: 7px; background: linear-gradient(#9bcb78, #639e53 48%, #4c8748 51%, #38713d); box-shadow: inset 0 1px #eaffd6, 0 2px 3px #69472144; color: #fffdf0; font-size: 15px; font-weight: 700; text-shadow: 0 -1px #37643b; }
+#hud-phone .hp-paid-confetti { position: absolute; z-index: 2; inset: 0; overflow: hidden; pointer-events: none; }
+#hud-phone .hp-paid-confetti i { position: absolute; left: calc(6% + var(--i) * 6.7%); top: -12px; width: 6px; height: 11px; border-radius: 1px; background: #e96554; animation: hp-paid-confetti 1.6s calc(var(--i) * .035s) ease-out both; }
+#hud-phone .hp-paid-confetti i:nth-child(3n) { background: #f5c749; }
+#hud-phone .hp-paid-confetti i:nth-child(3n+1) { background: #7bc9ad; }
+@keyframes hp-paid-arrive { from { opacity: .3; transform: translateY(35px) scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes hp-paid-confetti { 0% { opacity: 0; transform: translateY(0) rotate(0); } 10%, 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(300px) rotate(330deg); } }
 @media (max-height: 690px) { #hud-phone.hp-expanded .hp-device { top: calc(100% - 306px); transform: translate(-50%, -50%) scale(.87) rotate(0deg); } }
-@media (prefers-reduced-motion: reduce) { #hud-phone .hp-device, #hud-phone .hp-banner, #hud-phone .hp-backdrop { transition-duration: .01ms; animation-duration: .01ms; } }
+@media (prefers-reduced-motion: reduce) { #hud-phone .hp-device, #hud-phone .hp-banner, #hud-phone .hp-backdrop, #hud-phone .hp-paid-modal, #hud-phone .hp-paid-confetti i { transition-duration: .01ms; animation-duration: .01ms; animation-delay: 0s; } }

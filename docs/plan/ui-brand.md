@@ -2,7 +2,7 @@
 
 [← план](../IDEAS.md)
 
-**Статус:** [сообщение у нижнего края №8-9](../IDEAS-ARCHIVE.md#ui-phone-chat-spacing), [итог доставки в игровом HUD №8-8](../IDEAS-ARCHIVE.md#ui-phone-delivery-result), [деньги и чаевые летят в телефон №8-7](../IDEAS-ARCHIVE.md#ui-phone-payout), [тройка лидеров №8-6](../IDEAS-ARCHIVE.md#ui-phone-leaders) и прежние шаги телефона готовы.
+**Статус:** [№8-10 — один праздничный итог доставки в телефоне, заказ перед лидерами](../IDEAS-ARCHIVE.md#ui-phone-one-result) готов. Несделанных задач в этом треке нет; следующая основная очередь — №17.
 
 <details><summary><b>Решения</b> (что уже решено и почему)</summary>
 

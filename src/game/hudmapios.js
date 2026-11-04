@@ -3,7 +3,6 @@ import './hudmapios.css';
 import { t } from '../i18n/index.js';
 
 let bars = null;
-let paidTimer = 0;
 const point = p => Array.isArray(p) ? p : [p?.x, p?.z];
 
 /* Обзор заказа: масштаб считается по всему пути, включая машину и адрес. */
@@ -69,42 +68,6 @@ export function fuel (value) {
   bars.forEach((bar, i) => bar.classList.toggle('on', i < count));
 }
 
-export function payment ({ name = '', avatar = '', mood = 'ok', amount = '', money = '', zero = '0 ₽', breakdown = [] } = {}) {
-  let card = document.getElementById('hios-paid');
-  if (!card) {
-    card = document.createElement('div'); card.id = 'hios-paid'; card.setAttribute('role', 'status');
-    card.innerHTML = '<div class="hios-paid-confetti" aria-hidden="true">' + '<i></i>'.repeat(14) + '</div>' +
-      '<div class="hios-paid-head"><strong>✓ ' + t('Доставлено') + '</strong><span class="hios-paid-star" aria-hidden="true">★</span></div>' +
-      '<div class="hios-paid-guest"><span class="hios-paid-avatar"></span><div><b class="hios-paid-name"></b><span class="hios-paid-reaction"></span></div></div>' +
-      '<div class="hios-paid-receipt"></div><div class="hios-paid-bottom"><span>' + t('Выплата') + '</span><strong class="hios-paid-gain"></strong></div>' +
-      '<div class="hios-paid-shift"><span>' + t('За смену') + '</span><b class="hios-paid-total"></b></div>';
-    (document.getElementById('game') || document.body).appendChild(card);
-  }
-  const face = card.querySelector('.hios-paid-avatar');
-  if (avatar) { const img = document.createElement('img'); img.src = avatar; img.alt = ''; face.replaceChildren(img); }
-  else face.replaceChildren((name || t('клиент')).slice(0, 1).toUpperCase());
-  card.querySelector('.hios-paid-name').textContent = name || t('клиент');
-  const reaction = card.querySelector('.hios-paid-reaction');
-  const reactionText = mood === 'happy' ? t('Понравилось') : mood === 'angry' ? t('Не понравилось') : t('Нормально');
-  reaction.textContent = (mood === 'happy' ? '♥ ' : mood === 'angry' ? '✕ ' : '✓ ') + reactionText;
-  reaction.className = 'hios-paid-reaction ' + (mood === 'happy' ? 'happy' : mood === 'angry' ? 'angry' : 'ok');
-  const receipt = card.querySelector('.hios-paid-receipt'); receipt.replaceChildren();
-  const lines = breakdown.some(r => r.kind === 'tip') ? breakdown : [...breakdown, { label: t('чаевые'), amount: zero, kind: 'tip' }];
-  for (const line of lines) {
-    const row = document.createElement('div'); row.className = 'hios-paid-line ' + (line.kind || '');
-    const label = document.createElement('span'); label.textContent = line.label;
-    const value = document.createElement('b'); value.textContent = line.amount;
-    row.append(label, value); receipt.appendChild(row);
-  }
-  card.querySelector('.hios-paid-gain').textContent = amount;
-  card.querySelector('.hios-paid-total').textContent = money;
-  card.classList.toggle('negative', amount.startsWith('−'));
-  clearTimeout(paidTimer);
-  card.classList.remove('on'); void card.offsetWidth; card.classList.add('on');
-  paidTimer = setTimeout(() => { card.classList.remove('on'); setTimeout(() => card.remove(), 450); }, 5300);
-}
-export function hidePayment () { clearTimeout(paidTimer); document.getElementById('hios-paid')?.remove(); }
-
 /* Макет внешней карты для изолированного просмотра телефона в ui.html. */
 export function demoMap () {
   let el = document.getElementById('hios-demo');
@@ -122,7 +85,7 @@ export function demoMap () {
     <circle cx="102" cy="186" r="10" fill="#2789e7" opacity=".25"/><circle cx="102" cy="186" r="5" fill="#2789e7" stroke="#fff" stroke-width="2"/>
     <path d="M171 85c-9 0-14 5-14 14 0 10 14 23 14 23s14-13 14-23c0-9-5-14-14-14z" fill="#e94b38" stroke="#fff" stroke-width="2"/><circle cx="171" cy="99" r="4" fill="white"/>
     </svg></div><div class="hios-fuel"><svg viewBox="0 0 22 22"><path d="M4 3h10v16H4zM7 6h4v5H7zM14 7h2l3 3v6c0 2-3 2-3 0v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span class="hios-bars"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
-    <div class="hios-demo-order"><i class="hios-demo-avatar">С</i><div><b>Света</b><small>◷ 02:15 · 320 м</small></div></div>`;
+    `;
   (document.getElementById('game') || document.body).appendChild(el);
   return el;
 }

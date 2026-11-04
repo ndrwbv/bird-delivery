@@ -1,4 +1,4 @@
-/* Компактная карта и карточка заказа слева; нитро — отдельной строкой рядом. */
+/* Слева — компактная карта и нитро; карточка заказа и итог доставки — в телефоне. */
 body.hud-phone-active { --hios-map-w: min(190px, 20vw); --hios-map-h: min(136px, 14.3vw); }
 body.hud-phone-active #radar {
   left: 16px; bottom: 45px; width: var(--hios-map-w); height: var(--hios-map-h); aspect-ratio: auto;
@@ -22,77 +22,11 @@ body.hud-phone-active .hios-fuel { display: flex; }
 .hios-bars i { width: 5px; height: 10px; border: 1px solid #8095a3; border-radius: 1px; background: #83929f; box-shadow: inset 0 1px #fff6; }
 .hios-bars i:nth-child(n+4) { height: 14px; }
 .hios-bars i.on { border-color: #d4e6f0; background: #eaf7ff; }
-body.hud-phone-active #otags { left: 16px; bottom: calc(45px + var(--hios-map-h) + 8px); }
-body.hp-order-open #otags { visibility: hidden !important; opacity: 0 !important; }
-body.hud-phone-active #otags .otag {
-  max-width: min(262px, 29vw); padding: 7px 9px 7px 5px; color: #4a2917;
-  background: linear-gradient(#fffaf0, #f2d8b4 54%, #e4b788); border: 1px solid #a88466; border-left: 5px solid #b96d4d; border-radius: 9px;
-  box-shadow: inset 0 1px #fff9, 0 3px 6px #0006; transform: scale(.9); opacity: .8;
-}
-body.hud-phone-active #otags .otag.cur { transform: none; opacity: 1; }
-body.hud-phone-active #otags .otag.story { background: linear-gradient(#fff8e6, color-mix(in srgb, #f2d8b4 75%, var(--c) 25%)); }
-body.hud-phone-active #otags .otag.late { background: linear-gradient(#fff1d5, #f58772); border-color: #a92d2d; }
-body.hud-phone-active #otags .otag img { grid-row: 1 / 3; border-radius: 6px; border: 1px solid #9d592b; background: #ffe0a7; }
-body.hud-phone-active #otags .ot-nm { font-size: 12px; font-weight: 700; color: #542a19; }
-body.hud-phone-active #otags .ot-m { color: #78513a; font-size: 10px; }
-body.hud-phone-active #otags .ot-t { grid-column: 3; grid-row: 1 / 3; border: 1px solid #b6865f; border-radius: 5px; background: linear-gradient(#fff8e8, #eac49f); color: #7e4b32; transform: none; font-weight: 700; }
-body.hud-phone-active #otags .ot-t.low { background: #d7504a; border-color: #8a302b; color: #fff; }
-body.hud-phone-active #otags .otag.done::after { background: #c74431; }
-body.hud-phone-active #radio { bottom: calc(45px + var(--hios-map-h) + 12px + var(--otags-h, 0px)); }
+body.hud-phone-active #otags { display: none !important; }
+body.hud-phone-active #radio { bottom: calc(45px + var(--hios-map-h) + 12px); }
 
 /* Та же компоновка в изолированной песочнице. */
 #hios-demo { --hios-map-w: 190px; --hios-map-h: 136px; position: absolute; left: 16px; bottom: 45px; z-index: 7; width: 190px; pointer-events: none; font-family: "Helvetica Neue", Arial, sans-serif; }
 #hios-demo .hios-demo-map { position: relative; width: 190px; height: 136px; overflow: hidden; border-radius: 8px; box-shadow: 0 3px 10px #0006; }
 #hios-demo .hios-demo-map svg { width: 100%; height: 100%; }
 #hios-demo .hios-fuel { display: flex; left: 0; bottom: -29px; }
-#hios-demo .hios-demo-order { position: absolute; bottom: 144px; left: 0; width: 250px; display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid #a88466; border-left: 5px solid #b96d4d; border-radius: 9px; background: linear-gradient(#fffaf0, #f2d8b4 54%, #e4b788); box-shadow: inset 0 1px #fff9, 0 3px 6px #0006; }
-#hios-demo .hios-demo-avatar { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid #9d592b; border-radius: 6px; background: linear-gradient(#ffe4c6, #db7b53); color: #612a24; font: 700 22px/1 Georgia, serif; }
-#hios-demo .hios-demo-order div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-#hios-demo .hios-demo-order b { font-size: 12px; color: #542a19; }
-#hios-demo .hios-demo-order small { font-size: 10px; color: #873c1f; font-weight: 700; }
-#hios-demo.hios-awaiting-order .hios-demo-order { display: none; }
-
-#hios-paid { position: absolute; z-index: 30; left: 16px; bottom: calc(45px + var(--hios-map-h, 136px) + 8px); width: min(308px, 32vw); overflow: visible; border: 1px solid #9f7650; border-radius: 9px; background: repeating-linear-gradient(0deg, #fff9e9 0 2px, #f9eed6 2px 4px); box-shadow: inset 0 1px #fff, 0 7px 21px #0009; color: #583b25; font-family: "Helvetica Neue", Arial, sans-serif; transform: translateY(22px) scale(.85); opacity: 0; pointer-events: none; transition: transform .45s cubic-bezier(.18,1.25,.35,1), opacity .35s; }
-#hios-paid.on { transform: none; opacity: 1; }
-#hios-paid .hios-paid-head { display: flex; justify-content: space-between; align-items: center; height: 36px; padding: 0 12px; border-radius: 8px 8px 0 0; background: linear-gradient(#82b86a, #478b50 55%, #326d3e); box-shadow: inset 0 1px #e5ffca9c, 0 2px 3px #422b2255; color: #fffdf0; text-shadow: 0 -1px #2b6137; }
-#hios-paid .hios-paid-head strong { font-size: 17px; }
-#hios-paid .hios-paid-star { color: #ffe28a; font-size: 20px; text-shadow: 0 1px #36562e; }
-#hios-paid .hios-paid-guest { display: flex; align-items: center; gap: 9px; padding: 10px 12px 8px; }
-#hios-paid .hios-paid-guest > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-#hios-paid .hios-paid-avatar { width: 48px; height: 48px; flex: none; display: grid; place-items: center; overflow: hidden; border: 2px solid #fff9; border-radius: 7px; background: linear-gradient(#ffe2bd, #c87952); box-shadow: 0 0 0 1px #a97848, 0 2px 4px #0004; color: #66381e; font: 700 23px Georgia, serif; }
-#hios-paid .hios-paid-avatar img { width: 100%; height: 100%; object-fit: cover; }
-#hios-paid .hios-paid-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #563622; font-size: 15px; }
-#hios-paid .hios-paid-reaction { width: fit-content; padding: 2px 7px; border: 1px solid #b8a17b; border-radius: 9px; background: linear-gradient(#fffefa, #e7dfc8); color: #6c5941; font-size: 11px; font-weight: 800; }
-#hios-paid .hios-paid-reaction.happy { border-color: #91b67f; color: #3c8044; }
-#hios-paid .hios-paid-reaction.angry { border-color: #d29381; color: #ad503d; }
-#hios-paid .hios-paid-receipt { margin: 0 12px; border-top: 1px dashed #b89d76; }
-#hios-paid .hios-paid-line { display: flex; justify-content: space-between; gap: 12px; padding: 4px 1px; font-size: 12px; }
-#hios-paid .hios-paid-line + .hios-paid-line { border-top: 1px dashed #d6c7ac; }
-#hios-paid .hios-paid-line b { white-space: nowrap; color: #62452d; }
-#hios-paid .hios-paid-line.tip b { color: #a97416; }
-#hios-paid .hios-paid-line.neg b { color: #bd5037; }
-#hios-paid .hios-paid-bottom { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 3px 12px 0; padding: 6px 1px; border-top: 2px solid #b5976a; color: #5a412a; font-size: 12px; font-weight: 800; }
-#hios-paid .hios-paid-gain { color: #3d8145; font: 800 24px/1 Georgia, serif; text-shadow: 0 1px #fff; }
-#hios-paid.negative .hios-paid-gain { color: #bd5037; }
-#hios-paid .hios-paid-shift { display: flex; justify-content: space-between; gap: 8px; padding: 6px 12px; border-radius: 0 0 8px 8px; background: linear-gradient(#edd5a4, #d9b478); color: #5b3c22; font-size: 12px; font-weight: 800; }
-#hios-paid .hios-paid-total { font-size: 14px; }
-#hios-paid .hios-paid-confetti { position: absolute; inset: -23px -15px; overflow: visible; }
-#hios-paid .hios-paid-confetti i { position: absolute; left: 47%; top: 45%; width: 6px; height: 10px; border-radius: 1px; background: #e96554; opacity: 0; }
-#hios-paid .hios-paid-confetti i:nth-child(3n) { background: #f5c749; }
-#hios-paid .hios-paid-confetti i:nth-child(3n+1) { background: #5db49b; }
-#hios-paid.on .hios-paid-confetti i { animation: hios-confetti 1.25s ease-out both; }
-#hios-paid .hios-paid-confetti i:nth-child(1) { --x: -82px; --y: -55px; --r: 85deg; --d: .04s; }
-#hios-paid .hios-paid-confetti i:nth-child(2) { --x: 88px; --y: -62px; --r: 230deg; --d: .1s; }
-#hios-paid .hios-paid-confetti i:nth-child(3) { --x: -58px; --y: -91px; --r: 110deg; --d: .08s; }
-#hios-paid .hios-paid-confetti i:nth-child(4) { --x: 46px; --y: -97px; --r: 195deg; --d: .02s; }
-#hios-paid .hios-paid-confetti i:nth-child(5) { --x: -117px; --y: -20px; --r: 140deg; --d: .14s; }
-#hios-paid .hios-paid-confetti i:nth-child(6) { --x: 119px; --y: -19px; --r: 275deg; --d: .07s; }
-#hios-paid .hios-paid-confetti i:nth-child(7) { --x: -104px; --y: 35px; --r: 80deg; --d: .2s; }
-#hios-paid .hios-paid-confetti i:nth-child(8) { --x: 100px; --y: 47px; --r: 230deg; --d: .05s; }
-#hios-paid .hios-paid-confetti i:nth-child(9) { --x: -43px; --y: 58px; --r: 125deg; --d: .16s; }
-#hios-paid .hios-paid-confetti i:nth-child(10) { --x: 52px; --y: 62px; --r: 300deg; --d: .11s; }
-#hios-paid .hios-paid-confetti i:nth-child(11) { --x: -73px; --y: -35px; --r: 70deg; --d: .19s; }
-#hios-paid .hios-paid-confetti i:nth-child(12) { --x: 74px; --y: -42px; --r: 180deg; --d: .13s; }
-#hios-paid .hios-paid-confetti i:nth-child(13) { --x: -25px; --y: -78px; --r: 250deg; --d: .06s; }
-#hios-paid .hios-paid-confetti i:nth-child(14) { --x: 23px; --y: 78px; --r: 340deg; --d: .18s; }
-@keyframes hios-confetti { 0% { opacity: 0; transform: translate(0,0) rotate(0) scale(.4); } 12% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--x),var(--y)) rotate(var(--r)); } }
