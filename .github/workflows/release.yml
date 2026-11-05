@@ -14,6 +14,7 @@
 # Zip для Яндекса — только артефакт прогона: его заливают руками в консоль разработчика.
 # После релиза та же игра (сборка web) выкладывается на GitHub Pages — ndrwbv.github.io/bird-delivery.
 name: Релиз
+run-name: ${{ inputs.prepare_only && 'Подготовка города' || 'Релиз' }}
 
 on:
   workflow_dispatch:
@@ -36,6 +37,10 @@ on:
         type: string
         required: false
         default: ''
+      prepare_only:
+        description: 'Подготовить и сохранить данные города заранее, без публикации релиза'
+        type: boolean
+        default: false
       yandex:
         description: 'Собрать ещё и zip для Яндекс Игр (только когда нужно заливать в Яндекс)'
         type: boolean
@@ -43,7 +48,7 @@ on:
 
 # релизы — строго по одному: иначе два прогона посчитают одинаковый номер
 concurrency:
-  group: release
+  group: ${{ inputs.prepare_only && 'prepare-city' || 'release' }}
   cancel-in-progress: false
 
 permissions:
@@ -58,11 +63,13 @@ jobs:
       version: ${{ steps.t.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        if: '!inputs.prepare_only'
         with:
           fetch-depth: 0          # с тегами: от последнего vX.Y.Z считается следующий номер
 
       - id: t
         name: Номер версии
+        if: '!inputs.prepare_only'
         env:
           BUMP: ${{ inputs.bump }}
         run: |
@@ -87,6 +94,9 @@ jobs:
 
   prepare-land:
     needs: meta
+    concurrency:
+      group: prepare-land-${{ github.sha }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -120,7 +130,7 @@ jobs:
       - name: Подготовить землю города
         if: inputs.prepared_from == '' && steps.prepared.outputs.cache-hit != 'true'
         env:
-          BUILD_VERSION: ${{ needs.meta.outputs.version }}
+          BUILD_VERSION: ${{ needs.meta.outputs.version || '0.0.0' }}
           CHECKS: ${{ inputs.checks }}
         run: |
           args=("--out=$RUNNER_TEMP/bird-land-preparation")
@@ -144,6 +154,9 @@ jobs:
 
   prepare-address:
     needs: meta
+    concurrency:
+      group: prepare-address-${{ github.sha }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -177,7 +190,7 @@ jobs:
       - name: Подготовить адреса mid/high
         if: inputs.prepared_from == '' && steps.prepared.outputs.cache-hit != 'true'
         env:
-          BUILD_VERSION: ${{ needs.meta.outputs.version }}
+          BUILD_VERSION: ${{ needs.meta.outputs.version || '0.0.0' }}
           CHECKS: ${{ inputs.checks }}
         run: |
           set -o pipefail
@@ -205,6 +218,7 @@ jobs:
 
   build:
     needs: [meta, prepare-land, prepare-address]
+    if: '!inputs.prepare_only'
     strategy:
       fail-fast: false
       matrix:
@@ -364,7 +378,7 @@ jobs:
 
   yandex:
     needs: meta
-    if: inputs.yandex
+    if: inputs.yandex && !inputs.prepare_only
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
