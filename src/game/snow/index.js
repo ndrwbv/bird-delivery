@@ -198,6 +198,11 @@ export function step(dt) {
     const contact = contacts.vehicle(V, A.car(), dt, playerOptions);
     if (playerOptions.grounded) ST.playerContacts++;
     if (contact.hullChanged) ST.hullContacts++;
+    if (contact.bankDrag > 0) {
+      const keep = 1 - contact.bankDrag;
+      V.vx = V.vx * keep + Math.cos(V.h) * contact.bankPush;
+      V.vz = V.vz * keep - Math.sin(V.h) * contact.bankPush;
+    }
     nearbyContacts(dt);
   } else contacts.clearEntity('player');
   field.step(dt);

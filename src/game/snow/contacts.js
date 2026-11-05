@@ -12,7 +12,7 @@ export function createSnowContacts ({ field, resolveSurface }) {
   const contact = { surfaceId: null, from, to, width: SNOW.TIRE_WIDTH, length: SNOW.TIRE_LENGTH,
     heading: 0, load01: 1, slipLong: 0, slipSide: 0, dt: 0, kind: 'wheel', pickupCapacity: 0, depositMass: 0 };
   const hull = { kind: 'hull', from: { x: 0, z: 0 }, to: { x: 0, z: 0 } };
-  const result = { hullChanged: false, soft: 0, sand: 0, rut: 0, compaction: 0, snow: 0, changed: false, sprays: 0, supportY: 0, contacts: 0 };
+  const result = { hullChanged: false, bankDrag: 0, bankPush: 0, soft: 0, sand: 0, rut: 0, compaction: 0, snow: 0, changed: false, sprays: 0, supportY: 0, contacts: 0 };
   const event = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, size: 0.18, mass: 0 };
   let clock = 0;
 
@@ -26,7 +26,7 @@ export function createSnowContacts ({ field, resolveSurface }) {
         for (const entry of vehicles.values()) if (entry.id !== 'player' && (!oldest || entry.last < oldest.last)) oldest = entry;
         if (oldest) vehicles.delete(oldest.id);
       }
-      value = { id, wheels: [wheelState(), wheelState(), wheelState(), wheelState()], last: 0, spray: 0,
+      value = { id, wheels: [wheelState(), wheelState(), wheelState(), wheelState()], last: 0, spray: 0, bankHitT: 0,
         x: 0, z: 0, h: 0, model: null, valid: false, hullX: NaN, hullZ: NaN, hullH: 0, hullY: 0, hullId: null, hullDt: 0 };
       vehicles.set(id, value);
     }
@@ -60,18 +60,24 @@ export function createSnowContacts ({ field, resolveSurface }) {
     e.hullX = V.x; e.hullZ = V.z; e.hullH = V.h; e.hullY = soleY; e.hullId = id;
     hull.dt = e.hullDt; e.hullDt = 0;
     if (id == null || !Number.isFinite(soleY)) return null;
-    let touches = false;
+    const feelImpact = player && continuing && speed > 1.5 && e.bankHitT <= 0;
+    let touches = false, left = 0, middle = 0, right = 0;
     for (const z of BODY_PROBES) {
       const fore = halfLength * z;
       for (const x of BODY_PROBES) {
         const side = halfWidth * x;
         const px = V.x + fx * fore + fz * side, pz = V.z + fz * fore - fx * side;
         field.sample(id, px, pz, bodySample);
-        if (bodySample.valid && bodySample.deformable && bodySample.topY > soleY + pitch * fore + roll * side + 0.008) {
-          touches = true; break;
-        }
+        const overlap = bodySample.topY - (soleY + pitch * fore + roll * side);
+        if (!bodySample.valid || !bodySample.deformable || overlap <= 0.008) continue;
+        touches = true;
+        if (!feelImpact) break;
+        const loose = overlap * (1 - bodySample.compaction);
+        if (x < 0) left = Math.max(left, loose);
+        else if (x > 0) right = Math.max(right, loose);
+        else middle = Math.max(middle, loose);
       }
-      if (touches) break;
+      if (touches && !feelImpact) break;
     }
     if (!touches) return null;
     hull.to.x = V.x; hull.to.z = V.z;
@@ -79,17 +85,30 @@ export function createSnowContacts ({ field, resolveSurface }) {
     hull.surfaceId = id; hull.width = halfWidth * 2; hull.length = halfLength * 2; hull.heading = V.h;
     hull.load01 = Math.min(1, 0.65 + speed / 18);
     hull.slipLong = Math.min(1.6, speed / 7); hull.slipSide = sideSpeed * 0.2;
-    return field.stamp(hull);
+    const pressed = field.stamp(hull);
+    const overlap = Math.max(left, middle, right);
+    if (feelImpact && pressed.changed && overlap > 0.035) {
+      // Brief reaction to fresh material, capped well below a curb strike.
+      const fresh = clamp01((pressed.movedMass + pressed.compressedMass - 0.012) / 0.14);
+      const strength = clamp01((overlap - 0.035) / 0.2) * fresh;
+      if (strength > 0) {
+        result.bankDrag = 0.025 * strength;
+        result.bankPush = 0.16 * strength * (left - right) / overlap;
+        e.bankHitT = 0.28;
+      }
+    }
+    return pressed;
   }
 
   function vehicle (V, car, dt, options = {}) {
-    result.soft = result.sand = result.rut = result.compaction = result.snow = result.supportY = result.contacts = result.sprays = 0;
+    result.soft = result.sand = result.rut = result.compaction = result.snow = result.supportY = result.contacts = result.sprays = result.bankDrag = result.bankPush = 0;
     result.changed = result.hullChanged = false;
     if (!V || !Number.isFinite(V.x) || !Number.isFinite(V.z)) return result;
     const e = state(options.id ?? 'player');
     if (field.stats.season <= 0.0001) for (const wheel of e.wheels) wheel.carry = 0;
     const grounded = options.grounded !== false && !options.air && !V.air && !V.wade && V.sink === undefined;
     dt = Math.max(0, Math.min(0.15, dt || 0));
+    e.bankHitT -= dt;
     if (!grounded || !dt) { e.valid = false; e.hullX = NaN; e.hullId = null; e.hullDt = 0; for (const wheel of e.wheels) wheel.on = false; return result; }
     const fx = Math.sin(V.h), fz = Math.cos(V.h), sx = fz, sz = -fx;
     const speed = Math.hypot(V.vx || 0, V.vz || 0), sideSpeed = (V.vx || 0) * sx + (V.vz || 0) * sz;
