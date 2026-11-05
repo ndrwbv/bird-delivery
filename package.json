@@ -17,6 +17,7 @@
     "build:web": "vite build --mode web",
     "build:yandex": "vite build --mode yandex && node tools/zip-yandex.mjs",
     "build:steam": "vite build --mode steam",
+    "prepare:city": "bash tools/release-city-data.sh",
     "electron": "npm run build:steam && electron .",
     "dist:mac": "npm run build:steam && electron-builder --mac",
     "dist:win": "npm run build:steam && electron-builder --win zip --x64",

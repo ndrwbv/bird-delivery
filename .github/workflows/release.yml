@@ -112,9 +112,16 @@ jobs:
         run: |
           SOURCE_KEY=$(node --input-type=module -e "import { captureSource } from './tools/land-package-files.mjs'; console.log(captureSource('.').base.sourceHash)")
           echo "key=$SOURCE_KEY" >> "$GITHUB_OUTPUT"
+      - name: Взять землю, подготовленную на Mac
+        id: local
+        if: inputs.prepared_from == '' && !inputs.checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_KEY: ${{ steps.source.outputs.key }}
+        run: bash tools/release-city-data.sh download land "$SOURCE_KEY" "$RUNNER_TEMP/bird-land-preparation/package"
       - name: Кеш готовой земли
         id: prepared
-        if: inputs.prepared_from == '' && !inputs.checks
+        if: inputs.prepared_from == '' && !inputs.checks && steps.local.outputs.found != 'true'
         uses: actions/cache@v4
         with:
           key: prepared-land-v1-${{ steps.source.outputs.key }}
@@ -128,7 +135,7 @@ jobs:
           run-id: ${{ inputs.prepared_from }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Подготовить землю города
-        if: inputs.prepared_from == '' && steps.prepared.outputs.cache-hit != 'true'
+        if: inputs.prepared_from == '' && steps.local.outputs.found != 'true' && steps.prepared.outputs.cache-hit != 'true'
         env:
           BUILD_VERSION: ${{ needs.meta.outputs.version || '0.0.0' }}
           CHECKS: ${{ inputs.checks }}
@@ -143,7 +150,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: always() && steps.prepared.outputs.cache-hit != 'true' && inputs.prepared_from == ''
+        if: always() && steps.local.outputs.found != 'true' && steps.prepared.outputs.cache-hit != 'true' && inputs.prepared_from == ''
         with:
           name: prepared-land-proof
           path: |
@@ -172,9 +179,16 @@ jobs:
         run: |
           SOURCE_KEY=$(node --input-type=module -e "import { captureSource } from './tools/land-package-files.mjs'; console.log(captureSource('.').base.sourceHash)")
           echo "key=$SOURCE_KEY" >> "$GITHUB_OUTPUT"
+      - name: Взять адреса, подготовленные на Mac
+        id: local
+        if: inputs.prepared_from == '' && !inputs.checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_KEY: ${{ steps.source.outputs.key }}
+        run: bash tools/release-city-data.sh download address "$SOURCE_KEY" "$RUNNER_TEMP/bird-address-preparation/package"
       - name: Кеш готовых адресов
         id: prepared
-        if: inputs.prepared_from == '' && !inputs.checks
+        if: inputs.prepared_from == '' && !inputs.checks && steps.local.outputs.found != 'true'
         uses: actions/cache@v4
         with:
           key: prepared-address-v1-${{ steps.source.outputs.key }}
@@ -188,7 +202,7 @@ jobs:
           run-id: ${{ inputs.prepared_from }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Подготовить адреса mid/high
-        if: inputs.prepared_from == '' && steps.prepared.outputs.cache-hit != 'true'
+        if: inputs.prepared_from == '' && steps.local.outputs.found != 'true' && steps.prepared.outputs.cache-hit != 'true'
         env:
           BUILD_VERSION: ${{ needs.meta.outputs.version || '0.0.0' }}
           CHECKS: ${{ inputs.checks }}
@@ -204,7 +218,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: always() && steps.prepared.outputs.cache-hit != 'true' && inputs.prepared_from == ''
+        if: always() && steps.local.outputs.found != 'true' && steps.prepared.outputs.cache-hit != 'true' && inputs.prepared_from == ''
         with:
           name: prepared-address-proof
           path: |
