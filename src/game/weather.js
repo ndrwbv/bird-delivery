@@ -48,6 +48,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import { t } from '../i18n/index.js';
 import * as SEAS from './seasons.js';
+import { bankProfile } from './snow/shapes.js';
 import { onYard } from './yards.js';              // дворовые дорожки и выходы к тротуару — сугробы мимо (yards.js)
 import * as HUR from './hurricane.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
@@ -530,7 +531,7 @@ function* buildDeep () {
   const add = (x, z, nx, nz, Wd, L, H, house) => {
     H = SEAS.driftH(H, Wd, L);
     const y = groundH(x, z) + curbAt(x, z) + 0.02, ry = Math.atan2(-nz, nx);
-    P.add(T.mound, x, y, z, Wd, H, L, 0, ry, 0, '#e8edf4', 3, 0.02);
+    P.add(T.snowMound, x, y, z, Wd, H, L, 0, ry, 0, '#e8edf4', 3, 0.02);
     const d = { x, y, z, W: Wd, L, H, cs: nx, sn: -nz, nx, nz, house, sled: 0 };
     const k = gk(Math.floor(x / 20), Math.floor(z / 20));
     let a = DEEP.get(k); if (!a) DEEP.set(k, a = []);
@@ -599,7 +600,7 @@ function* buildDeep () {
   DSTAT.ms = Math.round(ms + performance.now() - t0);   // без пауз между шагами
 }
 /* верх сугроба (сбитые и пятна ложатся на него): профиль кучи — как у moundTpl */
-const prof = e => (e < 0.62 ? 1 - 0.3 * e / 0.62 : 0.7 - 0.78 * (e - 0.62) / 0.38);
+const prof = bankProfile;
 function deepTop (x, z) {
   if (ID !== 'snowy') return -Infinity;
   let top = -Infinity;

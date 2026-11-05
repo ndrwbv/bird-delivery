@@ -85,7 +85,9 @@ export function createSnowContacts ({ field, resolveSurface }) {
       contact.slipLong = options.gas ? Math.max(0, 1 - speed / 5) * 2 : options.brake || options.hand ? Math.min(2, speed / 6) : 0;
       contact.pickupCapacity = Math.max(0, SNOW.TIRE_CARRY - wheel.carry);
       contact.depositMass = sample.thickness < 0.025 && travelled > 0 ? wheel.carry * (1 - Math.exp(-travelled / SNOW.TIRE_DROP_DISTANCE)) : 0;
-      const changed = field.stamp(contact);
+      const changed = sample.deformable || continuing && wheel.deformable ? field.stamp(contact) : null;
+      wheel.deformable = sample.deformable;
+      if (!changed) { wheel.x = x; wheel.z = z; wheel.surfaceId = receiver.surfaceId; wheel.on = true; continue; }
       wheel.carry = Math.max(0, Math.min(SNOW.TIRE_CARRY, wheel.carry + changed.pickedUp - changed.deposited));
       if (changed.changed) result.changed = true;
       if (changed.movedMass > eventMass) { eventMass = changed.movedMass; eventX = x; eventZ = z; eventY = sample.topY; }

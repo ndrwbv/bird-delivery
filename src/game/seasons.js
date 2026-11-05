@@ -31,6 +31,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 
 import { t } from '../i18n/index.js';
+import { bankProfile } from './snow/shapes.js';
 import { LEGACY_SNOW_GLSL, bindSnowUniforms, patchLegacySnow } from './snow/render.js';
 import { setPeopleSeason, redressHumans } from './people.js';
 import { growTree } from './trees.js';
@@ -326,6 +327,8 @@ ${blended ? `// Same stationary coverage as the detailed surface.
 if (vRoadBlend < 0.05) discard;` : ''}`);
   };
   m.customProgramCacheKey = () => blended ? 'winter-road-grit-blend8' : 'winter-road-grit-opaque8';
+  // Packed roadway never switches to the local deformable grid.
+  if (blended) { m.userData.snowStatic = true; return m; }
   return patchLegacySnow(m);
 }
 export function bindWinterRoadGroup (groups) {
@@ -671,7 +674,7 @@ function tpls () {
     box: arr(new THREE.BoxGeometry(1, 1, 1)), ico: arr(new THREE.IcosahedronGeometry(1, 0)),
     cone: arr(new THREE.ConeGeometry(1, 1, 7, 1, true)), quad: arr(new THREE.PlaneGeometry(1, 1)),
     flat: arr(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)),
-    mound: moundTpl(),
+    mound: moundTpl(), snowMound: moundTpl(true),
     // стволы и ветки без торцов (8 треугольников вместо 12) и ягоды-октаэдры (8 вместо 20) — trees.js
     stick: arr(new THREE.CylinderGeometry(0.7071, 0.7071, 1, 4, 1, true).rotateY(Math.PI / 4)),
     oct: arr(new THREE.OctahedronGeometry(1, 0)),
@@ -681,7 +684,23 @@ function tpls () {
 
 /* Сугроб: пятиугольник у земли, кольцо выше и уже, макушка. Обход граней —
    наружу (снизу его не видно, дна нет). */
-function moundTpl () {
+function moundTpl (rounded = false) {
+  if (rounded) {
+    const sides = 10, radii = [0.46, 0.76, 1], out = [];
+    const rings = radii.map(r => Array.from({ length: sides }, (_, i) => {
+      const a = i / sides * Math.PI * 2;
+      return [Math.cos(a) * r, r === 1 ? -0.04 : bankProfile(r), Math.sin(a) * r];
+    }));
+    for (let i = 0; i < sides; i++) {
+      const next = (i + 1) % sides;
+      out.push(0, 1, 0, ...rings[0][next], ...rings[0][i]);
+      for (let r = 1; r < rings.length; r++) {
+        const inner = rings[r - 1], outer = rings[r];
+        out.push(...inner[i], ...inner[next], ...outer[next], ...inner[i], ...outer[next], ...outer[i]);
+      }
+    }
+    return Float32Array.from(out);
+  }
   const rim = [], ring = [], out = [];
   for (let i = 0; i < 5; i++) {
     const a = i / 5 * Math.PI * 2, b = a + Math.PI / 5;
@@ -985,7 +1004,7 @@ export function* seasonSteps () {
     if (busy(x, z) || onYard(x, z, Math.max(L, W) * 0.8)) return;   // на дворовые дорожки и выходы к тротуару — нет (yards.js)
     H = driftH(H, W, L);                                       // не уже 2,5 высоты (0п22)
     const y = groundH(x, z) + C.curbAt(x, z) + 0.02;
-    const at = DRIFTP.add(T.mound, x, y, z, W, H, L, 0, ry, 0, DRIFT_HEX, 3, seed);
+    const at = DRIFTP.add(T.snowMound, x, y, z, W, H, L, 0, ry, 0, DRIFT_HEX, 3, seed);
     const k = Math.floor(x / 20) + ',' + Math.floor(z / 20);
     if (!DRIFTS.has(k)) DRIFTS.set(k, []);
     DRIFTS.get(k).push({ x, y, z, L, H, W, ry, cs: Math.cos(ry), sn: Math.sin(ry), s: 1, t: 0, ...at, pile: DRIFTP,
@@ -1025,7 +1044,7 @@ export function* seasonSteps () {
     return false;
   };
   const nearStop = (x, z) => (CITY.stops || []).some(q => Math.abs(q.p[0] - x) < 9 && Math.abs(q.p[1] - z) < 9);
-  const RIDGES = svk ? 9000 : 3600, HEAPS = svk ? 1800 : 900, BANKS = svk ? 1300 : 650;
+  const RIDGES = svk ? 9000 : 3600, HEAPS = svk ? 1800 : 900, BANKS = svk ? 1550 : 800;
   let nRidge = 0, nHeap = 0, nBank = 0;
   const heapCells = new Set();
   let nRd = 0;
@@ -1424,7 +1443,7 @@ function driftShape (d, s) {
   if (!m) return;
   const pa = m.geometry.attributes.position;
   if (!pa.array) return;
-  (d.pile || DRIFTP).write(tpls().mound, pa.array, d.v0 * 3, d.x, d.y - (1 - s) * 0.05, d.z, d.W * (1 + (1 - s) * 0.25), d.H * s, d.L * (1 + (1 - s) * 0.15), 0, d.ry, 0);
+  (d.pile || DRIFTP).write(d.pile === LEAFP ? tpls().mound : tpls().snowMound, pa.array, d.v0 * 3, d.x, d.y - (1 - s) * 0.05, d.z, d.W * (1 + (1 - s) * 0.25), d.H * s, d.L * (1 + (1 - s) * 0.15), 0, d.ry, 0);
   pa.addUpdateRange(d.v0 * 3, d.nv * 3);
   pa.needsUpdate = true;
   d.s = s;
@@ -1488,7 +1507,7 @@ function stepCar (dt) {
   }
 }
 /* верх видимого сугроба в точке — сбитые, лужи и пятна ложатся на него, а не внутрь (hits.js topAt).
-   Профиль — как у модели кучи (moundTpl): вершина 1, на 0,62 радиуса — 0,7, край — у земли.
+   Округлый профиль общий с моделью сугроба: вершина 1, край у земли.
    Нет сугроба — -Infinity */
 const EXTRA_TOP = [];
 /* ещё сугробы со своим верхом (weather.js: снежная зима) */
@@ -1511,7 +1530,7 @@ function driftTop0 (x, z) {
       const lx = dx * d.cs - dz * d.sn, lz = dx * d.sn + dz * d.cs;
       const e = Math.hypot(lx / W, lz / L);
       if (e >= 1) continue;
-      const k = e < 0.62 ? 1 - 0.3 * e / 0.62 : 0.7 - 0.78 * (e - 0.62) / 0.38;
+      const k = bankProfile(e);
       const y = d.y - (1 - s) * 0.05 + d.H * s * k;
       if (y > top) top = y;
     }

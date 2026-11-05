@@ -22,18 +22,19 @@ export function createSnowBaseline(surfaces) {
     if (!tile.flags[k]) {
       const x = ix * STEP, z = iz * STEP;
       surfaces.initial(id, x, z, source);
-      let depth = source.thickness, sum = 4*depth, nx = 0, nz = 0, lip = false;
+      let depth = source.deformable ? source.thickness : 0, sum = 4*depth, weight = 4, nx = 0, nz = 0, lip = false;
       // Smooth only compatible receivers. A positive symmetric kernel cannot
       // overshoot into a sharp peak or mix a bridge with the ground below it.
       if (source.valid) for (const [dx, dz] of offsets) {
         surfaces.initial(id, x + dx, z + dz, neighbour);
         const same = neighbour.valid && Math.abs(source.baseY - neighbour.baseY) <= 0.22;
         if (!same) { lip = true; continue; }
-        sum += neighbour.thickness;
-        const h = neighbour.baseY + neighbour.thickness;
+        const neighbourDepth = neighbour.deformable ? neighbour.thickness : 0;
+        sum += neighbourDepth; weight++;
+        const h = neighbour.baseY + neighbourDepth;
         nx -= dx * h / (2*STEP*STEP); nz -= dz * h / (2*STEP*STEP);
       }
-      depth = lip ? 0 : sum/8;
+      depth = source.deformable ? sum / weight : 0;
       // A discontinuous receiver has its own normal; it is not a slope.
       if (lip) nx = nz = 0;
       tile.flags[k] = source.valid ? 3 : 1;

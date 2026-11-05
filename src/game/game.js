@@ -6267,9 +6267,9 @@ function buildCity () {
   HUR.holeMat(flatMat);
   FSH.mat(litMat); FSH.mat(flatMat);            // тени домов: маска в шейдере земли и разметки (fakeshadows.js)
   const groups = [];
-  const winterGroup = WINM.mesh(SEAS.winterRoadMat(true));
-  const winterRutGroup = WINRUTM.mesh(SEAS.winterRoadMat(true));
-  const winterSoftGroup = WINSOFTM.mesh(SEAS.winterRoadMat());
+  const winterGroup = WINM.mesh(FSH.mat(SEAS.winterRoadMat(true)));
+  const winterRutGroup = WINRUTM.mesh(FSH.mat(SEAS.winterRoadMat(true)));
+  const winterSoftGroup = WINSOFTM.mesh(FSH.mat(SEAS.winterRoadMat()));
   for (const mesh of winterRutGroup.children) mesh.renderOrder = 1;
   for (const group of [winterGroup, winterRutGroup, winterSoftGroup]) {
     WINROAD.addSandAttribute(group, THREE);

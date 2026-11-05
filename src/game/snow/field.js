@@ -34,6 +34,7 @@ export function createSnowField ({ initial }) {
 
   function initSample (id, x, z, out) {
     out.valid = false; out.baseY = 0; out.thickness = 0; out.compaction = 0;
+    out.deformable = true;
     out.wetness = out.ice = out.dirt = out.sand = 0;
     out.exposure = 1; out.materialId = 0; out.maxThickness = undefined;
     initial(id, x, z, out);
@@ -289,7 +290,7 @@ export function createSnowField ({ initial }) {
     const gx = x / DX - 0.5, gz = z / DX - 0.5, ix = Math.floor(gx), iz = Math.floor(gz), fx = gx - ix, fz = gz - iz;
     const has = own || tileAt(id, Math.floor(ix / N), Math.floor(iz / N)) || tileAt(id, Math.floor((ix + 1) / N), Math.floor(iz / N)) ||
       tileAt(id, Math.floor(ix / N), Math.floor((iz + 1) / N)) || tileAt(id, Math.floor((ix + 1) / N), Math.floor((iz + 1) / N));
-    if (out.valid && has) {
+    if (out.valid && out.deformable && has) {
       let total = 0, mass = 0, volume = 0, wet = 0, iced = 0, dirty = 0, sandy = 0;
       for (let dz = 0; dz < 2; dz++) for (let dx = 0; dx < 2; dx++) {
         const weight = (dx ? fx : 1 - fx) * (dz ? fz : 1 - fz);
@@ -373,7 +374,7 @@ export function createSnowField ({ initial }) {
       if (!tile || tile.archived || !tile.flags[index]) continue;
       if (tile.pending[index] === stampId) continue;
       initSample(id, (gx + 0.5) * DX, (gz + 0.5) * DX, base);
-      if (!base.valid) continue;
+      if (!base.valid || !base.deformable) continue;
       const c = tile.c[index] / Q, ice = tile.ice[index] / B;
       if (c > 0.85 || ice > 0.7) continue;
       const mass = tile.mass[index], top = base.baseY + mass * season / density(c);
@@ -438,7 +439,7 @@ export function createSnowField ({ initial }) {
         clamp01((Math.min(along - minDot, maxDot - along) + DX / 2) / DX);
       if (weight <= 0) continue;
       initSample(id, x, z, base);
-      if (!base.valid) continue;
+      if (!base.valid || !base.deformable) continue;
       cell(id, gx, gz, true, lookup);
       const tile = lookup.tile, i = lookup.index;
       if (!tile || !tile.flags[i]) continue;
@@ -476,7 +477,7 @@ export function createSnowField ({ initial }) {
         const rz = sideways ? z + nz * side * (half + SNOW.TRANSFER_STEP + ring * DX) :
           z + uz * (tail ? -1 : 1) * (length * 0.5 + SNOW.TRANSFER_STEP) + nz * (ring ? 1 : -1) * width * 0.25;
         initSample(id, rx, rz, pristine);
-        if (!pristine.valid || Math.abs(pristine.baseY - base.baseY) > SNOW.BARRIER_HEIGHT) continue;
+        if (!pristine.valid || !pristine.deformable || Math.abs(pristine.baseY - base.baseY) > SNOW.BARRIER_HEIGHT) continue;
         cell(id, Math.floor(rx / DX), Math.floor(rz / DX), true, lookup);
         const rt = lookup.tile, ri = lookup.index;
         if (!rt || !rt.flags[ri] || rt === tile && ri === i) continue;
@@ -588,6 +589,36 @@ export function createSnowField ({ initial }) {
   function getEdgeRevision (id, tx, tz, dx, dz) {
     return (tileAt(id, tx, tz)?.edgeRevision[(dz + 1) * 3 + dx + 1] || 0) + visualWeatherRevision * 100000000;
   }
+  function deformationRevision (id, tx, tz) {
+    const map = surfaceMap(id);
+    if (!map) return 0;
+    let r = map.get(tileCode(tx, tz))?.revision || 0;
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      if (dx || dz) r = Math.max(r, map.get(tileCode(tx + dx, tz + dz))?.edgeRevision[(1 - dz) * 3 + 1 - dx] || 0);
+    }
+    return r ? r + visualWeatherRevision * 100000000 : 0;
+  }
+  const renderSample = {};
+  // Sparse physical cells plus one cell of padding on all four sides. The
+  // GPU interpolates these heights over stationary snow geometry.
+  function writeDeformation (id, tx, tz, put) {
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      const tile = tileAt(id, tx + dx, tz + dz);
+      if (!tile) continue;
+      const x0 = dx === -1 ? -1 : dx === 1 ? N : 0, x1 = dx ? x0 : N - 1;
+      const z0 = dz === -1 ? -1 : dz === 1 ? N : 0, z1 = dz ? z0 : N - 1;
+      for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
+        const lx = x - dx * N, lz = z - dz * N;
+        const i = lx + lz * N, ai = Math.floor(lx / AS) + Math.floor(lz / AS) * AN;
+        if (tile.archived ? !tile.flags[ai] : !(tile.flags[i] & 2) && !tile.archive?.flags[ai]) continue;
+        cellState(id, tx * N + x, tz * N + z, renderSample);
+        if (!renderSample.valid || !renderSample.deformable) continue;
+        const depth = renderSample.mass / density(renderSample.compaction);
+        const delta = depth - renderSample.thickness;
+        put((z + 1) * (N + 2) + x + 1, delta, Math.max(0, renderSample.pristineVolume - depth));
+      }
+    }
+  }
   function getDirtyBounds (id, tx, tz, consumer) {
     const tile = tileAt(id, tx, tz);
     if (!tile || tile.archived || tile.weatherRevision !== weatherRevision) return null;
@@ -611,7 +642,8 @@ export function createSnowField ({ initial }) {
     for (const key of Object.keys(stats)) stats[key] = 0;
     stats.season = season; stats.revision = revision; stats.bytes = 65536;
   }
-  return { sample, stamp, setWeather, step, getRevision, getEdgeRevision, getDirtyBounds, clearDirty,
+  return { sample, stamp, setWeather, step, getRevision, getEdgeRevision, getDirtyBounds, clearDirty, deformationRevision, writeDeformation,
+    get deformationEpoch () { return revision + visualWeatherRevision * 100000000; },
     setFocus (x, z) { focusX = x; focusZ = z; },
     setProtection (predicate) { protectTile = typeof predicate === 'function' ? predicate : null; },
     reset, dispose: reset, stats };

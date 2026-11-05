@@ -290,7 +290,7 @@ ${lace}
   ST.depthMats++;
   return d;
 }
-const castable = m => m && m.isMaterial && !m.userData.fsCar && !m.userData.dirt && !m.userData.snowSurface && !(LIVING_SNOW && m.userData.livingSnowOwner) && !m.isShaderMaterial && !m.isRawShaderMaterial && !m.isMeshBasicMaterial && m.visible !== false && m.fog !== false &&
+const castable = m => m && m.isMaterial && !m.userData.fsCar && !m.userData.dirt && !m.userData.snowSurface && !m.userData.snowStatic && !(LIVING_SNOW && m.userData.livingSnowOwner) && !m.isShaderMaterial && !m.isRawShaderMaterial && !m.isMeshBasicMaterial && m.visible !== false && m.fog !== false &&
   (m.isMeshLambertMaterial || m.isMeshPhongMaterial || m.isMeshStandardMaterial) && !(m.transparent && m.opacity < 0.6) && m.depthWrite !== false;   // глубину не пишет (следы шин, пятна) — тень не отбрасывает
 
 let SCENE = null, R = null, SHS = null, LCAM = null;

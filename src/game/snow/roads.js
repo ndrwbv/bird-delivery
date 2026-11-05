@@ -51,7 +51,7 @@ export function corridorModes (roads, roadWidth) {
       const sandShare = c <= 3 ? 0.16 : c === 7 ? 0.05 : 0.12;
       const clearShare = c <= 3 ? 0.55 : c === 4 ? 0.38 : c === 5 ? 0.2 : 0.08;
       const sand = roll < sandShare, clear = !sand && roll < sandShare + clearShare;
-      mode = { sand, clear, rut: (c === 5 || c === 7) && !sand && !clear && hash(r.id + ':rut') < (c === 7 ? 0.65 : 0.48), corridor: r.id };
+      mode = { sand, clear, corridor: r.id };
       byRoot.set(r, mode);
     }
     result.set(e.road, mode);

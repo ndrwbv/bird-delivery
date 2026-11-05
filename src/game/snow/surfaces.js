@@ -103,6 +103,7 @@ export function createSnowSurfaces(A) {
   }
   function rawInitial(surfaceId, x, z, out = {}) {
     base(surfaceId, x, z, out);
+    out.deformable = true;
     out.visualCoverage = 1; out.thickness = 0; out.compaction = 0; out.wetness = 0; out.ice = 0;
     out.dirt = 0; out.sand = 0; out.rut = 0; out.heading = 0;
     out.normalX = 0; out.normalY = 1; out.normalZ = 0;
@@ -115,7 +116,8 @@ export function createSnowSurfaces(A) {
       if (road.onRoad && !raisedLand) {
         out.baseY = Number.isFinite(pavingY) ? pavingY : road.baseY;
         out.materialId = 1; out.thickness = road.thickness;
-        out.visualCoverage = road.thickness > road.roadThickness + 0.01 ? 1 : road.coverage;
+        out.deformable = road.bank > road.roadThickness + 0.004;
+        out.visualCoverage = out.deformable ? 1 : 0;
         out.compaction = road.compaction; out.dirt = road.dirt;
         out.sand = road.sand; out.rut = road.rut || 0; out.heading = road.heading || 0;
         out.legacyY = road.legacyY ?? (out.baseY + out.thickness);
@@ -124,6 +126,9 @@ export function createSnowSurfaces(A) {
         if (surfaceId === 0 && !raisedLand && (Number.isFinite(pavingY) || pave >= 0 || curb > 0 || A.onPave(x, z))) {
           out.baseY = Number.isFinite(pavingY) ? pavingY : originalY + Math.max(0, pave, curb);
           out.materialId = 2; out.thickness = 0.08 + noise(x, z, 3) * 0.04; out.compaction = 0.65;
+          // Packed paving keeps its continuous winter material. Only a
+          // real bank above it needs geometry or physical cells.
+          out.deformable = false; out.visualCoverage = 0;
         } else {
           out.thickness = 0.3 + noise(x + 19, z - 7, 4) * 0.12 + noise(x, z, 1.2) * 0.025;
           // A low rounded lip beside the actual paved boundary, not white
@@ -131,6 +136,10 @@ export function createSnowSurfaces(A) {
           if (A.nearCurb(x, z)) out.thickness += 0.12;
         }
         out.legacyY = out.baseY;
+      }
+      if (out.materialId !== 1 && road.bank > (out.materialId === 2 ? 0.008 : out.thickness)) {
+        out.thickness = road.bank; out.compaction = 0.12; out.legacyY = out.baseY + road.bank;
+        out.deformable = true; out.visualCoverage = 1;
       }
     } else {
       out.thickness = out.materialId === 3 ? 0.035 + noise(x, z, 3) * 0.04 : 0.08 + noise(x, z, 3) * 0.06;
@@ -156,12 +165,13 @@ export function createSnowSurfaces(A) {
       }
     }
     out.thickness *= out.exposure;
-    if (surfaceId === 0 && out.exposure) {
+    if (surfaceId === 0 && out.exposure && (out.materialId !== 1 || road.edgeDistance < 1.45)) {
       const top = Math.max(A.driftTop(x, z), A.lotSnowTop(x, z));
-      if (Number.isFinite(top) && top > out.baseY + out.thickness) {
+      if (Number.isFinite(top) && top > out.baseY + (out.materialId === 2 && !out.deformable ? 0.008 : out.thickness)) {
         out.thickness = Math.min(8, top - out.baseY);
         out.legacyY = top;
         out.compaction = 0.08;
+        out.deformable = true; out.visualCoverage = 1;
       }
     }
     out.legacyTopY = Math.max(out.legacyY + 0.12, out.baseY + out.thickness + 0.15, out.baseY + 0.4);
@@ -210,11 +220,11 @@ export function createSnowSurfaces(A) {
     const n=Math.floor((iz-tz*128)/2)*64+Math.floor((ix-tx*128)/2)+(ix&1)*4096;
     if(!c.flags[n]) {
       rawInitial(id,x,z,out); stats.samples++;
-      c.flags[n]=out.valid?3:1;c.material[n]=out.materialId;
+      c.flags[n]=1 | (out.valid ? 2 : 0) | (out.deformable ? 4 : 0);c.material[n]=out.materialId;
       for(let j=0;j<5;j++) c.f[n*5+j]=out[floats[j]]||0;
       for(let j=0;j<8;j++) c.b[n*8+j]=Math.round(clamp(out[bytes[j]]||0)*255);
     } else {
-      stats.hits++;out.valid=c.flags[n]===3;out.surfaceId=id;out.materialId=c.material[n];
+      stats.hits++;out.valid=!!(c.flags[n]&2);out.deformable=!!(c.flags[n]&4);out.surfaceId=id;out.materialId=c.material[n];
       for(let j=0;j<5;j++) out[floats[j]]=c.f[n*5+j];
       for(let j=0;j<8;j++) out[bytes[j]]=c.b[n*8+j]/255;
       out.normalX=0;out.normalY=1;out.normalZ=0;out.topY=out.baseY+out.thickness;
