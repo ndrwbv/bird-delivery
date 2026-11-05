@@ -7,7 +7,7 @@ import * as HUDMAP from './hudmapios.js';
 const H = { root: null, device: null, thread: null, banner: null, modal: null,
   visible: false, app: 'courier', order: null, messages: [], rating: null,
   shrink: 0, bannerTimer: 0, messageTimer: 0, enterTimer: 0, resourcesKey: '', rankKey: '',
-  moneyElement: null, moneyParent: null, payment: null, paymentModal: null };
+  moneyElement: null, moneyParent: null, payment: null, paymentModal: null, currentAvatar: '' };
 
 const icon = kind => '<span class="hp-icon hp-icon-' + kind + '" aria-hidden="true"><i></i></span>';
 const $ = s => H.root && H.root.querySelector(s);
@@ -92,7 +92,7 @@ export function init ({ visible = false } = {}) {
         </div>
         <section class="hp-app hp-courier-app" data-hp-app="courier"><header class="hp-nav"><b>${t('Птица Пицца')}</b></header>
           <div class="hp-courier-scroll">
-            <div class="hp-current"><small>${t('ТЕКУЩИЙ ЗАКАЗ')}</small><b class="hp-current-title">${t('Нет активного заказа')}</b><span class="hp-current-address"></span><span class="hp-current-time"></span></div>
+            <div class="hp-current" hidden><span class="hp-current-avatar"><img alt=""></span><span class="hp-current-copy"><b class="hp-current-title"></b><span class="hp-current-distance"></span></span><span class="hp-current-time"></span></div>
             <button class="hp-competition" type="button" data-open="rating"><span class="hp-rank-heading"><b>${t('ЛИДЕРЫ СМЕНЫ')}</b><span class="hp-rank-arrow">›</span></span><span class="hp-rank-list"></span></button>
             <div class="hp-shift-earn"><small>${t('ЗАРАБОТАНО ЗА СМЕНУ')}</small><strong class="hp-earned">0 ₽</strong></div>
             <div class="hp-last-rating" hidden><small>${t('РЕЙТИНГ ПОСЛЕ ЗАКАЗА')}</small><b></b></div>
@@ -137,20 +137,28 @@ export function mountMoney (el) {
   $('.hp-money-fallback').hidden = true;
   if (H.visible) $('.hp-money-slot').appendChild(el);
 }
-export function resources ({ hp, hpMax, money, order, time }) {
+export function resources ({ hp, hpMax, money, order, hasOrder = !!order }) {
   if (!H.root) return;
-  const title = order ? order.title : t('Нет активного заказа');
-  const address = order ? order.address : '';
-  const key = [hp, hpMax, money, title, address, time].join('|');
-  if (key === H.resourcesKey) return;
-  H.resourcesKey = key;
+  const { name = '', avatar = '', distance = '', time = '', urgency = '' } = order || {};
+  const key = [hp, hpMax, money, name, distance, time, urgency, hasOrder].join('|');
+  if (key === H.resourcesKey && avatar === H.currentAvatar) return;
+  H.resourcesKey = key; H.currentAvatar = avatar;
   $('.hp-health').textContent = '♥ ' + hp + '/' + hpMax;
   $('.hp-money-fallback').textContent = money;
   $('.hp-earned').textContent = money;
-  $('.hp-current-title').textContent = title;
-  $('.hp-current-address').textContent = address;
-  $('.hp-current-time').textContent = order && time ? '◷ ' + time : '';
-  if (!order && H.order) clearOrder();
+  const card = $('.hp-current'); card.hidden = !order;
+  card.classList.toggle('warn', urgency === 'warn'); card.classList.toggle('low', urgency === 'low');
+  $('.hp-current-title').textContent = name || t('клиент');
+  $('.hp-current-title').title = name;
+  $('.hp-current-distance').textContent = distance;
+  const face = $('.hp-current-avatar'), img = face.querySelector('img');
+  if (avatar) {
+    if (img) { if (img.getAttribute('src') !== avatar) img.src = avatar; }
+    else { const image = document.createElement('img'); image.src = avatar; image.alt = ''; face.replaceChildren(image); }
+  } else face.textContent = (name || t('клиент')).slice(0, 1).toUpperCase();
+  $('.hp-current-time').textContent = time ? '◷ ' + time : '';
+  $('.hp-current-time').hidden = !time;
+  if (!hasOrder && H.order) clearOrder();
 }
 export function showOrder ({ number, html, name = '', avatar = '', many = false, routeOverview, driveKey = 'W' }) {
   if (!H.root || document.body.classList.contains('touch')) return false;
@@ -322,9 +330,9 @@ export function reset () {
   $('.hp-last-rating').hidden = true;
 }
 /* Песочница: фиксированные состояния для сравнимых скриншотов без ожидания таймеров. */
-export function demo (phase = 'dock', text = 'Клиент уже ждёт. Ты где?') {
+export function demo (phase = 'dock', text = 'Клиент уже ждёт. Ты где?', avatar = '') {
   reset(); setVisible(true);
-  resources({ hp: 5.5, hpMax: 6, money: '3 200 ₽', order: { title: t('Заказ № 0007'), address: t('ул. Царевского, 2') }, time: '02:15' });
+  resources({ hp: 5.5, hpMax: 6, money: '3 200 ₽', order: { name: 'Света Т.', avatar, distance: t('{n} м', { n: 320 }), time: '02:15' } });
   rank({ place: 3, total: 8, rows: [
     { n: t('Вася'), d: 4, money: '4 100 ₽' },
     { n: t('Олег'), d: 3, money: '3 600 ₽' },

@@ -15065,9 +15065,6 @@ function hudStep (dt) {
   const lg = curLang();
   if (lg !== HUDC.lang) { HUDC.lang = lg; HUDC.money = NaN; HUDC.nos = -1; HUDC.bur = ''; HUDC.spd = -1; HUDC.key = ''; HUDC.dist = -1; HUDC.fx = '#'; }
   if (CAREER) walletHud(dt); else if (S.money !== HUDC.money) { HUDC.money = S.money; elMoney.textContent = money(S.money); }
-  HUDFONE.resources({ hp: S.hp, hpMax: S.hpMax, money: CAREER ? (SC.DEBUG.text || money(S.money)) : money(S.money),
-    order: S.order ? { title: $t('заказ {n}', { n: S.orders }), address: S.addr || (PIZZA ? PIZZA.name : '') } : null,
-    time: S.order && S.timeMax > 0 ? dashLeft(S.time) : '' });
   touchpadStep();
   const bk = S.burgers + '|' + S.people + '|' + S.scoots + '|' + S.wrecks;
   if (bk !== HUDC.bur) {
@@ -15101,6 +15098,7 @@ function hudStep (dt) {
   if (toastT > 0 && (toastT -= dt) <= 0) elToast.style.opacity = 0;
   if (phoneT > 0 && (phoneT -= dt) <= 0) hidePhone();
   OTAGS.step(dt);                                  // мини-карточки заказа над радаром (ordertags.js)
+  HUDFONE.resources({ hp: S.hp, hpMax: S.hpMax, money: CAREER ? (SC.DEBUG.text || money(S.money)) : money(S.money), order: OTAGS.current(), hasOrder: !!S.order });
 
   const on = S.state === 'drive' || S.state === 'back' || S.state === 'handover' || S.state === 'side';
   if (on && S.ride) {

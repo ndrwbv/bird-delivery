@@ -55,12 +55,10 @@
 #hud-phone .hp-courier-scroll { flex: 1; min-height: 0; overflow: auto; padding: 13px 10px; scrollbar-width: none; }
 #hud-phone .hp-courier-scroll::-webkit-scrollbar, #hud-phone .hp-thread::-webkit-scrollbar { display: none; }
 #hud-phone .hp-shift-earn { padding: 14px 12px 16px; border: 1px solid #9ba9b8; border-radius: 8px; background: linear-gradient(#fff, #edf3f7 48%, #dae2ea); box-shadow: inset 0 1px #fff, 0 2px 4px #0003; display: flex; flex-direction: column; gap: 5px; }
-#hud-phone .hp-shift-earn small, #hud-phone .hp-current small, #hud-phone .hp-last-rating small { color: #6b7f98; font-size: 10px; font-weight: 700; letter-spacing: .03em; }
+#hud-phone .hp-shift-earn small, #hud-phone .hp-last-rating small { color: #6b7f98; font-size: 10px; font-weight: 700; letter-spacing: .03em; }
 #hud-phone .hp-shift-earn strong { font-size: 27px; line-height: 1.1; color: #2b6846; text-shadow: 0 1px #fff; }
 #hud-phone .hp-current, #hud-phone .hp-last-rating { margin-top: 11px; padding: 12px; border: 1px solid #a8b2bf; border-radius: 8px; background: linear-gradient(#fff, #e6e9ed); box-shadow: inset 0 1px #fff, 0 2px 4px #0002; display: flex; flex-direction: column; gap: 5px; }
 #hud-phone .hp-current b, #hud-phone .hp-last-rating b { color: #252d39; font-size: 14px; }
-#hud-phone .hp-current-address, #hud-phone .hp-current-time { color: #68717b; font-size: 11px; }
-#hud-phone .hp-current-time { color: #3c6490; font-weight: 700; }
 #hud-phone .hp-courier-nav { height: 43px; flex: none; display: flex; align-items: center; gap: 5px; padding: 5px 6px; border-top: 1px solid #7f8c9f; background: linear-gradient(#dfe5ec, #a6b4c6); box-shadow: inset 0 1px #fff; }
 #hud-phone .hp-courier-nav button { flex: 1; height: 30px; border: 1px solid #687e9c; border-radius: 5px; background: linear-gradient(#f8fafd, #c6d0dd); color: #354d6a; font-size: 11px; font-weight: 700; text-shadow: 0 1px #fff; box-shadow: inset 0 1px #fff, 0 1px 1px #536880; }
 #hud-phone .hp-thread { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; padding: 12px 10px 8px; scrollbar-width: none; background: repeating-linear-gradient(0deg, #e3e5e8 0 2px, #e9eaed 2px 4px); }
@@ -138,7 +136,7 @@
 #hud-phone .hp-courier-app .hp-nav, #hud-phone .hp-rating-app .hp-nav { background: linear-gradient(#c99e7e 0%, #aa775c 48%, #916148 50%, #7d4d3b 100%); border-bottom-color: #704637; }
 #hud-phone .hp-messages .hp-nav { background: linear-gradient(#92b59b 0%, #6b9778 48%, #538466 50%, #416e56 100%); border-bottom-color: #385f4b; }
 #hud-phone .hp-shift-earn { border-color: #c6ae8b; background: linear-gradient(#fffdf6, #f5e8cf 53%, #e9d5b3); }
-#hud-phone .hp-shift-earn small, #hud-phone .hp-current small, #hud-phone .hp-last-rating small { color: #907254; }
+#hud-phone .hp-shift-earn small, #hud-phone .hp-last-rating small { color: #907254; }
 #hud-phone .hp-shift-earn strong { color: #437354; }
 #hud-phone .hp-current, #hud-phone .hp-last-rating { border-color: #cbb69b; background: linear-gradient(#fffdf8, #eee2cf); }
 #hud-phone .hp-courier-nav { background: linear-gradient(#e6d8c4, #cba98a); border-top-color: #9c806b; }
@@ -174,9 +172,19 @@
 #hud-phone .hp-rank-line.me { padding: 0 3px; margin-left: -3px; width: calc(100% + 6px); border-radius: 3px; background: #f7cd7770; }
 #hud-phone .hp-shift-earn, #hud-phone .hp-current, #hud-phone .hp-last-rating { position: relative; background: linear-gradient(#ffffff75, #ffffff00 48%), repeating-linear-gradient(0deg, #fbf3df 0 2px, #f5e8cf 2px 4px); border-color: #cfb78d; box-shadow: inset 0 1px #fff, 0 3px 7px #21140670; }
 #hud-phone .hp-shift-earn { margin-top: 10px; }
-#hud-phone .hp-current { margin-top: 0; }
+#hud-phone .hp-current { margin-top: 0; min-height: 76px; padding: 10px 8px; display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; align-items: center; gap: 8px; border: 1px solid #d49a42; border-left: 5px solid #e57d31; border-radius: 10px; background: linear-gradient(#fff9da, #ffe6a7 54%, #f6cc7b); box-shadow: inset 0 1px #fffde9, inset 0 -1px #d5a05766, 0 3px 7px #21140670; }
+#hud-phone .hp-current-avatar { display: grid; place-items: center; width: 46px; height: 46px; overflow: hidden; border: 2px solid #fff9df; border-radius: 9px; background: linear-gradient(#ffd378, #e98c42); box-shadow: 0 0 0 1px #bb8039, 0 2px 3px #8d481b44; color: #824423; font-size: 24px; font-weight: 700; }
+#hud-phone .hp-current-avatar img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+#hud-phone .hp-current-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+#hud-phone .hp-current-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#hud-phone .hp-current b { color: #61361e; font-size: 16px; line-height: 1.15; text-shadow: 0 1px #fff9; }
+#hud-phone .hp-current-distance { color: #965722; font-size: 12px; font-weight: 700; white-space: nowrap; }
+#hud-phone .hp-current-time { padding: 7px 5px; border: 1px solid #367a49; border-radius: 7px; background: linear-gradient(#77b46a, #43884e); box-shadow: inset 0 1px #d3f2baaa, 0 2px 3px #79502933; color: #fffce8; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; text-shadow: 0 -1px #367343; }
+#hud-phone .hp-current.warn .hp-current-time { border-color: #bc6825; background: linear-gradient(#f7b94e, #e7842c); color: #60330e; text-shadow: 0 1px #ffe6a6; }
+#hud-phone .hp-current.low { border-left-color: #cc483b; background: linear-gradient(#fff2d0, #ffd3a0); }
+#hud-phone .hp-current.low .hp-current-time { border-color: #a43c32; background: linear-gradient(#ed8263, #c84c3f); color: #fff7de; text-shadow: 0 -1px #9b392e; }
 #hud-phone .hp-competition { margin-top: 10px; }
-#hud-phone .hp-shift-earn::before, #hud-phone .hp-current::before { content: ''; position: absolute; inset: 4px; border: 1px dashed #bd966153; border-radius: 5px; pointer-events: none; }
+#hud-phone .hp-shift-earn::before { content: ''; position: absolute; inset: 4px; border: 1px dashed #bd966153; border-radius: 5px; pointer-events: none; }
 #hud-phone .hp-order-list { background: linear-gradient(#fffef8e6, #fffef8e6), repeating-linear-gradient(0deg, #e2cdac 0 1px, #f6e6cc 1px 4px); }
 #hud-phone .hp-order-title { background: linear-gradient(#fff4 0%, #12090355 52%, #12090388), url('/textures/phone-wood.svg') repeat-x; background-size: auto, auto 100%; }
 #hud-phone .hp-rating-app { background: url('/textures/phone-leather.svg') center / cover no-repeat; }
