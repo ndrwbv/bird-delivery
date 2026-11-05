@@ -268,9 +268,9 @@ export function say (text, onShow, angry, who, o) {
   const slot = TYPE_S + Math.max(C.ph ? PH.BIG_HOLD : Math.min(BIG.MAX, BIG.MIN + text.length / BIG.PER),
     Math.min(SLOT.MAX, Math.max(SLOT.MIN, SLOT.BASE + SLOT.PER * text.length)));
   NQ.push({
-    kind: crew ? 'crew' : 'boss', text, ms: slot * 1000, fresh: SLOT.FRESH, key: o && o.key,
+    kind: crew ? 'crew' : 'boss', text, ms: slot * 1000, fresh: SLOT.FRESH, key: o && o.key, urgent: !!o?.urgent,
     wait: crew ? SLOT.CREW_WAIT : SLOT.BOSS_WAIT, group: crew ? 'crew' : undefined, max: crew ? 1 : undefined,
-    show: () => { QN--; const f = rec.onShow; rec.onShow = null; rec.m = sayNow(text, f, angry, who); },
+    show: () => { QN--; const f = rec.onShow; rec.onShow = null; rec.m = sayNow(text, f, angry, who, o?.channel || who?.channel || 'crew'); },
     // перебило срочное или чек оплаты: только пришло — убираем из ленты, покажется заново целиком (вычет — один раз);
     // уже прочитали крупно — остаётся в ленте мелко
     hide: (it, again) => { if (!rec.m) return; if (again) { QN++; drop(rec.m); rec.m = null; } else { rec.m.calm = true; shrink(rec.m); } },
@@ -278,7 +278,7 @@ export function say (text, onShow, angry, who, o) {
   });
   return rec;
 }
-function sayNow (text, onShow, angry, who) {
+function sayNow (text, onShow, angry, who, channel = 'crew') {
   const el = box();
   place();
   // хад мог появиться или спрятаться, пока сообщения висят (написал в катсцене — хада нет, чат встал в самый верх;
@@ -313,7 +313,7 @@ function sayNow (text, onShow, angry, who) {
     place();                                              // текст пришёл — влезает ли по высоте (fit), до «крупно»
     m.said = true;
     shown(m);
-    if (C.hud && C.hud.active()) C.hud.receive({ name: nm0, role, text, avatar: img ? img.src : '' });
+    if (C.hud && C.hud.active()) C.hud.receive({ name: nm0, role, text, avatar: img ? img.src : '', manager: !who?.name, channel });
     ding(angry);
     if (img) TF.talk(img, TF.talkTime(text));
     const big = !m.calm && !(C.hud && C.hud.active()) && grow(m) ? bigHold(text) : 0;
@@ -349,7 +349,7 @@ export function shiftLine (mood) {
   return t(pool[Math.floor(Math.random() * pool.length)]);
 }
 
-export function clear () { NQ.clear(['boss', 'crew']); for (const m of C.items.slice()) drop(m); }   // ждущие в очереди — тоже (вычеты — всё равно)
+export function clear () { NQ.clear(['boss', 'crew']); for (const m of C.items.slice()) drop(m); C.hud?.clearReplies?.(); }   // ждущие в очереди — тоже (вычеты — всё равно)
 
 /* отложенное сообщение: пока таймер не вышел, чат «занят» (конец смены его подождёт); clear() его не
    отменяет — вычет за опоздание должен случиться и после конца смены */

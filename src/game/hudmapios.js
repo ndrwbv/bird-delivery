@@ -3,6 +3,8 @@ import './hudmapios.css';
 import { t } from '../i18n/index.js';
 
 let bars = null;
+let pizzaEl = null, pizzaState = '';
+const pizzaMark = () => '<span class="hios-pizza" role="img" aria-label="' + t('Пицца горячая') + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 9 5 12 9-10M4 8q7-4 16 2M8 7l1 2M16 8l-1 2M10 13h.1M13 16h.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path class="hios-pizza-heat" d="M8 4V1m5 3V1m5 4V2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path class="hios-pizza-snow" d="M18 1v7m-3-5 6 3m-6 0 6-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>';
 const point = p => Array.isArray(p) ? p : [p?.x, p?.z];
 
 /* Обзор заказа: масштаб считается по всему пути, включая машину и адрес. */
@@ -59,6 +61,8 @@ export function init (radar) {
   const el = document.createElement('div'); el.className = 'hios-fuel';
   el.setAttribute('aria-label', t('нитро'));
   el.innerHTML = '<svg viewBox="0 0 22 22" aria-hidden="true"><path d="M4 3h10v16H4zM7 6h4v5H7zM14 7h2l3 3v6c0 2-3 2-3 0v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span class="hios-bars">' + '<i></i>'.repeat(6) + '</span>';
+  el.innerHTML += pizzaMark();
+  pizzaEl = el.querySelector('.hios-pizza'); pizzaEl.hidden = true;
   (document.getElementById('game') || document.body).appendChild(el);
   bars = [...el.querySelectorAll('.hios-bars i')];
 }
@@ -66,6 +70,15 @@ export function fuel (value) {
   if (!bars) return;
   const count = Math.ceil(Math.max(0, Math.min(1, value)) * bars.length);
   bars.forEach((bar, i) => bar.classList.toggle('on', i < count));
+}
+export function pizza ({ carried = false, cooling = 0, cold = false } = {}) {
+  if (!pizzaEl) return;
+  const state = !carried ? 'empty' : cold ? 'cold' : cooling > 0 ? 'cooling' : 'warm';
+  if (state === pizzaState) return;
+  pizzaState = state; pizzaEl.hidden = !carried;
+  pizzaEl.classList.toggle('cold', state === 'cold'); pizzaEl.classList.toggle('cooling', state === 'cooling');
+  const label = cold ? t('Пицца остыла') : cooling > 0 ? t('Пицца остывает') : t('Пицца горячая');
+  pizzaEl.setAttribute('aria-label', label); pizzaEl.title = label;
 }
 
 /* Макет внешней карты для изолированного просмотра телефона в ui.html. */
@@ -86,6 +99,7 @@ export function demoMap () {
     <path d="M171 85c-9 0-14 5-14 14 0 10 14 23 14 23s14-13 14-23c0-9-5-14-14-14z" fill="#e94b38" stroke="#fff" stroke-width="2"/><circle cx="171" cy="99" r="4" fill="white"/>
     </svg></div><div class="hios-fuel"><svg viewBox="0 0 22 22"><path d="M4 3h10v16H4zM7 6h4v5H7zM14 7h2l3 3v6c0 2-3 2-3 0v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span class="hios-bars"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
     `;
+  el.querySelector('.hios-fuel').insertAdjacentHTML('beforeend', pizzaMark());
   (document.getElementById('game') || document.body).appendChild(el);
   return el;
 }

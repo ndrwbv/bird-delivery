@@ -204,6 +204,7 @@ import * as FAHEAD from './faceahead.js';       // портреты заране
 import * as CHAT from './chat.js';             // «Толик управляющий» пишет справа сверху, как в iMessage (похвала, ругань, вычет за опоздание)
 import * as HUDFONE from './hudphone.js';       // телефон курьера: сообщения и карта как приложения в HUD
 import * as HUDMAP from './hudmapios.js';        // карта и запас нитро слева от телефона
+import * as PCOLD from './pizzacold.js';         // одна реакция холодного клиента на адрес
 import { PHONE_MAP, phoneBuildingColor } from './maptheme2gis.js';
 import * as CREWC from './crewcast.js';        // свои люди в каждой пиццерии: состав, характеры, машины с наклейками (crewcast.js)
 import * as CREWR from './crewrank.js';        // рейтинг смены: вспышка и стрелка «место N из M» на хаде, коллеги и Толик пишут в чат, кто кого обогнал (crewrank.js)
@@ -10915,6 +10916,7 @@ function rivalsStep (dt) {
     FM.open || S.paused || briefShown() || DLG.isOpen() || DOOR.on() || STORY.active() || FIRST.on() || !!S.meal || CH.opts.length > 0, rivalBoard, SC.DEBUG.el);
   if (!on || (rivalsT -= dt) > 0) return;
   rivalsT = 0.5;
+  HUDFONE.members({ couriers: RIVALS.map(R => ({ name: R.name, avatar: R.person ? NICK.avatar(R.person, 32) : '' })), managerAvatar: CHAT.avatar(32) });
   // Расчёт мест сохраняется; постоянной строки и вспышки на хаде нет.
   CREWR.update(null, rivalBoard(), ['drive', 'back', 'loading'].includes(S.state) && !calmStart() && !S.ride);
 }
@@ -14887,6 +14889,7 @@ function popBonus (title, sub, o) {
   const text = title && sub ? title + (/[.!?…:]$/.test(title) ? ' ' : '. ') + sub : title || sub;
   if (!text) return;
   CL.event('line ' + text);
+  if (HUDFONE.active()) { CHAT.say(text, () => Snd.coin(), false, undefined, { urgent: !!o?.urgent }); return; }
   const p = CAREER && CHAT.person ? CHAT.person() : null;
   // в общей очереди уведомлений (notifyq.js); o.urgent — срочное («опаздываешь», «поторопись!») перебивает текущее
   DLG.line({ person: p, name: $t('Ирина Сергеевна'), text, color: '#3fae5a', urgent: !!(o && o.urgent), onShow: () => Snd.coin() });
@@ -15058,7 +15061,7 @@ function walletHud (dt) {
 /* Хад пишет в DOM, только если строка сменилась: запись textContent / innerHTML — это новый узел и
    пересчёт раскладки страницы, даже если текст тот же (было — каждый кадр). Числа (скорость, метры,
    счётчики) сравниваем числом, без сборки строки; язык сменился — пересобрать (HUDC.lang) */
-const HUDC = { lang: '', money: NaN, bur: '', spd: -1, nos: -1, burn: null, fx: '', on: null, vis: '', key: '', dist: -1 };
+const HUDC = { lang: '', money: NaN, bur: '', spd: -1, nos: -1, burn: null, fx: '', on: null, vis: '', key: '', dist: -1, pizzaT: 0 };
 const hudTxt = (el, s) => { if (el._hs !== s) { el._hs = s; el.textContent = s; } };
 const hudHtml = (el, s) => { if (el._hs !== s) { el._hs = s; el.innerHTML = s; } };
 function hudStep (dt) {
@@ -15099,6 +15102,12 @@ function hudStep (dt) {
   if (phoneT > 0 && (phoneT -= dt) <= 0) hidePhone();
   OTAGS.step(dt);                                  // мини-карточки заказа над радаром (ordertags.js)
   HUDFONE.resources({ hp: S.hp, hpMax: S.hpMax, money: CAREER ? (SC.DEBUG.text || money(S.money)) : money(S.money), order: OTAGS.current(), hasOrder: !!S.order });
+  if ((HUDC.pizzaT -= dt) <= 0) {
+    HUDC.pizzaT = 0.25;
+    const carried = pizzasInCar() > 0;
+    const cooling = carried ? ECON.coldCut({ ...DENTM.wear(car), hp: S.hp, hpMax: S.hpMax }).k : 0;
+    HUDMAP.pizza({ carried, cooling, cold: cooling >= ECON.PRESS.COLD_BAD });
+  }
 
   const on = S.state === 'drive' || S.state === 'back' || S.state === 'handover' || S.state === 'side';
   if (on && S.ride) {
@@ -16124,12 +16133,14 @@ function takeBox (ped, st, onTime, thrown) {
   ped.served = 1;
   ped.freeT = 16;
   // что делать с пиццей дальше (afterStart); сюжетного клиента ведёт story.js — его не трогаем
-  ped.afterMood = st.pay && st.pay.story ? '' : !onTime || st.bumped ? 'angry' : 'happy';
+  const mood = !onTime || st.bumped || st.pay?.coldUpset ? 'angry' : st.pay?.cold ? 'ok' : 'happy';
+  ped.afterMood = st.pay && st.pay.story ? '' : mood;
   // смену/заказ уже свернули (backToBase снимает гостя до того, как долетела коробка) — постоит с ней, потом afterStart
   if (ped.afterMood && !ped.guest && !ped.surf && ped.base !== undefined) { if (ped.after) afterDrop(ped, true); ped.guest = true; if (ped.sitting) offBench(ped, ped.sitRy); else if (ped.idle && ped.idle.phase === 'sit') offBench(ped, ped.idle.b.ry); ped.sitting = 0; ped.sitAt = null; ped.waitAt = null; if (ped.idle) { ped.idle.b.taken = 0; ped.idle = null; } }
-  if (ped.afterMood && afterCount() < AFTER.MAX) ped.freeT = onTime && !st.bumped ? AFTER.HOLD : AFTER.HOLD_ANGRY;
-  if (onTime) { ped.holdT = 7; emote(ped.x, 2.1, ped.z, 'heart', 5); }
-  else emote(ped.x, 2.1, ped.z, 'angry', 3);
+  if (ped.afterMood && afterCount() < AFTER.MAX) ped.freeT = mood === 'angry' ? AFTER.HOLD_ANGRY : AFTER.HOLD;
+  if (onTime) ped.holdT = 7;
+  if (mood === 'happy') emote(ped.x, 2.1, ped.z, 'heart', 5);
+  else if (mood === 'angry') emote(ped.x, 2.1, ped.z, 'angry', 3);
 }
 
 /* стопка рассыпалась (12бл): верхние коробки слетают с рук и лежат на земле (carried.js), в руках — остальное */
@@ -16186,14 +16197,14 @@ function checkArrival (dt) {
       const rich = onTime && !st.bumped ? LIFE.richTip(st.peds, share) : 0;
       const tip = onTime && !cold ? rich : 0;
       part = (onTime ? share : Math.round(share * ECON.PAY.LATE)) + tip;
-      st.pay = { fee: share, bonus: 0, tip, rich: !!tip, late: !onTime, cold, coldWhy: cold ? cw.why : '' };
+      st.pay = { fee: share, bonus: 0, tip, rich: !!tip, late: !onTime, ...PCOLD.result(st, cold, cw.why) };
       S.tips = (S.tips || 0) + tip;
     }
     if (o.ord && CAREER && !o.tut && !S.freeRun && o.ord.type !== 'staff') GROW.delivered(V.x, V.z);
     S.money += part;
     // оплата — сразу в кошелёк: умер или закрыл вкладку — деньги уже твои
     if (!S.freeRun) addWallet(part);
-    if (st.pay && st.pay.cold && !st.coldTold) {
+    if (st.pay?.coldNote && !st.pay.story && !S.ride && !st.coldTold) {
       st.coldTold = true;                           // один результат конкретной доставки, даже если случайных чаевых не было
       const chargeLate = !onTime && !st.pay.story && !S.ride, fee = st.pay.fee;
       const text = chargeLate
@@ -16570,8 +16581,9 @@ function sideEnd (ok, msg) {
      покерфейс — вовремя, но впритык (меньше 25 % срока) и без чаевых. */
 function payMood (st, onTime, tier) {
   const pp = st.pay || {};
-  if (!onTime || st.bumped || pp.cold) return 'angry';
+  if (!onTime || st.bumped || (pp.cold && pp.coldUpset !== false)) return 'angry';
   if (st.talk && st.talk.mood && !st.talk.aborted) return st.talk.mood;   // встреча у двери: лицо — как после ответа (smalltalk.js)
+  if (pp.cold) return 'ok'; // 30 % клиентов не возмущаются холодной пиццей
   return tier || pp.tip || S.free ? 'happy' : 'ok';
 }
 
@@ -16583,7 +16595,7 @@ function payMood (st, onTime, tier) {
      задел этого клиента — молчит (уже наругал в clientBump); без таймера и сюжетный — молчит. */
 function bossOnDeliver (o, st, onTime, tier) {
   const pp = st.pay || {};
-  if (pp.story || S.ride || pp.cold) return;        // холодный результат уже даёт одну SMS, включая прежний вычет за опоздание
+  if (pp.story || S.ride || pp.coldNote) return;    // редкое SMS о холоде уже включает прежний вычет за опоздание
   const last = o.idx >= o.stops.length - 1, bundle = !!(o.ord && o.ord.bundle);
   let kind = '';
   if (!onTime) kind = 'late';
@@ -17601,6 +17613,7 @@ if (CAREER) CAREERM.init({ S, NOS, Snd, ADULT, get DAY_LEN () { return DAY_LEN; 
   mealPaused: () => EXT.paused || document.hidden,
   mealPauseOwners: () => ({ paused: CH.pause || !!(elPause && !elPause.hidden), meal: CH.pause }),
   mealNitroHud: () => NFRAME.update(NOS.tank, false, $t('нитро')),
+  mealRepair: () => { S.hp = S.hpMax; S.hurt = 0; AUTO.repair(100); AUTO.reset(); resetCar(); hudHearts(); },
   choiceOpen: () => CH.opts.length > 0, endShift, rideOn, dropOrder: () => backToBase(), carChanged: () => { resetCar(); carStats(); },
   atPizza: r => !!PIZZA && Math.hypot(V.x - PIZZA.x, V.z - PIZZA.z) < r,   // полночь у пиццерии — смена всё; дальше — довези и вернись (0п45)
   openShop: cb => { openPanel('shop'); const iv = setInterval(() => { if (elPanel.hidden) { clearInterval(iv); if (cb) cb(); } }, 300); },
@@ -18716,7 +18729,7 @@ function frame (now) {
 }
 function frameStep (now) {
   CL.at.ph = 'pre';
-  HUDFONE.setVisible(!TOUCH && isPlaying() && (!S.paused || FM.open));
+  HUDFONE.setVisible(!TOUCH && isPlaying() && (!S.paused || FM.open || HUDFONE.conversationActive()));
   if (LATE.busy() && lateFrame(now)) return;      // город ещё достраивается за меню (latebuild.js)
   if (LAND_READ17 && !LAND_READ17.ready || LAND_PACKAGE?.fatal || ADDRESS_PREPARED17?.meta().fatal) return;
   if (LAND_STREAM && !LAND_ENTERING && (!LAND_READ17 || LAND_READ17.ready)) CL.step('земля рядом', () => {

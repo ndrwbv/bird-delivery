@@ -4,7 +4,8 @@ import './mealchat.css';
 import { t, tn, lang } from '../i18n/index.js';
 import * as DLG from './dialog.js';
 import * as ECON from './econ.js';
-import { NITRO_ICON, HEART_ICON, MONEY_ICON } from './lunchicons.js';
+import * as HUDFONE from './hudphone.js';
+import { REPAIR_ICON, HEART_ICON, MONEY_ICON } from './lunchicons.js';
 import { heroName } from './playername.js';
 import { pad as PAD } from '../input/gamepad.js';
 
@@ -13,18 +14,14 @@ const esc = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<'
 const capture = (S, NOS) => ({ hp: S.hp, hpMax: S.hpMax, tank: NOS.tank, efficiency: S.nosEff || 1, lunch: S.lunch });
 const fmt = value => Number(value).toLocaleString(lang() === 'zh' ? 'zh-CN' : lang());
 
-function foods (S, NOS) {
+function foods (S, NOS, repair) {
   const L = ECON.LUNCH, T = ECON.TIPS;
   return [
-    { id: 'nitro', text: t('Пицца с кофейным кремом'), reply: t('Пиццу с кофейным кремом.'),
-      sub: t('Нитро на {p} % дольше, бак полный', { p: Math.round((L.nitro.tank - 1) * 100) }),
-      apply (before) {
-        S.nosEff = (S.nosEff || 1) / L.nitro.tank; NOS.tank = 1;
-        const effects = [{ kind: 'nitro-duration', icon: NITRO_ICON, text: t('Нитро на {p} % дольше', { p: Math.round((L.nitro.tank - 1) * 100) }), target: '.nitro-frame' }];
-        const added = Math.max(0, NOS.tank - before.tank);
-        if (added > 0.001) effects.push({ kind: 'nitro-refill', icon: NITRO_ICON,
-          text: t('+{p} % нитро', { p: Math.round(added * 100) }), target: '.nitro-frame' });
-        return effects;
+    { id: 'repair', text: t('Починить машину'), reply: t('Машину бы починить.'),
+      sub: t('Восстановить сердца, кузов и мотор'),
+      apply () {
+        repair?.();
+        return [{ kind: 'repair', icon: REPAIR_ICON, text: t('Машина починена'), target: '#hearts' }];
       } },
     { id: 'tips', text: t('«Директорская»'), reply: t('«Директорскую».'),
       sub: t('Шанс чаевых +{p} п.п., размер ×{k}', { p: Math.round(T.LUNCH_CHANCE * 100), k: fmt(T.LUNCH_MUL) }),
@@ -60,6 +57,7 @@ function cleanup (run) {
     document.body.classList.remove('meal-chat-open');
   }
   if (run.held) { run.held = false; DLG.hold(false); }
+  if (run.embedded) HUDFONE.endConversation(!run.cancelled && run.api.valid());
   if (active === run) active = null;
 }
 
@@ -129,14 +127,18 @@ export function play (api) {
   };
   const manager = { name: api.name || t('Ирина Сергеевна'), person: api.person, courier: false };
   const player = { name: heroName(), courier: true }, history = [];
-  const common = { phone: true, compact: false, head: t('Сообщения') + (api.title ? ' · ' + api.title : ''), canonicalName: true,
-    owner: run.owner, fillers: false, paused: api.paused, skip: () => !live(run) };
+  const common = { phone: true, compact: false, head: t('Курьерский чат') + (api.title ? ' · ' + api.title : ''), canonicalName: true,
+    owner: run.owner, fillers: false, paused: api.paused, skip: () => !live(run),
+    host: () => { const host = HUDFONE.conversationHost(); if (host) run.embedded = true; return host; } };
   run.promise = (async () => {
     let receipt = null;
     try {
-      const options = foods(api.S, api.NOS), question = t('Поешь, что будешь?');
+      const options = foods(api.S, api.NOS, api.repair), question = t('Поешь, что будешь?');
       const picked = await DLG.say({ ...common, ...manager, text: question,
-        choices: options.map(o => ({ id: o.id, text: o.text, sub: o.sub })), onShow: takePause });
+        choices: options.map(o => ({ id: o.id, text: o.text, sub: o.sub })), onShow: () => {
+          takePause(); run.embedded = HUDFONE.conversationActive();
+          if (run.embedded) HUDFONE.recordMessage({ ...manager, text: question, role: t('управляющая') });
+        } });
       if (!live(run)) return null;
       const choice = options.find(o => o.id === picked);
       if (!choice) return null;
@@ -146,13 +148,23 @@ export function play (api) {
       run.committed = true;
       receipt = { id: choice.id, before, after: capture(api.S, api.NOS), effects: effects.map(e => ({ kind: e.kind, text: e.text })) };
       run.receipt = receipt; run.stage = 'reply';
+      if (run.embedded) HUDFONE.recordMessage({ ...player, text: choice.reply, outgoing: true });
       history.push({ ...manager, text: question });
       const replied = await DLG.say({ ...common, ...player, courierLine: true, text: choice.reply, auto: true, history: history.slice() });
       if (!live(run) || replied === null) return receipt;
       run.stage = 'ack'; history.push({ ...player, text: choice.reply });
-      const acknowledged = await DLG.say({ ...common, ...manager, text: t('Ок'), auto: true, history: history.slice() });
+      const acknowledged = await DLG.say({ ...common, ...manager, text: t('Ок'), auto: true, history: history.slice(),
+        onShow: () => { if (run.embedded) HUDFONE.recordMessage({ ...manager, text: t('Ок'), role: t('управляющая') }); } });
       if (!live(run) || acknowledged === null) return receipt;
       run.stage = 'effects';
+      if (run.embedded) {
+        const text = effects.map(effect => effect.text).join(' · ');
+        effects.forEach(effect => refresh(run, effect.kind));
+        history.push({ ...manager, text: t('Ок') });
+        HUDFONE.recordMessage({ ...manager, text, system: true });
+        await DLG.say({ ...common, ...manager, text, auto: true, history: history.slice() });
+        return receipt;
+      }
       const origin = document.querySelector('#dlg .dlg-bubble')?.getBoundingClientRect();
       for (const effect of effects) if (!await flight(run, effect, origin)) break;
       return receipt;

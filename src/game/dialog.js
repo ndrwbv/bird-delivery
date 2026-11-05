@@ -162,6 +162,10 @@ export function say (o) {
 
 function show (o, done) {
   if (!root) build();
+  const home = document.getElementById('game') || document.body;
+  const host = typeof o.host === 'function' ? o.host() : null;
+  (host || home).appendChild(root);
+  root.classList.toggle('dlg-in-phone', !!host);
   open++;
   API.pause(true);                               // руль из рук (game.js); мир при этом идёт
   const $ = s => root.querySelector(s);
@@ -306,6 +310,7 @@ function show (o, done) {
     yes.classList.remove('dlg-cur'); no.classList.remove('dlg-cur');
     hintEl.hidden = true;
     root.classList.remove('on');
+    if (host) { root.hidden = true; root.classList.remove('dlg-in-phone'); home.appendChild(root); }
     if (v !== null && !o.auto) sfx('pick');
     setTimeout(() => { if (!open) { root.hidden = true; document.body.classList.remove('dlg-open'); } }, 180);   // следующая реплика из очереди уже открылась — не прячем её
     open--;

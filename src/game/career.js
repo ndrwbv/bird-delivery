@@ -355,6 +355,7 @@ function showLunch (next) {
   const person = CHAT.person();
   A.Snd.order();
   return MEAL.play({ S: A.S, NOS: A.NOS, title: MEAL_NAME[DAYT.part(hour())](), person, name: t('Ирина Сергеевна'),
+    repair: () => A.mealRepair?.(),
     valid: lunchFits, paused: () => !!(A.mealPaused?.() || document.hidden), pauseOwners: () => A.mealPauseOwners?.(),
     refresh: kind => {
       if (!kind || kind === 'hp') A.hudHearts();
