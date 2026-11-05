@@ -203,6 +203,8 @@ import * as HAV from './havoc.js';             // Толик считает ра
 import * as FAHEAD from './faceahead.js';       // портреты заранее: получатель заказа, Толик, герои катсцен (в спокойные кадры)
 import * as CHAT from './chat.js';             // «Толик управляющий» пишет справа сверху, как в iMessage (похвала, ругань, вычет за опоздание)
 import * as HUDFONE from './hudphone.js';       // телефон курьера: сообщения и карта как приложения в HUD
+import * as SHIFTIN from './shiftcheckin.js';
+import * as SHIFTPREVIEW from './shiftpreview.js';
 import * as HUDMAP from './hudmapios.js';        // карта и запас нитро слева от телефона
 import * as PCOLD from './pizzacold.js';         // одна реакция холодного клиента на адрес
 import { PHONE_MAP, phoneBuildingColor } from './maptheme2gis.js';
@@ -10680,6 +10682,10 @@ function parkFree (R) {
   for (let k = 0; k < n; k++) { const j = (Math.max(0, R.slot) + k) % n; if (!RIVALS.some(o => o !== R && o.park === j)) return j; }
   return -1;
 }
+function rivalCrewCount () {
+  const shiftsDone = +Store.get('dlv-shifts', 0) || 0;
+  return CAREER ? Math.min(ECON.CREW.MAX, Math.max(GROW.couriers(), ECON.crewByShift(shiftsDone))) : RIVAL_SPEC.length;
+}
 function initRivals () {
   clearRivals();
   FOE_RAM_AT = -1e9;
@@ -10688,7 +10694,7 @@ function initRivals () {
   // (crewcast.js: у каждой пиццерии 7 своих, имена в смене разные); водит каждый по-своему (RIVAL_SPEC[pace]), машина — своя
   // 12ан: и по числу законченных смен — с каждой сменой больше (econ.js CREW.BY_SHIFT, от 1 до 6): берётся большее
   const shiftsDone = +Store.get('dlv-shifts', 0) || 0;
-  const crew = CREWC.pick(DIST.cur(), CAREER ? Math.min(ECON.CREW.MAX, Math.max(GROW.couriers(), ECON.crewByShift(shiftsDone))) : RIVAL_SPEC.length);
+  const crew = CREWC.pick(DIST.cur(), rivalCrewCount());
   // шаблоны машин тех, кто не вышел в эту смену, — из памяти (за сессию по всем пиццериям их набралось бы 56)
   for (const k in RIV_LITE) {
     const id = k.split(':')[3];
@@ -15232,13 +15238,13 @@ $('start').addEventListener('submit', e => {
   goRun();
 });
 /* «ещё раз» после смены — естественная пауза: здесь реклама (если пора) */
-function goRun (picked) {
+function goRun (picked, checkIn = false) {
   if (RESET_LOCKED) return;
   LATE.flush();                                   // город ещё достраивался за меню — сначала достроить (latebuild.js)
   // все районы открыты: перед сменой — праздник (один раз) и выбор «весь город / пиццерия» (cityopen.js)
-  if (!picked && DISTRICTS && CITYOPEN.beforeShift(() => goRun(true))) return;
-  if (S.state === 'over' && Platform.features.ads && (S.delivered || 0) > 0) { S.state = 'title'; $('over').hidden = true; showAd().then(() => startRun()); }
-  else startRun();
+  if (!picked && DISTRICTS && CITYOPEN.beforeShift(() => goRun(true, checkIn))) return;
+  if (S.state === 'over' && Platform.features.ads && (S.delivered || 0) > 0) { S.state = 'title'; $('over').hidden = true; showAd().then(() => startRun(false, checkIn)); }
+  else startRun(false, checkIn);
 }
 const hideBig = () => { elBig.hidden = true; $('over').hidden = true; };
 const hideOver = hideBig;
@@ -17026,8 +17032,9 @@ function reviveTick (dt) {
   // плашки «воскрес!» нет: цену видел на карточке, списание — красной купюрой из пачки
 }
 
-function startRun (ride) {
+function startRun (ride, checkIn = false) {
   if (LAND_ENTERING || RESET_LOCKED || LAND_READ17?.failed || LAND_PACKAGE?.fatal || ADDRESS_PREPARED17?.meta().fatal) return;
+  SHIFTIN.cancel();
   STARTUP.request({ ride: !!ride, district: DIST.cur() });
   CL.transFor('начало смены', 3000);             // метка перехода (crashlog.js, 0п48): оборвётся — следующий запуск запишет
   LATE.flush();                                   // город ещё достраивался за меню — сначала достроить (latebuild.js)
@@ -17042,7 +17049,7 @@ function startRun (ride) {
     const advance=()=>{
       try {
         const until=performance.now()+12;
-        while(performance.now()<until)if(task.next().done){boot.remove();LAND_ENTERING=false;startRun(ride);return;}
+        while(performance.now()<until)if(task.next().done){boot.remove();LAND_ENTERING=false;startRun(ride, checkIn);return;}
         setTimeout(advance,0);
       } catch(e) {boot.remove();LAND_ENTERING=false;CL.report('земля перед сменой',e,'error');}
     };
@@ -17095,7 +17102,17 @@ function startRun (ride) {
   hideOver();
   $('menu').hidden = !S.ride;
   if (S.ride) { clearRivals(); S.order = null; S.target = null; routePts = []; toast($t('просто катаемся: без заказов и рекордов · esc — пауза и выход')); Platform.gameplayStart(); }
-  else { initRivals(); newOrder(); }
+  else {
+    initRivals();
+    if (checkIn && CAREER && !TOUCH) {
+      SHIFTIN.open({
+        teammates: RIVALS.slice(0, 2).map(rival => ({ name: rival.name, role: $t('курьер'), avatar: faceDataURL(rival.person, 48) })),
+        courier: { name: heroName(), role: $t('курьер') },
+        manager: { name: $t('Ирина Сергеевна'), role: $t('управляющая'), avatar: CHAT.avatar(48) },
+        done: () => { for (const k in IN) IN[k] = 0; touchReset(); newOrder(); },
+      });
+    } else newOrder();
+  }
 }
 
 /* из «просто покататься» — обратно в меню */
@@ -17224,6 +17241,7 @@ function renderPause () {
   PAUSE.more();                                        // не влез лист — «ещё ▼» внизу (pausecz.js, Р23-14)
 }
 function setPause (on) {
+  if (SHIFTIN.active()) return;
   // обед — обязательный выбор (CAREER.md «Обед»): пока карточка на экране, пауза ни ставится, ни снимается —
   // Start / Esc / кнопка паузы раньше снимали паузу, и мир ехал под висящей карточкой обеда
   if (S.meal) return;
@@ -17277,6 +17295,7 @@ const KEY = {
 };
 
 addEventListener('keydown', e => {
+  if (SHIFTIN.active()) return;
   if (!elPanel.hidden) {
     if (e.code === 'Escape') panelBack();
     else if (!CAREER && (e.code === 'ArrowLeft' || e.code === 'ArrowRight') && SET.flip(e.code === 'ArrowLeft' ? -1 : 1)) e.preventDefault();   // в карьере листает career.js onKey
@@ -17719,7 +17738,21 @@ if (CAREER) CAREERM.init({ S, NOS, Snd, ADULT, get DAY_LEN () { return DAY_LEN; 
   atPizza: r => !!PIZZA && Math.hypot(V.x - PIZZA.x, V.z - PIZZA.z) < r,   // полночь у пиццерии — смена всё; дальше — довези и вернись (0п45)
   openShop: cb => { openPanel('shop'); const iv = setInterval(() => { if (elPanel.hidden) { clearInterval(iv); if (cb) cb(); } }, 300); },
   // главное меню карьеры (menu.js) и рейтинг пиццерии
-  menuGo: () => { Snd.boot(); Snd.resume(); goRun(); }, menuStoryGo: () => { Snd.boot(); Snd.resume(); goRun(true); }, menuRide: () => { Snd.boot(); Snd.resume(); startRun(true); },
+  menuGo: (checkIn = false) => { Snd.boot(); Snd.resume(); goRun(false, checkIn); }, menuStoryGo: () => { Snd.boot(); Snd.resume(); goRun(true); }, menuRide: () => { Snd.boot(); Snd.resume(); startRun(true); },
+  shiftPreview: i => {
+    const place = PIZZERIAS[i] || PIZZA;
+    const roster = CREWC.roster(i).length;
+    return {
+      address: place.name.split(' · ').slice(1).join(' · '),
+      manager: { name: $t('Ирина Сергеевна'), avatar: CHAT.avatar(48) },
+      roster, onShift: 1 + Math.min(roster, rivalCrewCount()),
+      map: canvas => SHIFTPREVIEW.drawMap(canvas, { base: FM.base, x: fmX(place.bx), y: fmZ(place.bz), scale: FM.s, paint: paintBase }),
+      photos: canvases => LATE.onDone(() => requestAnimationFrame(() => {
+        if (!canvases[0]?.isConnected || canvases[0].closest('[hidden]')) return;
+        CL.step('shift-district-photos', () => SHIFTPREVIEW.drawPhotos({ THREE, renderer, scene, place }, canvases), 0);
+      })),
+    };
+  },
   openCollect: () => openPanel('collect'), openSettings: () => { elPanel.hidden = false; elPanel.dataset.kind = 'settings'; renderSettings(); },
   canNavigate: () => !RESET_LOCKED, panelOpen: () => !elPanel.hidden, quit: () => Platform.quit(), canQuit: !!Platform.features.quit, playerName: heroName,
   padClear: () => padMenu.clear(), cardFlip: (root, d) => (root === elPanel ? SET : PAUSE).flip(d),                 // меню-карусель (menu.js): после листания подсветка геймпада — на карточку в центре
@@ -18602,6 +18635,7 @@ buildFullMap();
 hudHearts();
 resize();
 function showTitle () {
+  SHIFTIN.cancel();
   HANDOFF.cancel();
   if (INTRO) return;
   CHAT.clear(); DLG.lineClear(); RADIO.clear();
@@ -18885,7 +18919,7 @@ function frame (now) {
 }
 function frameStep (now) {
   CL.at.ph = 'pre';
-  HUDFONE.setVisible(!TOUCH && isPlaying() && (!S.paused || FM.open || HUDFONE.conversationActive()));
+  HUDFONE.setVisible(SHIFTIN.active() || (!TOUCH && isPlaying() && (!S.paused || FM.open || HUDFONE.conversationActive())));
   if (LATE.busy() && lateFrame(now)) return;      // город ещё достраивается за меню (latebuild.js)
   if (LAND_READ17 && !LAND_READ17.ready || LAND_PACKAGE?.fatal || ADDRESS_PREPARED17?.meta().fatal) return;
   if (LAND_STREAM && !LAND_ENTERING && (!LAND_READ17 || LAND_READ17.ready)) CL.step('земля рядом', () => {
@@ -18903,6 +18937,10 @@ function frameStep (now) {
   const raw = Math.max(0, (now - last) / 1000);
   let dt = clamp(raw, 0, 1 / 20);       // назад время не идёт
   last = now;
+  if (SHIFTIN.active()) {
+    if (!EXT.paused && !document.hidden) CL.step('shift-check-in', SHIFTIN.step, dt);
+    return;
+  }
   CULL.govern(raw, isPlaying() && !S.paused && !EXT.paused && !FM.open && !document.hidden);
   padStep();
   CL.track(S.state);
@@ -19314,12 +19352,13 @@ if (LATE.busy()) {
   const hold = e => {
     if (!LATE.busy() || replay) return;
     const tgt = e.target;
-    const cardEl = tgt && tgt.closest && tgt.closest('.crm-card');
-    if (!cardEl) return;
+    const action = tgt?.closest?.('.crm-card:not(.k-go), .rf-shift-start');
+    if (!action) return;
+    const key = action.dataset.key || 'go';       // кнопка «Начать смену» в открытом окне
     // ждать город — только тем, кому он нужен: смена, быстрый заезд, покататься, гараж;
     // настройки, доска почёта, находки, рекорды, выход — сразу (автор 11.10.2026)
-    if (cardEl.classList.contains('crm-card') && ['settings', 'honor', 'collect', 'board', 'quit'].includes(cardEl.dataset.key)) return;
-    if (cardEl.dataset.key === 'go') STARTUP.request({ menuKey: 'go', district: DIST.cur() });
+    if (['settings', 'honor', 'collect', 'board', 'quit'].includes(key)) return;
+    if (key === 'go') STARTUP.request({ menuKey: 'go', district: DIST.cur() });
     e.preventDefault(); e.stopImmediatePropagation();
     if (document.querySelector('.late-wait')) return;   // уже ждём
     const boot = document.createElement('div');

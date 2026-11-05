@@ -41,7 +41,7 @@ export function dock () {
   H.root.classList.remove('hp-expanded', 'hp-new-message', 'hp-focus-latest', 'hp-app-launching', 'hp-notifying');
 }
 
-function drawMessage ({ name, role = '', text, avatar = '', outgoing = false, system = false }) {
+function drawMessage ({ name, role = '', text, avatar = '', outgoing = false, system = false, earlier = false }) {
   if (!H.root) return;
   H.thread.querySelector('.hp-chat-empty')?.remove();
   H.thread.querySelector('.hp-message.latest')?.classList.remove('latest');
@@ -49,7 +49,8 @@ function drawMessage ({ name, role = '', text, avatar = '', outgoing = false, sy
   const meta = document.createElement('div'); meta.className = 'hp-message-meta';
   if (avatar) { const img = document.createElement('img'); img.src = avatar; img.alt = ''; meta.appendChild(img); }
   const who = document.createElement('b'); who.textContent = name;
-  const time = document.createElement('small'); time.textContent = role ? role + ' · ' + t('сейчас') : t('сейчас');
+  const stamp = earlier ? t('до смены') : t('сейчас');
+  const time = document.createElement('small'); time.textContent = role ? role + ' · ' + stamp : stamp;
   const labels = document.createElement('span'); labels.append(who, time); meta.appendChild(labels);
   const bubble = document.createElement('p'); bubble.textContent = text;
   row.append(meta, bubble); H.thread.appendChild(row);
@@ -150,7 +151,7 @@ export function init ({ visible = false } = {}) {
   H.modal = root.querySelector('.hp-order-modal');
   root.addEventListener('click', e => {
     if (H.payment) { if (e.target.closest('.hp-paid-close')) finishPayment(); return; }
-    if (H.conversation) return;
+    if (H.conversation || root.classList.contains('hp-shift-chat')) return;
     if (!H.modal.hidden) return;
     const channel = e.target.closest('[data-hp-channel]');
     if (channel) { clearTimeout(H.shrink); setChannel(channel.dataset.hpChannel); return; }
@@ -232,6 +233,21 @@ export function showOrder ({ number, html, name = '', avatar = '', many = false,
 }
 export function hasOrder () { return !!H.order; }
 export function clearOrder () { if (!H.root) return; H.order = null; H.modal.hidden = true; document.body.classList.remove('hp-order-open'); $('.hp-order-details').replaceChildren(); }
+export function beginShiftChat (history) {
+  if (!H.root) return;
+  setVisible(true);
+  H.root.classList.add('hp-shift-chat');
+  $('.hp-messages .hp-nav b').textContent = t('Общий чат');
+  setChannel('crew');
+  history.forEach(addMessage);
+  open('messages');
+}
+export function endShiftChat () {
+  if (!H.root) return;
+  H.root.classList.remove('hp-shift-chat');
+  $('.hp-messages .hp-nav b').textContent = t('Сообщения');
+  dock();
+}
 export function receive (o) {
   if (!active()) return false;
   clearTimeout(H.shrink); clearTimeout(H.messageTimer);

@@ -7,7 +7,7 @@
    внизу справа — номер версии. Правила — docs/CAREER.md «Главное меню».
 
      MENU.init(api)   — из career.js (api — тот же, что у карьеры, + crew() и garage())
-     MENU.show()      — из showTitle: собрать карточки и статистику
+     MENU.show({ openShift }) — собрать карточки. При входе в меню выбрать «На смену» и открыть окно района.
      MENU.flip(±1)    — листать (career.js padPre / onKey); MENU.focus() — фокус на карточке в центре
      MENU.cam(cam, P, tG) — камера заставки
      MENU.modal()     — открытое окно (статистика или выбор района: геймпад, клавиатура) или null; MENU.back() — закрыть
@@ -37,6 +37,8 @@ import { carousel } from './carousel.js';
 import * as PFX from './paperfx.js';
 import * as DP from './distpick.js';            // выбор района — карусель карточек (distpick.js)
 import * as STORYTEST from './storytest.js';      // отладочная панель сюжета у номера версии
+import { mountStart } from './menudock.js';
+import * as SHIFTAPP from './shiftapp.js';
 
 let A = null, el = null, CZ = null, curKey = 'go';
 const $ = id => document.getElementById(id);
@@ -68,14 +70,25 @@ function build () {
     '<div class="crm-meta"><button type="button" class="crm-debug" data-a="storytest"></button><div class="crm-ver"></div></div>';
   big.appendChild(el);
   el.querySelectorAll('[data-a]').forEach(b => b.addEventListener('click', () => act(b.dataset.a)));
-  CZ = carousel(el.querySelector('.crm-car'), { cls: 'crm-cz', scales: [1, 0.86, 0.74], reach: 3, onChange: (i, c) => { curKey = c.dataset.key; navReset(); if (A.Snd && A.Snd.click) try { A.Snd.click(520); } catch (e) { /* — */ } } });
+  CZ = carousel(el.querySelector('.crm-car'), { cls: 'crm-cz', grid: true, scales: [1, 0.86, 0.74], reach: 3, onChange: (i, c) => { curKey = c.dataset.key; navReset(); if (A.Snd && A.Snd.click) try { A.Snd.click(520); } catch (e) { /* — */ } } });
+  mountStart(el);
   return el;
 }
 /* после листания подсветка геймпада и клавиатуры встаёт на карточку в центре */
 function navReset () { if (A.padClear) A.padClear(); if (A.kbClear) A.kbClear(); }
 
+function openShiftApp () {
+  const current = DIST.cur();
+  const district = DIST.city() ? t('весь город') : t(DIST.list()[current]?.name || 'Солнечный');
+  SHIFTAPP.open(el.querySelector('.rf-body'), { district, preview: A.shiftPreview(current), onClose: focus, onStart: () => {
+    if (A.canNavigate && !A.canNavigate()) return;
+    STARTUP.request({ menuKey: 'go', district: DIST.cur() }); A.menuGo(true);
+  } });
+}
+
 function act (a) {
   if (A.canNavigate && !A.canNavigate()) return;
+  if (a !== 'go') SHIFTAPP.close(false);
   if (a === 'storytest') {
     if (DP.root() || BOARD.root() || HONOR.root() || QR.root() || CCARD.root() || CITY.root()) return;
     STORYTEST.togglePanel();
@@ -83,7 +96,10 @@ function act (a) {
   }
   if (DP.root() || BOARD.root() || HONOR.root() || QR.root() || CCARD.root() || CITY.root() || STORYTEST.panelRoot()) return;
   A.Snd.boot && A.Snd.boot();
-  if (a === 'go') { STARTUP.request({ menuKey: 'go', district: DIST.cur() }); A.menuGo(); }
+  if (a === 'go') {
+    openShiftApp();
+    navReset();
+  }
   else if (a === 'district') openDistricts();
   else if (a === 'quick') { if (QR.available()) QR.openSetup(); }
   else if (a === 'stats') openStats();
@@ -111,8 +127,9 @@ function card (key, ico, title, sub, cls) {
   return c;
 }
 
-export function show () {
+export function show ({ openShift = false } = {}) {
   if (!A || !build()) return;
+  SHIFTAPP.close(false);
   // надпись логотипа — название пиццерии на языке игрока (brands.js OWN.pizza → #big-t), по слову в строку
   const logo = ($('big-t') ? $('big-t').textContent : '') || t('Птица Пицца');
   el.querySelector('.crm-logo').innerHTML = logo.trim().split(/\s+/).map(w => '<span>' + esc(w) + '</span>').join('');
@@ -137,14 +154,19 @@ export function show () {
   cards.push(card('collect', '◆', t('мои находки'), t('предметы, разбросанные по району')),
     card('settings', '⚙', t('настройки'), t('звук, графика, язык, управление, версия')));
   if (A.canQuit) cards.push(card('quit', '✕', t('выйти'), t('закрыть игру')));
-  const keep = cards.findIndex(c => c.dataset.key === curKey);
+  const keep = openShift ? 0 : cards.findIndex(c => c.dataset.key === curKey);
   CZ.set(cards, keep >= 0 ? keep : 0);
   curKey = CZ.card() ? CZ.card().dataset.key : 'go';
   heroButton();
   upd();
   syncDebugButton();
   hint();
-  CITY.check(() => show());                  // открыт весь город, а праздника ещё не было — сейчас (cityopen.js)
+  if (CITY.check(() => show({ openShift }))) return;   // сначала праздник открытия города
+  if (openShift) requestAnimationFrame(() => {
+    // Повторная сборка меню или выбор игрока до первого кадра отменяют открытие.
+    if (!go.isConnected || !shown() || curKey !== 'go' || A.S.state !== 'title' || A.panelOpen?.() || QR.root() || CITY.root() || modal()) return;
+    openShiftApp();
+  });
 }
 /* подсказка внизу — значком того, чем играют сейчас (glyphs.js): [A] / [Enter]; пальцем — «свайп · тап» */
 function hint () {
@@ -158,7 +180,7 @@ onInput(() => hint());
     Зовут career.js padPre (геймпад) и onKey (клавиатура X); true — нажали */
 export function hot (k) {
   if (!el || !shown() || modal()) return false;
-  const b = k === 'x' ? el.querySelector('.crm-card.cz-card.on .crm-sub') : null;
+  const b = k === 'x' && curKey === 'go' ? el.querySelector('.crm-sub') : null;
   if (!b || b.hidden) return false;
   PFX.press(b);
   b.click();
@@ -170,7 +192,7 @@ export const shown = () => !!(el && el.isConnected && !el.closest('[hidden]'));
 /** фокус и подсветка — на карточку в центре (после окон поверх меню: праздник, выбор) */
 export function focus () {
   navReset();
-  const b = CZ && CZ.card() && CZ.card().querySelector('[data-main]');
+  const b = (SHIFTAPP.root() || CZ?.card())?.querySelector('[data-main]');
   if (b && shown()) try { b.focus({ preventScroll: true }); } catch (e) { /* — */ }
 }
 
@@ -230,10 +252,11 @@ function openDistricts () {
   });
 }
 
-export const modal = () => DP.root() || CCARD.root() || BOARD.root() || HONOR.root() || (A?.S.state === 'title' ? STORYTEST.panelRoot() : null);
+export const modal = () => SHIFTAPP.root() || DP.root() || CCARD.root() || BOARD.root() || HONOR.root() || (A?.S.state === 'title' ? STORYTEST.panelRoot() : null);
 export function back () {
   const root = modal();
   if (!root) return false;
+  if (root === SHIFTAPP.root()) return SHIFTAPP.close();
   if (root === DP.root()) return DP.back();
   if (root === CCARD.root()) { CCARD.close(); return true; }
   if (root === BOARD.root()) return BOARD.close();

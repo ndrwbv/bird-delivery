@@ -17,6 +17,7 @@ import './pausecz.css';
 import { t } from '../i18n/index.js';
 import { carousel } from './carousel.js';
 import { keyHTML, onInput, inputKind } from '../input/glyphs.js';
+import { mountPause } from './menudock.js';
 
 let root = null, CZ = null, A = null;
 const $ = id => document.getElementById(id);
@@ -73,9 +74,10 @@ export function init (el, api) {
     btnCard('keys', ctrl),
     btnCard('end', $('pm-menu')),
   ];
-  CZ = carousel(host, { cls: 'pz-cz', scales: [1, 0.86, 0.74], reach: 3, onChange: () => { if (A.navReset) A.navReset(); } });
+  CZ = carousel(host, { cls: 'pz-cz', grid: true, scales: [1, 0.86, 0.74], reach: 3, onChange: () => { if (A.navReset) A.navReset(); } });
   CZ.set(cards, 0);
   if (desk) desk.hidden = true;
+  mountPause(el);
   label();
 }
 /* подписи ярлычков; game.js renderPause меняет текст «закончить смену» / «в главное меню» и зовёт label().

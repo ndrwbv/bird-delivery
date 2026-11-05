@@ -263,3 +263,15 @@ body.hud-phone-active #payfx { z-index: 31; }
 #hud-phone #dlg.dlg-in-phone .dlg-option.dlg-cur { outline: 2px solid #da9c3c; outline-offset: 1px; background: linear-gradient(#fff0b7, #f2cb7e); }
 #hud-phone #dlg.dlg-in-phone .dlg-hint { margin: 3px 0 0; color: #718067; font: 10px/1.3 "Helvetica Neue", Helvetica, Arial, sans-serif; }
 #hud-phone #dlg.dlg-in-phone .dlg-pop { animation: none; }
+
+/* На выходе на смену телефон — единственное окно. История остаётся в общем канале. */
+body.shift-check-in #game > :is(.hud, .hios-fuel) { visibility: hidden; }
+#hud-phone.hp-shift-chat { pointer-events: auto; }
+#hud-phone.hp-shift-chat .hp-backdrop { background: rgba(9, 16, 29, .32); }
+#hud-phone.hp-shift-chat.hp-expanded .hp-device {
+  left: 50%; top: 50%; transform: translate(-50%, -50%) scale(1); cursor: default;
+}
+#hud-phone.hp-shift-chat .hp-nav button, #hud-phone.hp-shift-chat .hp-health,
+#hud-phone.hp-shift-chat .hp-money-slot { visibility: hidden; }
+#hud-phone.hp-shift-chat :is(.hp-chat-tabs, .hp-chat-context) { display: none; }
+@media (max-height: 690px) { #hud-phone.hp-shift-chat.hp-expanded .hp-device { transform: translate(-50%, -50%) scale(.87); } }

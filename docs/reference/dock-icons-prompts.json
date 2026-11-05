@@ -1,0 +1,66 @@
+{
+  "tool": "built-in imagegen",
+  "reference": "Mac OS X icon reference supplied by the author in chat",
+  "task": "8-15",
+  "prompts": [
+    {
+      "name": "pizza",
+      "prompt": "Use case: style-transfer. Asset type: a single transparent desktop dock icon for a pizza delivery videogame. The attached image is a STYLE REFERENCE ONLY for authentic Mac OS X 2007–2012 skeuomorphic application icon craft. Create ONE isolated icon: a small slightly open real kraft cardboard pizza box with a delicious round pepperoni pizza visible, sitting in front of an orange insulated courier bag, three-quarter view. Rich handcrafted realistic miniature illustration, physically believable corrugated cardboard, melted cheese, orange woven textile, polished little zipper. Consistent upper-left studio key light, detailed material shading, soft restrained contact shadow. Original game icon with the natural tangible object appearance of the reference, irregular silhouette. Center the whole icon generously within a square canvas, entire object visible, occupies 78% of image width/height. Actual transparent background. No rounded-square app tile, no colored backplate, no circle background, no UI, no border, no labels, no letters, no watermark. This icon must read very clearly at 96 pixels."
+    },
+    {
+      "name": "quick",
+      "prompt": "Use case: style-transfer. Asset type: ONE transparent desktop dock icon for a pizza delivery videogame. The attached image is a STYLE REFERENCE ONLY: reproduce the natural, intricately crafted, tangible object style of Mac OS X application icons from 2007–2012. Rich, realistic miniature illustration with physically believable materials, top-left studio light, precise highlights, subtle soft contact shadow, expressive polished desktop-icon craft. Square composition, entire object visible, centered with clear transparent margin, approximately 80% canvas occupancy. Real transparent background. No app tile or rounded-square background, no colored plate, no UI frame, no letters, no words, no watermark. Clear silhouette legible at 96 pixels. Subject: a beautifully crafted vintage chrome stopwatch tilted slightly, ivory dial without numerals, a bold orange metallic lightning bolt crossing its lower right. Chrome rim, real glass dome, dark slender hands, orange crown. Represents quick drive."
+    },
+    {
+      "name": "garage",
+      "prompt": "Use case: style-transfer. Asset type: ONE transparent desktop dock icon for a pizza delivery videogame. The attached image is a STYLE REFERENCE ONLY: reproduce the natural, intricately crafted, tangible object style of Mac OS X application icons from 2007–2012. Rich, realistic miniature illustration with physically believable materials, top-left studio light, precise highlights, subtle soft contact shadow, expressive polished desktop-icon craft. Square composition, entire object visible, centered with clear transparent margin, approximately 80% canvas occupancy. Real transparent background. No app tile or rounded-square background, no colored plate, no UI frame, no letters, no words, no watermark. Clear silhouette legible at 96 pixels. Subject: a small cream-colored boxy 1980s delivery sedan in three-quarter front view with warm orange roof sign and a large polished chrome mechanic's spanner leaning diagonally beside it. Real painted metal, glass windows, black rubber wheels; no logos or text. Original miniature object icon, not a modern car."
+    },
+    {
+      "name": "map",
+      "prompt": "Use case: style-transfer. Asset type: ONE transparent desktop dock icon for a pizza delivery videogame. The attached image is a STYLE REFERENCE ONLY: reproduce the natural, intricately crafted, tangible object style of Mac OS X application icons from 2007–2012. Rich, realistic miniature illustration with physically believable materials, top-left studio light, precise highlights, subtle soft contact shadow, expressive polished desktop-icon craft. Square composition, entire object visible, centered with clear transparent margin, approximately 80% canvas occupancy. Real transparent background. No app tile or rounded-square background, no colored plate, no UI frame, no letters, no words, no watermark. Clear silhouette legible at 96 pixels. Subject: a classic nautical pocket compass like a premium old Safari application icon: round bright chrome bezel, deep ocean-blue glass face, white compass rose and striking red-and-white needle, a small metal hanging loop. Three-quarter but nearly frontal, luminous glass with soft reflection. No letters or numerals."
+    },
+    {
+      "name": "honor",
+      "prompt": "Use case: style-transfer. Asset type: ONE transparent desktop dock icon for a pizza delivery videogame. The attached image is a STYLE REFERENCE ONLY: reproduce the natural, intricately crafted, tangible object style of Mac OS X application icons from 2007–2012. Rich, realistic miniature illustration with physically believable materials, top-left studio light, precise highlights, subtle soft contact shadow, expressive polished desktop-icon craft. Square composition, entire object visible, centered with clear transparent margin, approximately 80% canvas occupancy. Real transparent background. No app tile or rounded-square background, no colored plate, no UI frame, no letters, no words, no watermark. Clear silhouette legible at 96 pixels. Subject: a realistic gleaming golden trophy cup with two curved handles, warmly lit solid gold, smooth silver accent bands and a small dark polished walnut plinth with a blank brass plaque. Slight three-quarter view. Elegant desktop icon with rich reflected highlights."
+    },
+    {
+      "name": "collect",
+      "prompt": "Use case: style-transfer. Asset type: ONE transparent desktop dock icon for a pizza delivery videogame. The attached image is a STYLE REFERENCE ONLY: reproduce the natural, intricately crafted, tangible object style of Mac OS X application icons from 2007–2012. Rich, realistic miniature illustration with physically believable materials, top-left studio light, precise highlights, subtle soft contact shadow, expressive polished desktop-icon craft. Square composition, entire object visible, centered with clear transparent margin, approximately 80% canvas occupancy. Real transparent background. No app tile or rounded-square background, no colored plate, no UI frame, no letters, no words, no watermark. Clear silhouette legible at 96 pixels. Subject: a small open warm brown cardboard keepsake box containing a brass key, a tiny purple faceted crystal and a blue cassette tape, with a slightly tilted little snapshot tucked behind. Tactile corrugated paper, realistic brass and glass, a friendly collection of finds, clear simple silhouette. No text on objects."
+    },
+    {
+      "name": "settings",
+      "prompt": "Use case: style-transfer. Asset type: ONE transparent desktop dock icon for a pizza delivery videogame. The attached image is a STYLE REFERENCE ONLY: reproduce the natural, intricately crafted, tangible object style of Mac OS X application icons from 2007–2012. Rich, realistic miniature illustration with physically believable materials, top-left studio light, precise highlights, subtle soft contact shadow, expressive polished desktop-icon craft. Square composition, entire object visible, centered with clear transparent margin, approximately 80% canvas occupancy. Real transparent background. No app tile or rounded-square background, no colored plate, no UI frame, no letters, no words, no watermark. Clear silhouette legible at 96 pixels. Subject: a classic old Mac OS system-preferences mechanical gear icon: large intricately machined brushed steel cog in front of a smaller dark graphite cog, nearly frontal with slight perspective, authentic polished metal teeth, bright beveled rims and dark circular recesses. Real steel material, no colored square tile."
+    },
+    {
+      "name": "resume",
+      "prompt": "Use case: style-transfer. Asset type: ONE transparent desktop dock icon for a pizza delivery videogame. The attached image is a STYLE REFERENCE ONLY: reproduce the natural, intricately crafted, tangible object style of Mac OS X application icons from 2007–2012. Rich, realistic miniature illustration with physically believable materials, top-left studio light, precise highlights, subtle soft contact shadow, expressive polished desktop-icon craft. Square composition, entire object visible, centered with clear transparent margin, approximately 80% canvas occupancy. Real transparent background. No app tile or rounded-square background, no colored plate, no UI frame, no letters, no words, no watermark. Clear silhouette legible at 96 pixels. Subject: a luminous emerald green glass circular play button with a thick beveled polished chrome rim, a white solid right-facing play triangle embedded under curved glass. Slight three-quarter view, highlights and realistic dark reflections on chrome, simple clear silhouette."
+    },
+    {
+      "name": "music",
+      "prompt": "Use case: style-transfer. Asset type: ONE transparent desktop dock icon for a pizza delivery videogame. The attached image is a STYLE REFERENCE ONLY: reproduce the natural, intricately crafted, tangible object style of Mac OS X application icons from 2007–2012. Rich, realistic miniature illustration with physically believable materials, top-left studio light, precise highlights, subtle soft contact shadow, expressive polished desktop-icon craft. Square composition, entire object visible, centered with clear transparent margin, approximately 80% canvas occupancy. Real transparent background. No app tile or rounded-square background, no colored plate, no UI frame, no letters, no words, no watermark. Clear silhouette legible at 96 pixels. Subject: a classic music application icon consisting of a realistic tilted iridescent compact disc and a sculpted translucent cobalt-blue musical eighth note standing in front. Visible rainbow diffraction on silver CD, blue glass highlights and rounded dimensional note. Inspired by the natural music icon craft in the reference, no letters."
+    },
+    {
+      "name": "controls",
+      "prompt": "Use case: style-transfer. Asset type: ONE transparent desktop dock icon for a pizza delivery videogame. The attached image is a STYLE REFERENCE ONLY: reproduce the natural, intricately crafted, tangible object style of Mac OS X application icons from 2007–2012. Rich, realistic miniature illustration with physically believable materials, top-left studio light, precise highlights, subtle soft contact shadow, expressive polished desktop-icon craft. Square composition, entire object visible, centered with clear transparent margin, approximately 80% canvas occupancy. Real transparent background. No app tile or rounded-square background, no colored plate, no UI frame, no letters, no words, no watermark. Clear silhouette legible at 96 pixels. Subject: a friendly silver and charcoal wired game controller in three-quarter view, analog sticks, rounded black rubber handles, four jewel-like red blue green amber buttons and a loosely curling dark cable behind. Real molded plastic, polished metal accents, tactile detailed surfaces. No lettering."
+    },
+    {
+      "name": "end",
+      "prompt": "Use case: style-transfer. Asset type: ONE transparent desktop dock icon for a pizza delivery videogame. The attached image is a STYLE REFERENCE ONLY: reproduce the natural, intricately crafted, tangible object style of Mac OS X application icons from 2007–2012. Rich, realistic miniature illustration with physically believable materials, top-left studio light, precise highlights, subtle soft contact shadow, expressive polished desktop-icon craft. Square composition, entire object visible, centered with clear transparent margin, approximately 80% canvas occupancy. Real transparent background. No app tile or rounded-square background, no colored plate, no UI frame, no letters, no words, no watermark. Clear silhouette legible at 96 pixels. Subject: a glossy deep red glass circular power button with a wide polished chrome ring, simple white power symbol under domed glass, slightly tilted three-quarter view. Real glass highlights and metal reflections, clear strong silhouette, matching the emerald play-button icon. No text."
+    }
+  ],
+  "native_replacements": [
+    {
+      "asset": "public/concepts/dock/garage-game.webp",
+      "source": "Existing game semerka model: CARSM.makeModel + REALCAR.dress, original geometry and textures",
+      "paint": "#ebe6d8",
+      "method": "Three.js transparent render, no image generation",
+      "credit": "Old Car - VAZ 2107 by Arkady Gribachev, CC-BY-4.0; see public/models/vaz2107/LICENSE.txt",
+      "source_url": "https://sketchfab.com/3d-models/old-car-vaz-2107-91270dab9d1a47c7ba7ffaaf8c8b0beb"
+    },
+    {
+      "asset": "public/concepts/dock/pizza-game.webp",
+      "source": "src/game/pizzabox.js makeBox; original dimensions, materials and brand/logo-px.png texture",
+      "method": "Two original game boxes rendered with Three.js on transparent background, no image generation"
+    }
+  ]
+}

@@ -20,6 +20,7 @@ import './carousel.css';
 export function carousel (host, opts = {}) {
   const el = document.createElement('div');
   el.className = 'cz' + (opts.cls ? ' ' + opts.cls : '');
+  if (opts.grid) el.classList.add('cz-grid');
   el.innerHTML = '<div class="cz-arr l" role="button" aria-label="prev">◀</div>' +
     '<div class="cz-stage"><div class="cz-track"></div></div>' +
     '<div class="cz-arr r" role="button" aria-label="next">▶</div><div class="cz-dots"></div>';
@@ -39,10 +40,10 @@ export function carousel (host, opts = {}) {
       c.classList.toggle('side', a === 1);
       c.classList.toggle('far', a >= 2);
       c.classList.toggle('gone', a > REACH);
-      c.setAttribute('aria-hidden', o === 0 ? 'false' : 'true');
+      c.setAttribute('aria-hidden', opts.grid || o === 0 ? 'false' : 'true');
       if (o === 0) c.removeAttribute('data-pad-skip'); else c.setAttribute('data-pad-skip', '');
       c.querySelectorAll('button, input, select, textarea, a[href]').forEach(b => {
-        if (o === 0) b.removeAttribute('tabindex'); else b.setAttribute('tabindex', '-1');
+        if (opts.grid || o === 0) b.removeAttribute('tabindex'); else b.setAttribute('tabindex', '-1');
         if (b.hasAttribute('data-main')) { if (o === 0) b.setAttribute('autofocus', ''); else b.removeAttribute('autofocus'); }
       });
     });
@@ -81,11 +82,13 @@ export function carousel (host, opts = {}) {
     const c = e.target.closest && e.target.closest('.cz-card');
     if (!c) return;
     const i = cards.indexOf(c);
+    if (opts.grid) { if (i >= 0) go(i); return; }
     if (DRAG.moved || (i >= 0 && i !== idx)) { e.preventDefault(); e.stopPropagation(); if (!DRAG.moved && i >= 0) go(i); }
   }, true);
 
   /* свайп: тянешь — карточки едут за пальцем, отпустил дальше 50 px — следующая */
   stage.addEventListener('pointerdown', e => {
+    if (opts.grid) return;
     if (e.button !== undefined && e.button !== 0) return;
     if (e.target.closest && e.target.closest('input, textarea, select')) return;
     DRAG.id = e.pointerId; DRAG.x0 = e.clientX; DRAG.y0 = e.clientY; DRAG.dx = 0; DRAG.moved = false;

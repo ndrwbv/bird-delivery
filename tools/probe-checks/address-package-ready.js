@@ -7,7 +7,9 @@ if(before.district.current!==0||before.district.opened!==1||before.district.city
 const startConditions={state:before.state,queueFullAt:initialReport.marks?.['queue.full']?.at??null,bootFull:window.__boot?.full??null,preexistingControl:!!before.firstControl};
 if(settled&&(!startConditions.bootFull||!Number.isFinite(startConditions.queueFullAt)))throw Error('Settled queue not complete');
 const visible=b=>b&&!b.closest('[hidden]')&&!b.disabled&&b.getBoundingClientRect().width>0&&getComputedStyle(b).visibility!=='hidden';
-const go=document.querySelector('.crm-card[data-key="go"] .crm-cb');
+const shiftStart='.rf-shift-app .rf-shift-start';
+if(document.querySelector('#cr-menu.rf-menu'))await until(()=>document.querySelector(shiftStart),5000);
+const go=document.querySelector(shiftStart)||document.querySelector('.crm-card[data-key="go"] .crm-cb');
 if(!visible(go))throw Error('Visible real Go button missing');
 const start=performance.now();go.click();
 const limit=settled?admission.controlWaitMs:240000,deadline=start+limit;let dialogClicks=0;

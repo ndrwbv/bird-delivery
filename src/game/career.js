@@ -1104,7 +1104,7 @@ export function crewBoard () {
 export function crewPlace () { const b = crewBoard(); return b.findIndex(r => r.me) + 1; }
 
 /* ── меню и экраны поверх: геймпад и клавиатура ── */
-export function menu () { KB.clear(); MENU.show(); }
+export function menu () { KB.clear(); MENU.show({ openShift: true }); }
 /** главное меню на экране и ничего поверх (панель настроек — отдельно, game.js) */
 const menuOn = () => A && A.S.state === 'title' && !(A.panelOpen && A.panelOpen()) && MENU.shown() && !$('big').hidden;
 /** после окна поверх меню (праздник, выбор): подсветка клавиатуры сброшена, фокус — на карточке меню */
