@@ -104,15 +104,22 @@ float fsShade () {
 export function mat (m) {
   if (!FS.HOUSES) return m;
   m.userData.fsGround = 1;
-  const prev = m.onBeforeCompile, key = m.customProgramCacheKey;
+  const prev = m.onBeforeCompile, key = m.customProgramCacheKey, snow = !!m.userData.snowSurface;
   m.onBeforeCompile = function (sh, r) {
     if (prev) prev.call(this, sh, r);
     Object.assign(sh.uniforms, U, SSU);
     sh.vertexShader = 'varying vec3 vFsW;\n' + sh.vertexShader.replace('#include <project_vertex>', VERT);
     // после перевода в цвет экрана (sRGB), до тумана: густота FS.DAY — как у пятна под машиной (смешивание тоже в цвете экрана)
-    sh.fragmentShader = FRAG_HEAD + sh.fragmentShader.replace('#include <colorspace_fragment>', '#include <colorspace_fragment>\nif (uFsK > 0.0) gl_FragColor.rgb *= fsShade();');
+    let shadow = FRAG_HEAD;
+    if (snow) {
+      sh.vertexShader = 'varying vec3 vFsSnowNormal;\n' + sh.vertexShader.replace('#include <defaultnormal_vertex>',
+        '#include <defaultnormal_vertex>\nvFsSnowNormal = normalize(mat3(modelMatrix) * objectNormal);');
+      shadow = 'varying vec3 vFsSnowNormal;\n' + shadow.replace('vec3 N = normalize(cross(dFdx(vFsW), dFdy(vFsW)));',
+        'vec3 N = normalize(vFsSnowNormal);');
+    }
+    sh.fragmentShader = shadow + sh.fragmentShader.replace('#include <colorspace_fragment>', '#include <colorspace_fragment>\nif (uFsK > 0.0) gl_FragColor.rgb *= fsShade();');
   };
-  m.customProgramCacheKey = function () { return (key ? key.call(this) : '') + '|fs'; };
+  m.customProgramCacheKey = function () { return (key ? key.call(this) : '') + (snow ? '|fssnow' : '|fs'); };
   m.needsUpdate = true;
   return m;
 }

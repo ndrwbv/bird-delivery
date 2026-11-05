@@ -10,7 +10,7 @@ const TILE = 8, NEAR_GRID = 32, WINDOW = 5, MASK_N = WINDOW * NEAR_GRID;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const tileKey = (id, x, z) => `${id}:${x}:${z}`;
 // The RG channels contain base elevation (1/32 m); B is the legacy envelope
-// above that base (1/16 m), A says this exact quad has a replacement.
+// above that base (1/16 m), A hides the legacy volume. A=255 marks live geometry.
 const MASK_WIDTH = MASK_N * 2;
 const NEAR_BYTES = new Uint8Array(MASK_WIDTH * MASK_N * 4);
 const NEAR_TEXTURE = new THREE.DataTexture(NEAR_BYTES, MASK_WIDTH, MASK_N,
@@ -40,6 +40,7 @@ export const SNOW_UNIFORMS = {
   uSnowOwnerMap: { value: NEAR_TEXTURE },
   uSnowOwnerOrigin: { value: new THREE.Vector2(0, 0) },
   uSnowOwnerOn: { value: 0 },
+  uSnowPrimarySurface: { value: 0 },
   uSnowFarMap: { value: FAR_TEXTURE },
   uSnowFarOrigin: { value: new THREE.Vector2(0, 0) },
   uSnowFarOn: { value: 0 },
@@ -104,9 +105,9 @@ export function bindSnowUniforms (shader) {
 }
 
 /** Snow-only materials, or a snow branch of a mixed material (predicate).
- * For seasonal tint use LEGACY_SNOW_GLSL and cov *= 1.0-snowOwned(vSW),
- * not discard: the underlying asphalt/grass must remain visible. */
-export function patchLegacySnow (material, { predicate = 'true' } = {}) {
+ * Leave the winter tint on the underlying terrain; this mask is for
+ * volumetric legacy drifts which would cover a live tyre groove. */
+export function patchLegacySnow (material, { predicate = 'true', roadBanks = false } = {}) {
   if (!material || material.userData.livingSnowOwner) return material;
   material.userData.livingSnowOwner = true;
   const previous = material.onBeforeCompile;
@@ -123,12 +124,18 @@ export function patchLegacySnow (material, { predicate = 'true' } = {}) {
       snowLegacyP = instanceMatrix * snowLegacyP;
       #endif
       vSnowLegacyWorld = (modelMatrix * snowLegacyP).xyz;`);
-    shader.fragmentShader = 'varying vec3 vSnowLegacyWorld;\n' + LEGACY_SNOW_GLSL + shader.fragmentShader;
+    const primary = roadBanks ? 'uniform float uSnowPrimarySurface;\n' : '';
+    shader.fragmentShader = primary + 'varying vec3 vSnowLegacyWorld;\n' + LEGACY_SNOW_GLSL + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace('#include <clipping_planes_fragment>', `
       #include <clipping_planes_fragment>
+      ${roadBanks ? `#ifdef USE_COLOR_ALPHA
+        // Ground banks and the near surface must never occupy the same
+        // screen area. Bridge banks keep their own height-aware mask.
+        if (vColor.a < 0.5 && uSnowPrimarySurface < 0.5 && uSnowOwnerOn > 0.5 && snowNearBlend(vSnowLegacyWorld.xz) >= 0.5) discard;
+      #endif` : ''}
       if (${predicate}) { if (snowOwned(vSnowLegacyWorld) > 0.5) discard; }`);
   };
-  material.customProgramCacheKey = () => key + '|living-snow-owner-1:' + predicate;
+  material.customProgramCacheKey = () => key + '|living-snow-owner-1:' + predicate + (roadBanks ? '|road' : '');
   material.needsUpdate = true;
   return material;
 }
@@ -169,8 +176,10 @@ varying vec3 vSnowWorld;
       }`);
     shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
       #include <begin_vertex>
-      float localDepth = max(0.0, snowDepth + snowChange.r) * uSnowSeason;
-      transformed.y = snowSupport.x + localDepth + 0.002;`);
+      float localDepth = max(0.0, snowDepth + snowChange.r * min(1.0, snowCover / 0.6)) * uSnowSeason;
+      // Embed the thin rim into its floor. The side of a curb
+      // cannot reveal a paper-thin sheet above the snow's support.
+      transformed.y = snowSupport.x + localDepth + 0.002 - 0.018 * (1.0 - smoothstep(0.0, 0.075, localDepth));`);
     shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', `
       #include <project_vertex>
       vSnowDepth = localDepth;
@@ -190,7 +199,7 @@ float snGrain(vec2 p) {
     shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
       #include <color_fragment>
       // Continuous opaque snow; no stochastic holes in coverage or LODs.
-      ${coarse ? 'if (snowOwnedNear(vSnowWorld) > 0.5 || distance(vSnowWorld.xz, uSnowFocus) >= uSnowFarRadius) discard;'
+      ${coarse ? 'if (snowNearBlend(vSnowWorld.xz) >= 0.5 || distance(vSnowWorld.xz, uSnowFocus) >= uSnowFarRadius) discard;'
         : 'if (snowNearBlend(vSnowWorld.xz) < 0.5) discard;'}
       if (vSnowDepth <= 0.004 || vSnowCover < 0.05) discard;
       float snowNear = 1.0 - smoothstep(12.0, 35.0, length(vSnowWorld.xz - cameraPosition.xz));
@@ -214,7 +223,7 @@ function createSnowLayer ({ scene, field, surfaces, baseline, deform, coarse = f
   const tiles = new Map(), pages = new Map();
   const material = snowMaterial(coarse, deform);
   const baselineNormal = {x:0,z:0};
-  const sample = {}, wanted = new Map();
+  const sample = {}, roadNormalSample = {}, wanted = new Map();
   let cx = Infinity, cz = Infinity, activeId = null, on = false;
   let ownerDirty = true, disposed = false, pending = null;
   const stats = { tiles: 0, pages: 0, triangles: 0, cpuBytes: 0, gpuBytes: 0,
@@ -281,8 +290,8 @@ function createSnowLayer ({ scene, field, surfaces, baseline, deform, coarse = f
     const page = pageFor(id, tx, tz), slot = (tz - page.pz * PAGE) * PAGE + tx - page.px * PAGE;
     const tile = { id, tx, tz, key: tileKey(id, tx, tz), page, slot, stale: false, min: Infinity, max: -Infinity,
       restNormal: new Float32Array(VERTS * 2), base: new Float32Array(VERTS), envelope: new Float32Array(VERTS),
-      depth: new Float32Array(VERTS), cover: new Uint8Array(VERTS), colours: new Uint8Array(VERTS * 3),
-      valid: new Uint8Array(VERTS), material: new Uint8Array(VERTS), fence: new Uint8Array(VERTS), owner: new Uint8Array(QUADS * 4), triangles: 0 };
+      depth: new Float32Array(VERTS), packed: new Float32Array(VERTS), cover: new Uint8Array(VERTS), colours: new Uint8Array(VERTS * 3),
+      valid: new Uint8Array(VERTS), material: new Uint8Array(VERTS), edge: new Uint8Array(VERTS), owner: new Uint8Array(QUADS * 4), triangles: 0 };
     pending = { tile, original, row: 0, workMs: 0 };
   }
 
@@ -296,21 +305,31 @@ function createSnowLayer ({ scene, field, surfaces, baseline, deform, coarse = f
       tile.valid[k] = valid ? 1 : 0;
       tile.base[k] = valid ? sample.baseY : 0;
       tile.material[k] = sample.materialId;
-      tile.fence[k] = Math.round(255 * sample.fenceCover);
-      if (depth > 0) baseline.height(id, x, z, 1, sample.baseY + depth, baselineNormal);
-      tile.restNormal[k * 2] = depth > 0 ? baselineNormal.x : 0;
-      tile.restNormal[k * 2 + 1] = depth > 0 ? baselineNormal.z : 0;
-      const rest = Number.isFinite(baselineNormal.depth) ? baselineNormal.depth : depth;
-      tile.depth[k] = depth > 0 ? Math.min(rest, depth + 0.03) : 0;
-      tile.cover[k] = depth > 0 ? Math.round(255 * sample.visualCoverage) : 0;
+      tile.packed[k] = sample.packedDepth || 0;
+      tile.edge[k] = Math.round(255 * sample.edgeCover);
+      if (depth > 0 && sample.materialId === 1) {
+        // A road bank is narrower than the common half-metre rest grid.
+        // Keep its continuous authored profile instead of cutting it with
+        // the diagonals of an interpolated coarse heightfield.
+        tile.depth[k] = depth;
+        tile.cover[k] = Math.round(255 * sample.visualCoverage);
+      } else if (depth > 0) {
+        baseline.height(id, x, z, 1, sample.baseY + depth, baselineNormal);
+        tile.restNormal[k * 2] = baselineNormal.x;
+        tile.restNormal[k * 2 + 1] = baselineNormal.z;
+        const rest = Number.isFinite(baselineNormal.depth) ? baselineNormal.depth : depth;
+        tile.depth[k] = Math.min(rest, depth + 0.03) * baselineNormal.edge;
+        tile.cover[k] = Math.round(255 * sample.visualCoverage * (0.35 + 0.65 * baselineNormal.edge));
+      }
       tile.envelope[k] = valid ? Math.max(sample.legacyTopY || sample.baseY + 0.12, sample.baseY + 0.4) : 0;
       const compact = clamp(sample.compaction || 0, 0, 1), wet = clamp(sample.wetness || 0, 0, 1);
       const dirt = clamp((sample.dirt || 0) * 0.6 + (sample.sand || 0) * 0.16, 0, 0.6);
       const dark = 1 - 0.11 * compact - 0.1 * wet;
-      const c = k * 3;
-      tile.colours[c] = Math.round(255 * (0.86 * dark * (1 - dirt) + 0.26 * dirt));
-      tile.colours[c + 1] = Math.round(255 * (0.9 * dark * (1 - dirt) + 0.22 * dirt));
-      tile.colours[c + 2] = Math.round(255 * (0.93 * dark * (1 - dirt) + 0.18 * dirt));
+      const rim = sample.materialId === 1 ? clamp((tile.depth[k] - 0.035) / 0.17, 0, 1) : 1;
+      const loose = rim * rim * (3 - 2 * rim), packed = 1 - loose, c = k * 3;
+      tile.colours[c] = Math.round(255 * ((0.86 * dark * (1 - dirt) + 0.26 * dirt) * loose + 0.46 * packed));
+      tile.colours[c + 1] = Math.round(255 * ((0.9 * dark * (1 - dirt) + 0.22 * dirt) * loose + 0.53 * packed));
+      tile.colours[c + 2] = Math.round(255 * ((0.93 * dark * (1 - dirt) + 0.18 * dirt) * loose + 0.565 * packed));
     }
   }
 
@@ -338,6 +357,19 @@ function createSnowLayer ({ scene, field, surfaces, baseline, deform, coarse = f
     pending = null;
   }
 
+  function roadSlope(tile, k, a, b, dx, dz) {
+    const x = tile.tx * TILE + (k % SIDE) * STEP, z = tile.tz * TILE + Math.floor(k / SIDE) * STEP;
+    const center = tile.base[k] + tile.depth[k];
+    const top = (vertex, direction) => {
+      if (vertex >= 0) return tile.material[vertex] === 1 && Math.abs(tile.base[vertex] - tile.base[k]) < 0.12
+        ? tile.base[vertex] + tile.depth[vertex] : center;
+      surfaces.initial(tile.id, x + dx * direction, z + dz * direction, roadNormalSample);
+      if (!roadNormalSample.valid || roadNormalSample.materialId !== 1 || Math.abs(roadNormalSample.baseY - tile.base[k]) >= 0.12) return center;
+      return roadNormalSample.baseY + (roadNormalSample.deformable ? roadNormalSample.thickness : 0);
+    };
+    return (top(a, -1) - top(b, 1)) / (2 * STEP);
+  }
+
   function publishMesh (tile) {
     const { tx, tz, id, page, slot } = tile, offset = slot * VERTS;
     const p = page.p.array, n = page.n.array;
@@ -346,9 +378,16 @@ function createSnowLayer ({ scene, field, surfaces, baseline, deform, coarse = f
     page.h.array.set(tile.depth, offset);
     for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
       const k = j * SIDE + i, v = offset + k, y = tile.base[k];
-      p[v * 3] = tx * TILE + i * STEP; p[v * 3 + 1] = y + tile.depth[k]; p[v * 3 + 2] = tz * TILE + j * STEP;
-      page.support.array[v * 2] = y; page.support.array[v * 2 + 1] = id;
-      const nx = tile.restNormal[k * 2], nz = tile.restNormal[k * 2 + 1], norm = Math.hypot(nx, 1, nz);
+      const road = tile.material[k] === 1;
+      // Meet the packed snow layer at its own height, so the two surfaces
+      // never clip through the visible side of a shallow bank.
+      const floor = y + (road ? tile.packed[k] : 0);
+      p[v * 3] = tx * TILE + i * STEP; p[v * 3 + 1] = floor + tile.depth[k]; p[v * 3 + 2] = tz * TILE + j * STEP;
+      page.support.array[v * 2] = floor; page.support.array[v * 2 + 1] = id;
+      const roadBank = road && tile.cover[k];
+      const nx = roadBank ? 0.30 * roadSlope(tile, k, i ? k - 1 : -1, i < N ? k + 1 : -1, STEP, 0) : tile.restNormal[k * 2];
+      const nz = roadBank ? 0.30 * roadSlope(tile, k, j ? k - SIDE : -1, j < N ? k + SIDE : -1, 0, STEP) : tile.restNormal[k * 2 + 1];
+      const norm = Math.hypot(nx, 1, nz);
       n[v * 3] = nx / norm; n[v * 3 + 1] = 1 / norm; n[v * 3 + 2] = nz / norm;
       if (tile.valid[k]) { tile.min = Math.min(tile.min, y); tile.max = Math.max(tile.max, y + tile.depth[k] + 0.4, tile.envelope[k]); }
     }
@@ -361,24 +400,31 @@ function createSnowLayer ({ scene, field, surfaces, baseline, deform, coarse = f
       // Both diagonals must stay on one receiver. Crossing a curb can
       // otherwise leave a wedge of snow suspended above the lower side.
       const base = Math.min(tile.base[k], tile.base[kb], tile.base[kc], tile.base[kd]);
+      // The winter tint fills the feathered rim. Suppress legacy volume
+      // even there, so two coincident snow surfaces do not cut through it.
+      const top = Math.max(tile.envelope[k], tile.envelope[kb], tile.envelope[kc], tile.envelope[kd]);
+      const packed = clamp(Math.round((base + 512) * 32), 0, 65535), at = q * 4;
+      tile.owner[at] = packed >> 8; tile.owner[at + 1] = packed & 255;
+      tile.owner[at + 2] = clamp(Math.ceil((top - base) * 16), 0, 255); tile.owner[at + 3] = 128;
       const high = Math.max(tile.base[k], tile.base[kb], tile.base[kc], tile.base[kd]);
       const material = tile.material[k];
       const mixed = material !== tile.material[kb] || material !== tile.material[kc] || material !== tile.material[kd];
       if (high - base > (mixed ? 0.065 : 0.20)) continue;
-      if (!tile.fence[k] || !tile.fence[kb] || !tile.fence[kc] || !tile.fence[kd]) continue;
+      if (!tile.edge[k] || !tile.edge[kb] || !tile.edge[kc] || !tile.edge[kd]) continue;
+      if (high - base > 0.055 || mixed) {
+        // A paved notch can sit inside the cell, between its four vertices.
+        const x = tx * TILE + (i + 0.5) * STEP, z = tz * TILE + (j + 0.5) * STEP;
+        surfaces.initial(id, x, z, sample);
+        if (!sample.valid || sample.edgeCover === 0 || (tile.base[kb] + tile.base[kc]) * 0.5 - sample.baseY > 0.055) continue;
+      }
       const a = offset + k, b = offset + kb, c = offset + kc, d = offset + kd;
       elements[count++] = a; elements[count++] = c; elements[count++] = b;
       elements[count++] = b; elements[count++] = c; elements[count++] = d;
-      if (Math.min(tile.cover[k], tile.cover[kb], tile.cover[kc], tile.cover[kd]) <= 13
-        || Math.min(tile.depth[k], tile.depth[kb], tile.depth[kc], tile.depth[kd]) <= 0.004) continue;
-      const top = Math.max(tile.envelope[k], tile.envelope[kb], tile.envelope[kc], tile.envelope[kd]);
-      const packed = clamp(Math.round((base + 512) * 32), 0, 65535), at = q * 4;
-      tile.owner[at] = packed >> 8; tile.owner[at + 1] = packed & 255;
-      tile.owner[at + 2] = clamp(Math.ceil((top - base) * 16), 0, 255); tile.owner[at + 3] = 255;
+      tile.owner[at + 3] = 255;
     }
     tile.elements = elements.subarray(0, count);
     tile.triangles = count / 3;
-    tile.restNormal = tile.base = tile.envelope = tile.depth = tile.cover = tile.colours = tile.valid = tile.material = tile.fence = null;
+    tile.restNormal = tile.base = tile.envelope = tile.depth = tile.packed = tile.cover = tile.colours = tile.valid = tile.material = tile.edge = null;
     changed(page.p, offset * 3, VERTS * 3); changed(page.n, offset * 3, VERTS * 3);
     changed(page.c, offset * 3, VERTS * 3); changed(coverage, offset, VERTS);
     changed(page.h, offset, VERTS); changed(page.support, offset * 2, VERTS * 2);
@@ -454,7 +500,7 @@ function createSnowLayer ({ scene, field, surfaces, baseline, deform, coarse = f
     if (ix < 0 || iz < 0 || ix >= MASK_N || iz >= MASK_N) return false;
     for (let layer = 0; layer < LAYERS; layer++) {
       const at = (iz * MASK_WIDTH + layer * MASK_N + ix) * 4;
-      if (!OWNER_BYTES[at + 3]) continue;
+      if (OWNER_BYTES[at + 3] < 255) continue;
       if (!Number.isFinite(y)) return true;
       const base = (OWNER_BYTES[at] * 256 + OWNER_BYTES[at + 1]) / 32 - 512;
       if (y >= base - 0.14 && y <= base + OWNER_BYTES[at + 2] / 16 + 0.08) return true;
@@ -570,6 +616,7 @@ export function createSnowRenderer ({ scene, field, surfaces }) {
     uploadBytes: 0, built: 0, rebuilt: 0, buildMs: 0, updateMs: 0, pending: 0 };
   function update (state) {
     if (state.snowAmount > 0.015) deform.update(state.x, state.z, state.surfaceId);
+    SNOW_UNIFORMS.uSnowPrimarySurface.value = state.surfaceId;
     near.update(state); middle.update(state);
     stats.nearRadius = near.stats.revealRadius; stats.middleRadius = middle.stats.revealRadius;
     stats.tiles = near.stats.tiles; stats.mediumTiles = middle.stats.tiles;

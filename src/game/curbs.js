@@ -734,6 +734,25 @@ export function near (x, z, r = 0.3) {
   for (let i = i0; i < i1; i += 4) if (segD(x, z, a[i], a[i + 1], a[i + 2], a[i + 3]) < r) return true;
   return false;
 }
+/* Расстояние до контура, включая камни у края соседней клетки. */
+export function distance (x, z, limit) {
+  if (!ON) return limit;
+  let d = limit;
+  for (let j = Math.floor((z - limit) / BC); j <= Math.floor((z + limit) / BC); j++)
+    for (let i = Math.floor((x - limit) / BC); i <= Math.floor((x + limit) / BC); i++) {
+      const v = BI.get(ck(i, j));
+      if (v === undefined) continue;
+      const end = (Math.floor(v / 1024) + v % 1024) * 4;
+      for (let k = Math.floor(v / 1024) * 4; k < end; k += 4) {
+        const ax = BF[k], az = BF[k + 1], bx = BF[k + 2], bz = BF[k + 3];
+        if (x + d < Math.min(ax, bx) || x - d > Math.max(ax, bx)
+          || z + d < Math.min(az, bz) || z - d > Math.max(az, bz)) continue;
+        d = Math.min(d, segD(x, z, ax, az, bx, bz));
+      }
+    }
+  return d;
+}
+
 /* отрезок p—q пересекает камень? 1 — заехал на газон (q слева от камня), −1 — съехал с газона, 0 — нет */
 function crosses (px, pz, qx, qz) {
   const kq = ck(Math.floor(qx / BC), Math.floor(qz / BC)), kp = ck(Math.floor(px / BC), Math.floor(pz / BC));

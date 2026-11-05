@@ -224,7 +224,12 @@ function stepStops (dt) {
       m.rotation.x += p.spin * dt * 0.5; m.rotation.z += p.spin * dt * 0.3;
       const fl = A.groundH(m.position.x, m.position.z) + p.restY;
       if (m.position.y <= fl && p.vy < 0) {
-        m.position.y = fl;
+        const floor = fl - p.restY;
+        const pressed = p.snowX === undefined || Math.hypot(m.position.x - p.snowX, m.position.z - p.snowZ) > 0.4;
+        if (pressed) {
+          p.snowX = m.position.x; p.snowZ = m.position.z;
+          m.position.y = (A.snowImpact?.(m.position.x, m.position.z, floor, m.rotation.y, 0.45, 0.85, -p.vy) ?? floor) + p.restY;
+        } else m.position.y = fl;
         if (Math.abs(p.vy) > 3) { p.vy *= -0.25; p.vx *= 0.5; p.vz *= 0.5; continue; }
         m.rotation.set(p.restRot[0], p.restRot[1], p.restRot[2]);           // упал и лёг
         p.rest = 1;
@@ -463,7 +468,13 @@ function stepCans (dt) {
       o.tipV += 9 * dt;
       if (o.tip >= Math.PI / 2) { A.Snd.fx('clank', s => s.noise(0.2, 0.25), { x: o.x, z: o.z }); A.puff && A.puff(o.x, 0.3, o.z, false, 0.7); }
     }
-    if (o.hop > 0) { o.hop += o.hopV * dt; o.hopV -= 19 * dt; if (o.hop <= 0) o.hop = 0; }
+    const wasHopping = o.hop > 0;
+    if (wasHopping) { o.hop += o.hopV * dt; o.hopV -= 19 * dt; if (o.hop <= 0) o.hop = 0; }
+    if (!o.hop && (wasHopping || o.snowX === undefined || Math.hypot(o.x - o.snowX, o.z - o.snowZ) > 0.35)) {
+      o.snowX = o.x; o.snowZ = o.z;
+      A.snowImpact?.(o.x, o.z, A.groundH(o.x, o.z) + A.curbAt(o.x, o.z), o.ry, CANS.R * 1.65,
+        o.fell ? CANS.R * 2.3 : CANS.R * 1.65, wasHopping ? -o.hopV : 3 + sp);
+    }
     pose(o);
     if (sp < 0.05 && Math.abs(o.w) < 0.05 && (!o.fell || o.tip >= Math.PI / 2) && !(o.hop > 0)) { o.vx = o.vz = 0; o.rest = 1; }
   }
@@ -542,7 +553,7 @@ export function reset () {
   STATS.broken = 0;
   for (const o of DYN) {
     A.scene.remove(o.dyn); o.dyn = null;
-    Object.assign(o, { x: o.x0, z: o.z0, ry: o.ry0, vx: 0, vz: 0, w: 0, tip: 0, tipV: 0, hop: 0, fell: 0, rest: 0 });
+    Object.assign(o, { x: o.x0, z: o.z0, ry: o.ry0, vx: 0, vz: 0, w: 0, tip: 0, tipV: 0, hop: 0, fell: 0, rest: 0, snowX: undefined, snowZ: undefined });
     unhide(o.it);
   }
   DYN.length = 0; STATS.dyn = 0;

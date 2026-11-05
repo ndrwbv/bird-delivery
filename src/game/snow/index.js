@@ -26,7 +26,7 @@ export function vehicleSupport(V, car, dt, active = true) {
   return suspension(V, car, dt, active && ready && snowAmount > 0.01);
 }
 const idOf = p => { let id = identities.get(p); if (!id) { id = `npc-${++identity}`; identities.set(p, id); } return id; };
-export const ST = { on: enabled, ready: false, surfaceId: 0, playerContacts: 0, npcContacts: 0, steps: 0, ms: 0,
+export const ST = { on: enabled, ready: false, surfaceId: 0, playerContacts: 0, hullContacts: 0, objectContacts: 0, npcContacts: 0, steps: 0, ms: 0,
   cpuBytes: 0, gpuBytes: 0, triangles: 0, uploadBytes: 0 };
 
 export function init(api) {
@@ -58,6 +58,24 @@ export function body(x, z, y, heading = 0) {
   if (!resolved.valid) return;
   contacts.body({ surfaceId: resolved.surfaceId, from: { x, z }, to: { x, z }, heading });
 }
+// A moving prop presses once at the actual point of contact. Falling pieces
+// can rest on the resulting dent, including on an elevated receiver.
+export function objectImpact(x, z, y, heading, width, length, force) {
+  if (!ready || !snowAmount || !A.live() || Math.abs(x - A.V.x) > 56 || Math.abs(z - A.V.z) > 56) return y;
+  surfaces.resolve(x, z, y, undefined, resolved);
+  if (!resolved.valid) return y;
+  const id = resolved.surfaceId;
+  field.sample(id, x, z, sampled);
+  if (!sampled.valid || !sampled.deformable || sampled.thickness < 0.014
+    || y > sampled.topY + 0.12 || y < sampled.baseY - 0.4) return y;
+  const drop = contacts.body({ kind: 'object', surfaceId: id, from: { x, z }, to: { x, z }, heading, width, length,
+    load01: Math.min(1, 0.28 + Math.max(0, force) * 0.09), dt: 0.15 });
+  if (!drop.changed) return y;
+  ST.objectContacts++;
+  field.sample(id, x, z, sampled);
+  return Math.max(sampled.baseY, sampled.topY);
+}
+
 // Called by the existing on-foot delivery animation. A footfall is distance
 // based, so a standing courier and a paused animation never dig a pit.
 export function foot(x, z, y) {
@@ -128,7 +146,7 @@ function nearbyContacts(dt) {
     npcV.x = t.x; npcV.z = t.z; npcV.y = t.y; npcV.h = t.h;
     npcV.vx = Math.sin(t.h) * t.speed; npcV.vz = Math.cos(t.h) * t.speed;
     npcV.air = false; npcV.wade = false; npcV.sink = undefined;
-    npcOptions.id = idOf(t);
+    npcOptions.id = idOf(t); npcOptions.halfLength = t.hl;
     contacts.vehicle(npcV, t.mesh, elapsed, npcOptions); cars++; ST.npcContacts++;
   }
   let people = 0;
@@ -177,8 +195,9 @@ export function step(dt) {
     playerOptions.gas = !!A.IN.gas; playerOptions.brake = !!A.IN.brake; playerOptions.hand = !!A.IN.hand;
     playerOptions.grounded = !V.air && !V.wade && V.sink === undefined && !A.flying() && resolved.valid;
     playerOptions.onSpray = A.spray;
-    contacts.vehicle(V, A.car(), dt, playerOptions);
+    const contact = contacts.vehicle(V, A.car(), dt, playerOptions);
     if (playerOptions.grounded) ST.playerContacts++;
+    if (contact.hullChanged) ST.hullContacts++;
     nearbyContacts(dt);
   } else contacts.clearEntity('player');
   field.step(dt);

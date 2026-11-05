@@ -164,11 +164,23 @@ function frame (s) {
 
 /* На незаасфальтированных пустырях снег собирается неровными островками.
    Всё в одном меше; летние площадки и ларьки остаются без сугробов. */
-export function buildSnowDrifts (floor, fences) {
+export function buildSnowDrifts (floor, fences, curbCover) {
   snowFloor = floor;
   if (SNOW_MESH) { SNOW_MESH.removeFromParent(); SNOW_MESH.geometry.dispose(); SNOW_MESH.material.dispose(); }
-  const positions = [], colors = [], indices = [];
-  const vertex = (x, y, z, rgb) => { positions.push(x, y, z); colors.push(rgb >> 16, (rgb >> 8) & 255, rgb & 255); };
+  const positions = [], colors = [], indices = [], support = [];
+  const vertex = (x, y, z, rgb) => {
+    const base = snowFloor(x, z);
+    support.push(base); positions.push(x, base + y, z); colors.push(rgb >> 16, (rgb >> 8) & 255, rgb & 255);
+  };
+  const triangle = (a, b, c) => {
+    const ya = support[a], yb = support[b], yc = support[c];
+    if (Math.max(ya, yb, yc) - Math.min(ya, yb, yc) > 0.065) {
+      const x = (positions[a * 3] + positions[b * 3] + positions[c * 3]) / 3;
+      const z = (positions[a * 3 + 2] + positions[b * 3 + 2] + positions[c * 3 + 2]) / 3;
+      if ((ya + yb + yc) / 3 - snowFloor(x, z) > 0.055) return;
+    }
+    indices.push(a, b, c);
+  };
   STATS.snowdrifts = 0; SNOW_TOP.clear();
   for (const s of LOTS) {
     if (s.kind === 'football' || s.kind === 'kiosks') continue;
@@ -188,18 +200,19 @@ export function buildSnowDrifts (floor, fences) {
           if (list) list.push(d); else SNOW_TOP.set(key, [d]);
         }
       const first = positions.length / 3, sides = 12, radii = [0.46, 0.76, 1];
-      vertex(cx, snowFloor(cx, cz) + 0.002 + h, cz, 0xe7eff0);
+      vertex(cx, 0.002 + h * curbCover(cx, cz), cz, 0xe7eff0);
       for (const radius of radii) for (let i = 0; i < sides; i++) {
         const t = i / sides * Math.PI * 2;
         const [x, z] = c.P(a + Math.cos(t) * ra * radius, b + Math.sin(t) * rb * radius);
-        vertex(x, snowFloor(x, z) + 0.002 + h * bankProfile(radius), z, 0xe7eff0);
+        vertex(x, -0.022 * radius + h * bankProfile(radius) * curbCover(x, z), z, 0xe7eff0);
       }
       for (let i = 0; i < sides; i++) {
         const j = (i + 1) % sides;
-        indices.push(first, first + 1 + j, first + 1 + i);
+        triangle(first, first + 1 + j, first + 1 + i);
         for (let r = 1; r < radii.length; r++) {
           const inner = first + 1 + (r - 1) * sides, outer = inner + sides;
-          indices.push(inner + i, inner + j, outer + j, inner + i, outer + j, outer + i);
+          triangle(inner + i, inner + j, outer + j);
+          triangle(inner + i, outer + j, outer + i);
         }
       }
       STATS.snowdrifts++;

@@ -2,6 +2,7 @@
    wheel history by entity prevents a car change/teleport drawing a long trench. */
 import { SNOW, clamp01 } from './config.js';
 
+const BODY_PROBES = [-0.9, 0, 0.9];
 const wheelState = () => ({ x: 0, z: 0, surfaceId: null, on: false, carry: 0 });
 
 export function createSnowContacts ({ field, resolveSurface }) {
@@ -10,7 +11,8 @@ export function createSnowContacts ({ field, resolveSurface }) {
   const from = { x: 0, z: 0 }, to = { x: 0, z: 0 };
   const contact = { surfaceId: null, from, to, width: SNOW.TIRE_WIDTH, length: SNOW.TIRE_LENGTH,
     heading: 0, load01: 1, slipLong: 0, slipSide: 0, dt: 0, kind: 'wheel', pickupCapacity: 0, depositMass: 0 };
-  const result = { soft: 0, sand: 0, rut: 0, compaction: 0, snow: 0, changed: false, sprays: 0, supportY: 0, contacts: 0 };
+  const hull = { kind: 'hull', from: { x: 0, z: 0 }, to: { x: 0, z: 0 } };
+  const result = { hullChanged: false, soft: 0, sand: 0, rut: 0, compaction: 0, snow: 0, changed: false, sprays: 0, supportY: 0, contacts: 0 };
   const event = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, size: 0.18, mass: 0 };
   let clock = 0;
 
@@ -25,7 +27,7 @@ export function createSnowContacts ({ field, resolveSurface }) {
         if (oldest) vehicles.delete(oldest.id);
       }
       value = { id, wheels: [wheelState(), wheelState(), wheelState(), wheelState()], last: 0, spray: 0,
-        x: 0, z: 0, h: 0, model: null, valid: false, bodySurfaceId: null };
+        x: 0, z: 0, h: 0, model: null, valid: false, hullX: NaN, hullZ: NaN, hullH: 0, hullY: 0, hullId: null, hullDt: 0 };
       vehicles.set(id, value);
     }
     value.last = ++clock;
@@ -38,21 +40,62 @@ export function createSnowContacts ({ field, resolveSurface }) {
     return returned || surface;
   }
 
+  function pressHull(V, car, e, dt, speed, fx, fz, sideSpeed, options) {
+    e.hullDt = Math.min(0.15, e.hullDt + dt);
+    const distance = Math.hypot(V.x - e.hullX, V.z - e.hullZ);
+    const turn = 1 - Math.cos(V.h - e.hullH);
+    const player = options.id === 'player';
+    if (Number.isFinite(distance) && (e.hullDt < (player ? 0.05 : 0.09)
+      || distance < (player ? 0.22 : 0.45) && turn < 0.003)) return null;
+    const box = car?.userData?.real?.C?.box;
+    const halfWidth = box?.W2 ?? 0.93, halfLength = Math.min(2.6, box?.HL ?? options.halfLength ?? 2.2);
+    const centerY = Number.isFinite(car?.position?.y) ? car.position.y : V.y;
+    const soleY = centerY + 0.16;
+    const pitch = -Math.sin(car?.rotation?.x || 0), roll = Math.sin(car?.rotation?.z || 0);
+    const receiver = resolve(V.x, V.z, centerY, e.hullId);
+    const id = receiver.valid ? receiver.surfaceId : null;
+    const continuing = id === e.hullId && distance <= SNOW.MAX_CONTACT_DISTANCE;
+    hull.from.x = continuing ? e.hullX : V.x; hull.from.z = continuing ? e.hullZ : V.z;
+    hull.soleYFrom = continuing ? e.hullY : soleY;
+    e.hullX = V.x; e.hullZ = V.z; e.hullH = V.h; e.hullY = soleY; e.hullId = id;
+    hull.dt = e.hullDt; e.hullDt = 0;
+    if (id == null || !Number.isFinite(soleY)) return null;
+    let touches = false;
+    for (const z of BODY_PROBES) {
+      const fore = halfLength * z;
+      for (const x of BODY_PROBES) {
+        const side = halfWidth * x;
+        const px = V.x + fx * fore + fz * side, pz = V.z + fz * fore - fx * side;
+        field.sample(id, px, pz, bodySample);
+        if (bodySample.valid && bodySample.deformable && bodySample.topY > soleY + pitch * fore + roll * side + 0.008) {
+          touches = true; break;
+        }
+      }
+      if (touches) break;
+    }
+    if (!touches) return null;
+    hull.to.x = V.x; hull.to.z = V.z;
+    hull.soleY = soleY; hull.pitch = pitch; hull.roll = roll;
+    hull.surfaceId = id; hull.width = halfWidth * 2; hull.length = halfLength * 2; hull.heading = V.h;
+    hull.load01 = Math.min(1, 0.65 + speed / 18);
+    hull.slipLong = Math.min(1.6, speed / 7); hull.slipSide = sideSpeed * 0.2;
+    return field.stamp(hull);
+  }
+
   function vehicle (V, car, dt, options = {}) {
     result.soft = result.sand = result.rut = result.compaction = result.snow = result.supportY = result.contacts = result.sprays = 0;
-    result.changed = false;
+    result.changed = result.hullChanged = false;
     if (!V || !Number.isFinite(V.x) || !Number.isFinite(V.z)) return result;
     const e = state(options.id ?? 'player');
     if (field.stats.season <= 0.0001) for (const wheel of e.wheels) wheel.carry = 0;
     const grounded = options.grounded !== false && !options.air && !V.air && !V.wade && V.sink === undefined;
     dt = Math.max(0, Math.min(0.15, dt || 0));
-    if (!grounded || !dt) { e.valid = false; for (const wheel of e.wheels) wheel.on = false; return result; }
+    if (!grounded || !dt) { e.valid = false; e.hullX = NaN; e.hullId = null; e.hullDt = 0; for (const wheel of e.wheels) wheel.on = false; return result; }
     const fx = Math.sin(V.h), fz = Math.cos(V.h), sx = fz, sz = -fx;
     const speed = Math.hypot(V.vx || 0, V.vz || 0), sideSpeed = (V.vx || 0) * sx + (V.vz || 0) * sz;
-    const forwardSpeed = (V.vx || 0) * fx + (V.vz || 0) * fz;
     const wheels = car?.userData?.wheels;
     const modelChanged = e.model !== car;
-    if (modelChanged) { e.model = car; e.valid = false; for (const wheel of e.wheels) wheel.on = false; }
+    if (modelChanged) { e.model = car; e.valid = false; e.hullX = NaN; e.hullId = null; for (const wheel of e.wheels) wheel.on = false; }
     const teleported = e.valid && Math.hypot(V.x - e.x, V.z - e.z) > SNOW.MAX_CONTACT_DISTANCE;
     if (teleported) { e.valid = false; for (const wheel of e.wheels) wheel.on = false; }
     let eventMass = 0, eventX = V.x, eventZ = V.z, eventY = V.y || 0;
@@ -98,29 +141,11 @@ export function createSnowContacts ({ field, resolveSurface }) {
       result.soft /= count; result.sand /= count; result.rut /= count;
       result.compaction /= count; result.snow /= count; result.supportY /= count;
     }
-    // The bumper can open a LOCAL channel in deep loose snow. It does not
-    // flatten a whole mound, nor move the car to the top of a high snowbank.
-    const front = forwardSpeed < -0.5 ? -1.8 : 1.9;
-    const bx = V.x + fx * front, bz = V.z + fz * front;
-    const receiver = resolve(bx, bz, V.y, e.wheels[0].surfaceId);
-    if (receiver.valid) {
-      field.sample(receiver.surfaceId, bx, bz, bodySample);
-      if (bodySample.valid && bodySample.thickness > 0.35 && speed > 0.3) {
-        to.x = bx; to.z = bz;
-        const sameSurface = e.valid && e.bodySurfaceId === receiver.surfaceId;
-        from.x = sameSurface ? e.x + Math.sin(e.h) * front : bx;
-        from.z = sameSurface ? e.z + Math.cos(e.h) * front : bz;
-        contact.surfaceId = receiver.surfaceId; contact.width = car?.userData?.bodyWidth || 1.65;
-        contact.length = 0.4; contact.heading = V.h; contact.kind = 'body'; contact.dt = dt;
-        contact.load01 = Math.min(1, 0.25 + speed / 14); contact.slipLong = Math.min(2, speed / 8); contact.slipSide = sideSpeed * 0.2;
-        contact.pickupCapacity = contact.depositMass = 0;
-        contact.soleY = bodySample.baseY + 0.26;
-        const changed = field.stamp(contact);
-        if (changed.changed) result.changed = true;
-        delete contact.soleY;
-      }
+    const body = pressHull(V, car, e, dt, speed, fx, fz, sideSpeed, options);
+    if (body?.changed) {
+      result.changed = result.hullChanged = true;
+      if (body.movedMass > eventMass) { eventMass = body.movedMass; eventX = V.x; eventZ = V.z; eventY = V.y + 0.2; }
     }
-    e.bodySurfaceId = receiver.valid ? receiver.surfaceId : null;
     e.spray -= dt;
     if (options.onSpray && eventMass > 0.001 && (speed > 1 || options.gas) && e.spray <= 0) {
       e.spray = 0.12;
@@ -154,7 +179,7 @@ export function createSnowContacts ({ field, resolveSurface }) {
   }
 
   function body (impact) {
-    return field.stamp({ ...impact, kind: 'body', width: impact.width || 0.5, length: impact.length || 1.3,
+    return field.stamp({ ...impact, kind: impact.kind || 'body', width: impact.width || 0.5, length: impact.length || 1.3,
       load01: impact.load01 ?? 1, dt: impact.dt || 0.15 });
   }
 

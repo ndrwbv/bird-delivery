@@ -104,7 +104,7 @@ export function createSnowSurfaces(A) {
   function rawInitial(surfaceId, x, z, out = {}) {
     base(surfaceId, x, z, out);
     out.deformable = true;
-    out.visualCoverage = 1; out.fenceCover = 1; out.thickness = 0; out.compaction = 0; out.wetness = 0; out.ice = 0;
+    out.visualCoverage = 1; out.edgeCover = 1; out.packedDepth = 0; out.thickness = 0; out.compaction = 0; out.wetness = 0; out.ice = 0;
     out.dirt = 0; out.sand = 0; out.rut = 0; out.heading = 0;
     out.normalX = 0; out.normalY = 1; out.normalZ = 0;
     if (!out.valid) { out.legacyY = out.legacyTopY = out.baseY; return out; }
@@ -115,6 +115,7 @@ export function createSnowSurfaces(A) {
       else if (road.onRoad && road.bridge) out.baseY = road.baseY;
       if (out.materialId === 1) {
         out.thickness = road.roadThickness;
+        out.packedDepth = road.roadThickness;
         out.deformable = false; out.visualCoverage = 0;
         out.compaction = road.compaction; out.dirt = road.dirt;
         out.sand = road.sand; out.rut = road.rut || 0; out.heading = road.heading || 0;
@@ -165,11 +166,11 @@ export function createSnowSurfaces(A) {
         out.deformable = true; out.visualCoverage = 1;
       }
     }
-    if (surfaceId === 0) out.fenceCover = A.fences.cover(x, z);
+    if (surfaceId === 0) out.edgeCover = Math.min(A.fences.cover(x, z), A.curbCover(x, z));
     if (out.deformable) {
-      out.thickness *= out.fenceCover;
-      out.visualCoverage *= out.fenceCover;
-      if (out.fenceCover === 0) out.deformable = false;
+      out.thickness *= out.edgeCover;
+      out.visualCoverage *= out.edgeCover;
+      if (out.edgeCover === 0) out.deformable = false;
     }
     out.legacyTopY = Math.max(out.legacyY + 0.12, out.baseY + out.thickness + 0.15, out.baseY + 0.4);
     out.topY = out.baseY + out.thickness;
@@ -184,8 +185,8 @@ export function createSnowSurfaces(A) {
   // Rendering and physics ask the same vertex/cell centres repeatedly.
   // Cache exact vertices and cell centres in two 64² planes. Mixed parity
   // coordinates are rare and sampled directly: no 128² allocation of holes.
-  const cache = new Map(), floats = ['baseY','thickness','legacyY','legacyTopY','heading'];
-  const bytes = ['compaction','wetness','ice','dirt','sand','exposure','rut','visualCoverage','fenceCover'];
+  const cache = new Map(), floats = ['baseY','thickness','legacyY','legacyTopY','heading','packedDepth'];
+  const bytes = ['compaction','wetness','ice','dirt','sand','exposure','rut','visualCoverage','edgeCover'];
   const floatCount = floats.length, byteCount = bytes.length;
   let cacheClock = 0;
   let focusX = 0, focusZ = 0;

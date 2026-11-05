@@ -151,7 +151,6 @@ vec2 seasonPatch (vec2 p) {
 }`;
 
 const TINT = `
-${LEGACY_SNOW_GLSL}
 #ifdef USE_COLOR_ALPHA
 #define S_LAND (vColor.a < 0.5)
 #else
@@ -249,7 +248,6 @@ vec3 seasonTint (vec3 c, float dryK, float snowK, float landK) {
   vec3 snowC = mix(vec3(0.88, 0.91, 0.97), vec3(0.46, 0.48, 0.52), road * 0.6);
   snowC = mix(snowC, vec3(0.66, 0.68, 0.72), yardP * 0.55);   // утоптанный снег — серее
   c = mix(c, vec3(0.55, 0.7, 0.8), uSnow * water * up * 0.85);
-  cov *= 1.0 - snowOwned(vSW);
   // The deformable layer replaces snow geometry, not the winter colour of
   // the earth underneath it. Keep a packed white base on land, including
   // grass-coloured raised edges: seams and compressed tracks cannot reveal
@@ -293,7 +291,7 @@ export function seasonMat (m, dryK = 1, propK, smashJ) {
   const dry = propK === undefined ? dryK.toFixed(2) : '(S_LAND ? ' + dryK.toFixed(2) + ' : ' + propK.toFixed(2) + ')';
   m.onBeforeCompile = sh => {
     yardMark();
-    Object.assign(sh.uniforms, U); bindSnowUniforms(sh);
+    Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vSW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
     sh.fragmentShader = (smashJ ? 'uniform float uYellow, uLeaf;\n' : '') + TINT + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' +
       (smashJ ? SMJ_FRAG(dryK, propK === undefined ? dryK : propK) : 'diffuseColor.rgb = seasonTint(diffuseColor.rgb, ' + dry + ', 1.0, S_LAND ? 1.0 : 0.0);'));
@@ -308,7 +306,7 @@ export function winterRoadMat (blended = false) {
   // материал ожидает отсутствующий атрибут normal и чернит дорогу.
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, flatShading: true,
     transparent: false, depthWrite: true });
-  if (!blended) return patchLegacySnow(m);
+  if (!blended) return patchLegacySnow(m, { roadBanks: true });
   m.onBeforeCompile = sh => {
     sh.vertexShader = 'attribute float roadSand; attribute float roadBlend; varying float vRoadSand; varying float vRoadBlend; varying vec2 vRoadXZ;\n' +
       sh.vertexShader.replace('#include <begin_vertex>',
@@ -388,7 +386,7 @@ function pileMat () {
         if (vK == 7.0 && uLeaf > vSeed) transformed = vec3(0.0, -3000.0, 0.0);   // вид 7 — ветки и прутья голой кроны (trees.js, зимние модели): видны, когда облетела листва`)
         .replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
     sh.uniforms.uSeeP = SEE_U;
-    sh.fragmentShader = 'uniform float uYellow;\nvarying float vK, vP, vSeed;\n' + (WOOD_ON ? 'varying vec3 vFolN;\n' : '') + TINT + BAYER_FN + SEE_FN + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+    sh.fragmentShader = 'uniform float uYellow;\nvarying float vK, vP, vSeed;\n' + (WOOD_ON ? 'varying vec3 vFolN;\n' : '') + LEGACY_SNOW_GLSL + TINT + BAYER_FN + SEE_FN + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       if (vK == 3.0 && snowOwned(vSW) > 0.5) discard;
       if (vK != 2.0 && vK != 3.0) seeCut(vSW);       // между камерой и машиной — тает (seethru.js); листья и сугробы на земле — нет
       if (vK == 1.0) {
@@ -1451,14 +1449,29 @@ function driftShape (d, s) {
     const heights = new Map();
     const pos = pa.array, box = m.geometry.boundingBox, sphere = m.geometry.boundingSphere;
     let radiusSq = sphere ? sphere.radius * sphere.radius : 0;
-    for (let i = d.v0 * 3; i < (d.v0 + d.nv) * 3; i += 3) {
-      const x = pos[i], z = pos[i + 2], key = x + ',' + z;
+    const floorAt = (x, z) => {
+      const key = x + ',' + z;
       let floor = heights.get(key);
-      if (floor === undefined) { floor = C.snowFloor(x, z); heights.set(key, floor); }
-      pos[i + 1] += floor - d.floor;
-      driftVertex.x = x; driftVertex.y = pos[i + 1]; driftVertex.z = z;
-      box?.expandByPoint(driftVertex);
-      if (sphere) radiusSq = Math.max(radiusSq, sphere.center.distanceToSquared(driftVertex));
+      if (!floor) { floor = { y: C.snowFloor(x, z), cover: C.snowCurbCover(x, z) }; heights.set(key, floor); }
+      return floor;
+    };
+    for (let i = d.v0 * 3; i < (d.v0 + d.nv) * 3; i += 9) {
+      const a = floorAt(pos[i], pos[i + 2]), b = floorAt(pos[i + 3], pos[i + 5]), c = floorAt(pos[i + 6], pos[i + 8]);
+      const span = Math.max(a.y, b.y, c.y) - Math.min(a.y, b.y, c.y);
+      if (span > 0.065) {
+        const x = (pos[i] + pos[i + 3] + pos[i + 6]) / 3, z = (pos[i + 2] + pos[i + 5] + pos[i + 8]) / 3;
+        if ((a.y + b.y + c.y) / 3 - floorAt(x, z).y > 0.055) {
+          pos.copyWithin(i + 3, i, i + 3); pos.copyWithin(i + 6, i, i + 3);
+          continue;
+        }
+      }
+      for (let j = 0; j < 3; j++) {
+        const at = i + j * 3, floor = j === 0 ? a : j === 1 ? b : c;
+        pos[at + 1] = floor.y + (pos[at + 1] - d.floor) * floor.cover;
+        driftVertex.x = pos[at]; driftVertex.y = pos[at + 1]; driftVertex.z = pos[at + 2];
+        box?.expandByPoint(driftVertex);
+        if (sphere) radiusSq = Math.max(radiusSq, sphere.center.distanceToSquared(driftVertex));
+      }
     }
     if (sphere) sphere.radius = Math.sqrt(radiusSq);
   }

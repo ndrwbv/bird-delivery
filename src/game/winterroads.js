@@ -80,11 +80,15 @@ function treadAt (off, width, lanes) {
 }
 
 // The rendered shoulder and wheel contact share the same rounded profile.
-function bankWidth(p, t) { return p.width * 0.5 * Math.sqrt(Math.max(0, Math.sin(Math.PI * t))); }
+function bankEnds(p, t) {
+  const length = p.d1 - p.d0;
+  return smooth(clamp(Math.min(t, 1 - t) * length / Math.min(2.3, length / 2), 0, 1));
+}
+function bankWidth(p, t) { return p.width * 0.5 * Math.sqrt(bankEnds(p, t)); }
 function bankAxis(p, t) { return p.off + p.width * 0.08 * Math.sin(t * Math.PI * 2 + p.phase) * Math.sin(Math.PI * t); }
 function bankRise(p, t, lateral) {
-  const mid = Math.sin(Math.PI * t), section = Math.max(0, 1 - lateral * lateral);
-  return (p.base + p.height * mid) * mid * section * section;
+  const mid = bankEnds(p, t), section = Math.max(0, 1 - lateral * lateral);
+  return (p.base + p.height * (0.91 + 0.09 * Math.sin(t * Math.PI * 3 + p.phase))) * mid * section * section;
 }
 function moundAt (p, x, z) {
   const dx = x - p.x, dz = z - p.z, along = dx * p.ux + dz * p.uz;
@@ -444,11 +448,12 @@ function mound (M, x, z, ux, uz, d0, d1, off, width, base, height, surfaceY, sou
 
 /* Мощение и заборы к этому моменту уже построены. Дальняя форма
    сугроба лежит на той же опоре, что ближняя сетка и колесо. */
-export function* finishBanks (groundH, groundReceiver, fences, legacy) {
+export function* finishBanks (groundH, groundReceiver, fences, curbCover, legacy) {
   const cols = [-1, -0.58, 0, 0.58, 1], road = {}, receiver = {};
   let built = 0;
   for (const { M, p } of BANKS) {
     const { x, z, ux, uz, d0, d1, surfaceY, source, bridge } = p;
+    M.flag(bridge ? 255 : 0);
     const floorAt = (px, pz) => {
       const y = bridge ? surfaceY(px, pz) : groundH(px, pz);
       sampleSurface(px, pz, y, road, bridge);
@@ -462,9 +467,11 @@ export function* finishBanks (groundH, groundReceiver, fences, legacy) {
     const points = t => cols.map(q => {
       const along = d0 + (d1 - d0) * t, off = bankAxis(p, t) + bankWidth(p, t) * q;
       const px = x + ux * along - uz * off, pz = z + uz * along + ux * off;
-      const floor = floorAt(px, pz), cover = bridge ? 1 : fences.cover(px, pz);
-      const depth = bankRise(p, t, q) * (road.onRoad && road.bridge === bridge ? road.moundMask : 1) * cover;
-      return [px, floor + depth, pz, floor, depth, receiver.materialId];
+      const floor = floorAt(px, pz), rise = bankRise(p, t, q);
+      const cover = bridge || rise === 0 ? 1 : Math.min(fences.cover(px, pz), curbCover(px, pz));
+      const depth = rise * (road.onRoad && road.bridge === bridge ? road.moundMask : 1) * cover;
+      const colour = receiver.materialId === 1 ? mixHex(ROAD_SNOW, 0xe7eff2, smooth(clamp((depth - 0.035) / 0.17, 0, 1))) : 0xe7eff2;
+      return [px, floor + depth - 0.018 * (1 - Math.min(1, depth / 0.075)), pz, floor, depth, receiver.materialId, colour];
     });
     const tri = (a, b, c) => {
       if (Math.max(a[4], b[4], c[4]) < 0.006) return;
@@ -476,11 +483,11 @@ export function* finishBanks (groundH, groundReceiver, fences, legacy) {
         const span = Math.max(a[3], b[3], c[3]) - Math.min(a[3], b[3], c[3]);
         const mixed = a[5] !== b[5] || a[5] !== c[5];
         if (span > (mixed ? 0.065 : 0.20)) return;
+        if (span > 0.055 && (a[3] + b[3] + c[3]) / 3 - floorAt(cx, cz) > 0.055) return;
       }
-      M.tri(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+      M.tri3(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2], a[6], b[6], c[6]);
     };
     let prev = points(0);
-    M.color('#e7eff2');
     const rows = Math.max(5, Math.min(16, Math.ceil((d1 - d0) / 1.3)));
     for (let i = 1; i <= rows; i++) {
       const next = points(i / rows);
@@ -609,6 +616,7 @@ export function build ({ M, rutM, softM, roads, roadWidth, yOf, groundH, junctio
       }
       if (i + 1 < pts.length) progress += Math.hypot(pts[i + 1][0] - p[0], pts[i + 1][1] - p[1]);
     }
+    const bankGaps = breaks.map(({ at, core }) => [at - core - 2.4, at + core + 2.4]).sort((a, b) => a[0] - b[0]);
     // На большой карте миллиметры разницы глубины исчезают. Снег выше полотна,
     // а каждый видимый слой выше предыдущего на сантиметры.
     const y = yOf(road) + 0.06;
@@ -635,14 +643,14 @@ export function build ({ M, rutM, softM, roads, roadWidth, yOf, groundH, junctio
         return true;
       };
       coverJunction(a); coverJunction(b);
-      const segment = { a, b, ux, uz, len, w, surfaceY, sand, clear, road, rutRoad, count, depth, fade, breaks, total, along,
+      const segment = { a, b, ux, uz, len, w, surfaceY, sand, clear, road, rutRoad, count, depth, fade, breaks, bankGaps, total, along,
         corridor: modes.get(road)?.corridor || String(road.c), heading: Math.atan2(ux, uz) };
       segments.push(segment); registerRoad(segment);
       along += len;
     }
   }
   for (const segment of segments) {
-    const { a, b, ux, uz, len, w, surfaceY, sand, clear, road, rutRoad, count, depth, fade, breaks, total, along } = segment;
+    const { a, b, ux, uz, len, w, surfaceY, sand, clear, road, rutRoad, count, depth, fade, breaks, bankGaps, total, along } = segment;
     roadSheet(rutM, segment);
     if (!clear) {
       rutSegment((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, ux, uz, len, w, count,
@@ -668,18 +676,34 @@ export function build ({ M, rutM, softM, roads, roadWidth, yOf, groundH, junctio
         }
         ST.sand++;
       }
-      // Рыхлый снег на кромке между въездами. Середина полосы свободна.
-      for (let d = 2; d < len - 4; d += 10) for (const side of [-1, 1]) {
-        const cx = a[0] + ux * d, cz = a[1] + uz * d;
-        if (hash(cx, cz, 81 + side) < 0.36) continue;
-        if (breaks.some(b => Math.abs(along + d + 3 - b.at) < b.core + 4)) continue;
-        const end = Math.min(len - 0.4, d + 4 + hash(cx, cz, 83 + side) * 4);
-        const off = side * (w / 2 - 0.33), width = 0.95 + 0.80 * hash(cx, cz, 84 + side);
-        const height = 0.25 + 0.25 * hash(cx, cz, 85 + side);
-        const patch = softPatch(a[0] + ux * (d + end) / 2, a[1] + uz * (d + end) / 2, ux, uz, end - d, off, width, 0.85, surfaceY);
-        mound(softM, a[0], a[1], ux, uz, d, end, off, width, 0.075, height, surfaceY, patch);
-        ST.edges++;
+      // Длинный грейдерный вал идёт между въездами, с короткими просветами.
+      const bankRange = (first, last) => {
+        for (let d = first; d + 4.5 < last;) {
+          const cx = a[0] + ux * d, cz = a[1] + uz * d;
+          const end = Math.min(last, d + 12 + 6 * hash(cx, cz, 83));
+          for (const side of [-1, 1]) {
+            if (hash(cx, cz, 81 + side) < 0.18) continue;
+            // Keep the bank's footprint on the road receiver through the
+            // bend and leave the vertical curb face clear.
+            const off = side * (w / 2 - 0.73), width = 0.95 + 0.25 * hash(cx, cz, 84 + side);
+            const height = 0.25 + 0.23 * hash(cx, cz, 85 + side);
+            const middle = (d + end) / 2;
+            const patch = softPatch(a[0] + ux * middle, a[1] + uz * middle, ux, uz, end - d, off, width, 0.85, surfaceY);
+            mound(softM, a[0], a[1], ux, uz, d, end, off, width, 0.075, height, surfaceY, patch);
+            ST.edges++;
+          }
+          d = end + 1 + 1.4 * hash(cx, cz, 88);
+        }
+      };
+      let start = 1.1;
+      const finish = len - 0.65;
+      for (const [a, b] of bankGaps) {
+        if (b - along <= start) continue;
+        if (a - along >= finish) break;
+        bankRange(start, a - along);
+        start = b - along;
       }
+      bankRange(start, finish);
   }
   return ST;
 }

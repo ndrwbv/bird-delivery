@@ -416,29 +416,55 @@ export function createSnowField ({ initial }) {
     if (!Number.isFinite(x0) || !Number.isFinite(z0) || !Number.isFinite(x1) || !Number.isFinite(z1)) return result;
     const vx = x1 - x0, vz = z1 - z0, distance = Math.hypot(vx, vz);
     if (distance > SNOW.MAX_CONTACT_DISTANCE) return result;
+    const hull = contact.kind === 'hull';
     const width = Math.max(0.08, Math.min(3.5, contact.width || SNOW.TIRE_WIDTH));
-    const length = Math.max(0.08, Math.min(2, contact.length || SNOW.TIRE_LENGTH));
+    const length = Math.max(0.08, Math.min(hull ? 5.2 : 2, contact.length || SNOW.TIRE_LENGTH));
     const dt = Math.max(0, Math.min(0.15, contact.dt || 0));
     if (!dt && !contact.depositMass) return result;
-    const ux = distance > 0.001 ? vx / distance : Math.sin(contact.heading || 0);
-    const uz = distance > 0.001 ? vz / distance : Math.cos(contact.heading || 0), nx = uz, nz = -ux;
-    const half = width / 2, pad = Math.max(width, length) * 0.5 + DX;
-    const minX = Math.floor((Math.min(x0, x1) - pad) / DX), maxX = Math.floor((Math.max(x0, x1) + pad) / DX);
-    const minZ = Math.floor((Math.min(z0, z1) - pad) / DX), maxZ = Math.floor((Math.max(z0, z1) + pad) / DX);
+    const ux = !hull && distance > 0.001 ? vx / distance : Math.sin(contact.heading || 0);
+    const uz = !hull && distance > 0.001 ? vz / distance : Math.cos(contact.heading || 0), nx = uz, nz = -ux;
+    const half = width / 2, halfLength = length / 2;
+    const pad = Math.max(half, halfLength) + DX;
+    const padX = hull ? Math.abs(ux) * halfLength + Math.abs(nx) * half + DX : pad;
+    const padZ = hull ? Math.abs(uz) * halfLength + Math.abs(nz) * half + DX : pad;
+    const minX = Math.floor((Math.min(x0, x1) - padX) / DX), maxX = Math.floor((Math.max(x0, x1) + padX) / DX);
+    const minZ = Math.floor((Math.min(z0, z1) - padZ) / DX), maxZ = Math.floor((Math.max(z0, z1) + padZ) / DX);
     if ((maxX - minX + 1) * (maxZ - minZ + 1) > SNOW.MAX_CONTACT_CELLS) { stats.overflow++; return result; }
-    const load = clamp01(contact.load01 ?? 1), foot = contact.kind === 'foot';
-    const target = foot ? SNOW.FOOT_TARGET : SNOW.WHEEL_TARGET;
+    const load = clamp01(contact.load01 ?? 1), foot = contact.kind === 'foot', object = contact.kind === 'object';
+    const target = foot ? SNOW.FOOT_TARGET : object ? 0.72 : SNOW.WHEEL_TARGET;
     const slip = Math.min(3, Math.abs(contact.slipLong || 0) + Math.abs(contact.slipSide || 0));
     const dwell = dt * Math.min(1, (length + DX) / Math.max(length + DX, distance));
     stats.contacts++; stampId++; workTiles.length = 0;
     let availablePickup = Math.max(0, contact.pickupCapacity || 0) / season;
     let deposit = Math.max(0, contact.depositMass || 0) / season;
-    const minDot = -length * 0.5, maxDot = distance + length * 0.5;
+    const minDot = -halfLength, maxDot = distance + halfLength;
+    const foreMotion = vx * ux + vz * uz, sideMotion = vx * nx + vz * nz;
+    const firstSole = contact.soleYFrom ?? contact.soleY;
     for (let gz = minZ; gz <= maxZ; gz++) for (let gx = minX; gx <= maxX; gx++) {
       const x = (gx + 0.5) * DX, z = (gz + 0.5) * DX;
       const along = (x - x0) * ux + (z - z0) * uz, across = (x - x0) * nx + (z - z0) * nz;
-      const weight = clamp01((half + DX / 2 - Math.abs(across)) / DX) *
-        clamp01((Math.min(along - minDot, maxDot - along) + DX / 2) / DX);
+      let soleY = contact.soleY, weight;
+      if (hull) {
+        // Intersect the swept rectangle in car space, including a sideways skid.
+        let first = 0, last = 1;
+        if (Math.abs(foreMotion) > 1e-6) {
+          const t = (along + halfLength + DX / 2) / foreMotion, u = (along - halfLength - DX / 2) / foreMotion;
+          first = Math.max(first, Math.min(t, u)); last = Math.min(last, Math.max(t, u));
+        } else if (Math.abs(along) > halfLength + DX / 2) continue;
+        if (Math.abs(sideMotion) > 1e-6) {
+          const t = (across + half + DX / 2) / sideMotion, u = (across - half - DX / 2) / sideMotion;
+          first = Math.max(first, Math.min(t, u)); last = Math.min(last, Math.max(t, u));
+        } else if (Math.abs(across) > half + DX / 2) continue;
+        if (first > last) continue;
+        const t = (first + last) * 0.5, fore = along - foreMotion * t, side = across - sideMotion * t;
+        weight = clamp01((half + DX / 2 - Math.abs(side)) / DX) *
+          clamp01((halfLength + DX / 2 - Math.abs(fore)) / DX);
+        const bumper = clamp01((Math.abs(fore) - halfLength + 0.65) / 0.5);
+        soleY = firstSole + (contact.soleY - firstSole) * t + fore * contact.pitch + side * contact.roll + 0.09 * bumper;
+      } else {
+        weight = clamp01((half + DX / 2 - Math.abs(across)) / DX) *
+          clamp01((Math.min(along - minDot, maxDot - along) + DX / 2) / DX);
+      }
       if (weight <= 0) continue;
       initSample(id, x, z, base);
       if (!base.valid || !base.deformable) continue;
@@ -447,7 +473,14 @@ export function createSnowField ({ initial }) {
       if (!tile || !tile.flags[i]) continue;
       tile.last = ++serial;
       const old = tile.mass[i], oldC = tile.c[i] / Q, icy = tile.ice[i] / B;
-      const nextC = Math.max(oldC, oldC + (target - oldC) * (1 - Math.exp(-SNOW.COMPACT_RATE * load * dwell * weight)) * (1 - icy * 0.9));
+      const preHeight = old * season / density(oldC);
+      if (Number.isFinite(soleY)) {
+        const penetration = base.baseY + preHeight - soleY;
+        if (penetration <= 0.008) continue;
+        weight *= Math.min(1, penetration / 0.12);
+      }
+      const capC = hull ? Math.min(target, compactionOf(old * season / Math.max(0.006, soleY - base.baseY))) : target;
+      const nextC = Math.max(oldC, oldC + (capC - oldC) * (1 - Math.exp(-SNOW.COMPACT_RATE * load * dwell * weight)) * (1 - icy * 0.9));
       pending(tile, i);
       if (Math.round(nextC * Q) !== tile.c[i]) {
         tile.c[i] = Math.round(nextC * Q); tile.flags[i] |= CELL_COMPACTED; result.changed = true;
@@ -463,21 +496,26 @@ export function createSnowField ({ initial }) {
       // Bearing pressure compacts first. Only the remaining loose part moves;
       // an arbitrary low visual wheel position cannot excavate the solid base.
       const bed = (base.materialId === 0 ? 0.06 : base.materialId === 2 ? 0.025 : 0) * season;
-      const desired = Math.max(bed, Number.isFinite(contact.soleY) ? Math.max(0.006, contact.soleY - base.baseY) : height * 0.65);
+      const desired = Math.max(bed, Number.isFinite(soleY) ? Math.max(0.006, soleY - base.baseY) : height * 0.65);
       const excess = Math.max(0, old - desired / Math.max(season, 0.001) * density(nextC));
-      const motion = foot ? 1 : Math.min(1, distance / DX + slip);
+      const motion = foot || object ? 1 : Math.min(1, distance / DX + slip);
       const moved = Math.min(excess, old * (1 - nextC) * (1 - icy) * (1 - Math.exp(-(foot ? 3 : 12 + slip * 9) * dwell * weight * load * motion)));
       if (moved <= 1e-6) continue;
       let totalWeight = 0, count = 0, totalCapacity = 0;
       for (let slot = 0; slot < 6; slot++) {
         const side = slot < 2 ? -1 : 1, ring = slot % 2;
         const sideways = slot < 4, tail = (contact.slipLong || 0) > 0.3;
-        // Two receiving cells per bank keep ridges broad. A slipping tyre
-        // also throws material behind it; gentle rolling pushes it forward.
-        const rx = sideways ? x + nx * side * (half + SNOW.TRANSFER_STEP + ring * DX) :
-          x + ux * (tail ? -1 : 1) * (length * 0.5 + SNOW.TRANSFER_STEP) + nx * (ring ? 1 : -1) * width * 0.25;
-        const rz = sideways ? z + nz * side * (half + SNOW.TRANSFER_STEP + ring * DX) :
-          z + uz * (tail ? -1 : 1) * (length * 0.5 + SNOW.TRANSFER_STEP) + nz * (ring ? 1 : -1) * width * 0.25;
+        // Put displaced snow just outside the swept hull, not one car
+        // length beyond each individual donor cell.
+        const direction = hull ? (foreMotion < 0 ? -1 : 1) : tail ? -1 : 1;
+        let sideOffset = sideways ? side * (half + SNOW.TRANSFER_STEP + ring * DX) : (ring ? 1 : -1) * width * 0.25;
+        let foreOffset = sideways ? 0 : direction * (halfLength + SNOW.TRANSFER_STEP);
+        if (hull) {
+          if (sideways) sideOffset += (sideMotion * side > 0 ? sideMotion : 0) - across;
+          else foreOffset += (foreMotion * direction > 0 ? foreMotion : 0) - along;
+        }
+        const rx = x + nx * sideOffset + ux * foreOffset;
+        const rz = z + nz * sideOffset + uz * foreOffset;
         initSample(id, rx, rz, pristine);
         if (!pristine.valid || !pristine.deformable || Math.abs(pristine.baseY - base.baseY) > SNOW.BARRIER_HEIGHT) continue;
         cell(id, Math.floor(rx / DX), Math.floor(rz / DX), true, lookup);
@@ -539,11 +577,17 @@ export function createSnowField ({ initial }) {
     // part receives its fraction of elapsed time and the remaining tyre store.
     const parts = Math.min(8, Math.ceil(box / SNOW.MAX_CONTACT_CELLS) + 1);
     Object.assign(splitContact, contact); splitContact.from = splitFrom; splitContact.to = splitTo;
+    splitContact.soleY = contact.soleY; splitContact.soleYFrom = contact.soleYFrom;
     splitResult.changed = false;
     splitResult.movedMass = splitResult.compressedMass = splitResult.pickedUp = splitResult.deposited = 0;
     for (let part = 0; part < parts; part++) {
       splitFrom.x = contact.from.x + dx * part / parts; splitFrom.z = contact.from.z + dz * part / parts;
       splitTo.x = contact.from.x + dx * (part + 1) / parts; splitTo.z = contact.from.z + dz * (part + 1) / parts;
+      if (contact.kind === 'hull') {
+        const y = contact.soleYFrom ?? contact.soleY;
+        splitContact.soleYFrom = y + (contact.soleY - y) * part / parts;
+        splitContact.soleY = y + (contact.soleY - y) * (part + 1) / parts;
+      }
       splitContact.dt = (contact.dt || 0) / parts;
       splitContact.pickupCapacity = Math.max(0, (contact.pickupCapacity || 0) - splitResult.pickedUp);
       splitContact.depositMass = (contact.depositMass || 0) / parts;
