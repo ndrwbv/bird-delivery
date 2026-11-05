@@ -68,16 +68,16 @@ const hash = (x, z, k = 0) => { const s = Math.sin(x * 12.9898 + z * 78.233 + k 
 
 let A = null;
 const LOTS = [];
-let SNOW_MESH = null;
+let SNOW_MESH = null, snowFloor;
 const SNOW_TOP = new Map();
 // Same rounded, terrain-following profile as the distant drift mesh.
-export function snowTop(x, z) {
+export function snowTop(x, z, receiverY) {
   let top = -Infinity;
   for (const d of SNOW_TOP.get(Math.floor(x / 16) + ',' + Math.floor(z / 16)) || []) {
     if (Math.abs(x - d.x) > d.extent || Math.abs(z - d.z) > d.extent) continue;
     const dx = x - d.x, dz = z - d.z;
     const r = Math.hypot((dx * d.ux + dz * d.uz) / d.ra, (-dx * d.uz + dz * d.ux) / d.rb);
-    if (r < 1) top = Math.max(top, A.groundH(x, z) + 0.052 + d.h * bankProfile(r));
+    if (r < 1) top = Math.max(top, (receiverY ??= snowFloor(x, z)) + 0.002 + d.h * bankProfile(r));
   }
   return top;
 }
@@ -164,7 +164,8 @@ function frame (s) {
 
 /* На незаасфальтированных пустырях снег собирается неровными островками.
    Всё в одном меше; летние площадки и ларьки остаются без сугробов. */
-function buildSnowDrifts () {
+export function buildSnowDrifts (floor, fences) {
+  snowFloor = floor;
   if (SNOW_MESH) { SNOW_MESH.removeFromParent(); SNOW_MESH.geometry.dispose(); SNOW_MESH.material.dispose(); }
   const positions = [], colors = [], indices = [];
   const vertex = (x, y, z, rgb) => { positions.push(x, y, z); colors.push(rgb >> 16, (rgb >> 8) & 255, rgb & 255); };
@@ -179,6 +180,7 @@ function buildSnowDrifts () {
       const rb = 1.3 + hash(s.x, s.z, 214 + k * 5) * 1.2;
       const h = 0.27 + hash(s.x, s.z, 215 + k * 5) * 0.38;
       const [cx, cz] = c.P(a, b), extent = Math.max(ra, rb);
+      if (!fences.fits(cx, cz, extent)) continue;
       const d = { x: cx, z: cz, ux: s.ux, uz: s.uz, ra, rb, h, extent };
       for (let x = Math.floor((cx - extent) / 16); x <= Math.floor((cx + extent) / 16); x++)
         for (let z = Math.floor((cz - extent) / 16); z <= Math.floor((cz + extent) / 16); z++) {
@@ -186,11 +188,11 @@ function buildSnowDrifts () {
           if (list) list.push(d); else SNOW_TOP.set(key, [d]);
         }
       const first = positions.length / 3, sides = 12, radii = [0.46, 0.76, 1];
-      vertex(cx, A.groundH(cx, cz) + 0.052 + h, cz, 0xe7eff0);
+      vertex(cx, snowFloor(cx, cz) + 0.002 + h, cz, 0xe7eff0);
       for (const radius of radii) for (let i = 0; i < sides; i++) {
         const t = i / sides * Math.PI * 2;
         const [x, z] = c.P(a + Math.cos(t) * ra * radius, b + Math.sin(t) * rb * radius);
-        vertex(x, A.groundH(x, z) + 0.052 + h * bankProfile(radius), z, 0xe7eff0);
+        vertex(x, snowFloor(x, z) + 0.002 + h * bankProfile(radius), z, 0xe7eff0);
       }
       for (let i = 0; i < sides; i++) {
         const j = (i + 1) % sides;
@@ -644,7 +646,6 @@ export function* build (api) {
     A.scene.add(m);
   }
   STATS.lots = LOTS.length; STATS.kinds = used;
-  buildSnowDrifts();
   STATS.ms = Math.round(performance.now() - t0);
 }
 

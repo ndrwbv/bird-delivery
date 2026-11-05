@@ -245,6 +245,7 @@ import * as OSKM from './osk.js';                // экранная клави�
 import * as RW from './roadwear.js';            // асфальт разный: свежий, ровный, в заплатках, старый, разбитый (roadwear.js)
 import * as WINROAD from './winterroads.js';     // зимняя дорога: местами песок, колея, сгребённый снег и рыхлые участки
 import * as SNOW from './snow/index.js';
+import { createSnowFences } from './snow/fences.js';
 import * as SNOWPRINT from './snowimprint.js';   // примятый снег под колёсами вне дороги
 import * as LAWN from './lawn.js';              // пятна на газоне — в краске земли (lawn.js)
 import * as SHORT from './shortcuts.js';        // тропинки-срезки через газоны дворов (shortcuts.js, 2г9)
@@ -1981,6 +1982,8 @@ WINS.quality(GFX.winQ());
 const LITM = Mesher({ alpha: !NO_LITJ || !NO_SMJ, index: true, keepFront: true, mainRGB: true });   // всё материальное: земля, дороги, дома; с 17.10.2026 и склейки реквизита (LIT) — признак «реквизит» в четвёртом байте цвета
 const WINM = Mesher({ index: true });             // зимний слой дороги; скрыт вне снега
 const WINRUTM = Mesher({ index: true });          // рельеф колеи рисуется поверх снежной основы
+const SNOW_FENCES = createSnowFences();
+const SNOW_FLOOR_ROAD = {}, SNOW_FLOOR_RECEIVER = {};
 const WINSOFTM = Mesher({ index: true, keepFront: true }); // рыхлые сугробы оседают под колёсами
 const FLATM = Mesher({ alpha: true, index: true, mainRGB: true });   // разметка, окна, вывески — света не ловят; с 17.10.2026 и плафоны (LAMPH) — признак «светится» в четвёртом байте цвета
 const GROUND_M = RLAND.ON ? Mesher({ alpha: true, index: true, keepFront: true, mainRGB: true, groundOnly: true }) : LITM;
@@ -6174,7 +6177,7 @@ function buildCity () {
   if (!INTRO) tm('yardcurbs', () => buildCurbs());   // бордюры у дорожек и проездов дворов — после карманов парковки и лабиринта (curbs.js); ?nocurbs — без них
   if (!INTRO) tm('yarddecor', () => DECOR.build({ ...ymApi(), LITM, groundHex, mazeBlocks: (x, z, r) => YMAZE.blocks(x, z, r), mazeAdd: YMAZE.addObj, groves: () => YMAZE.DEBUG.OBJ.filter(o => o.kind === 'grove'),
     curbNear: CURBS.near, greenHex: g => GREEN_HEX[g.k] || '#95c579', greenY: g => 0.04 + flatRank(GREEN_RANK, GREEN_HEX[g.k] || '#95c579', 5) * 0.0007 }));   // палисадники, грядки, круги у деревьев, холмики — после бордюров, до сугробов и smashBuild (yarddecor.js); ?nodecor — без них
-  tm('seasonyard', SEAS.seasonYard);
+  tm('seasonyard', () => { SNOW_FENCES.build(SMASH); return SEAS.seasonYard(); });
   if (!INTRO) tm('courts', () => COURTS.build(courtsApi()));   // теннисные и падел-корты — после горок дворов, до smashBuild (courts.js); ?nocourts — без них
   if (!INTRO && !new URLSearchParams(location.search).has('nojumps')) tm('jumps', () => JUMPS.build(jumpApi()));   // большие трамплины у низких крыш — после дворов и кортов, до smashBuild (jumps.js); ?nojumps — без них
   if (!INTRO) tm('yardfill', () => YFILL.build(yfApi()));   // дворы без пустых мест — после кортов и трамплинов, до smashBuild и сугробов (yardfill.js); ?nofill — без них
@@ -6269,9 +6272,11 @@ function buildCity () {
   const groups = [];
   const winterGroup = WINM.mesh(FSH.mat(SEAS.winterRoadMat(true)));
   const winterRutGroup = WINRUTM.mesh(FSH.mat(SEAS.winterRoadMat(true)));
-  const winterSoftGroup = WINSOFTM.mesh(FSH.mat(SEAS.winterRoadMat()));
+  const winterSoftGroup = new THREE.Group();
+  const winterSoftMat = FSH.mat(SEAS.winterRoadMat());
+  scene.add(winterSoftGroup); groups.push(winterSoftGroup);
   for (const mesh of winterRutGroup.children) mesh.renderOrder = 1;
-  for (const group of [winterGroup, winterRutGroup, winterSoftGroup]) {
+  for (const group of [winterGroup, winterRutGroup]) {
     WINROAD.addSandAttribute(group, THREE);
     if (group.children.length) { groups.push(group); scene.add(group); }
   }
@@ -6359,6 +6364,13 @@ function buildCity () {
   BUILD_T.mesh = Math.round(performance.now() - tq);
   // шагами (latebuild.js): общие вершины клеток (ixCell, Mesher prep) — пачками по ~150 тыс. вершин, на Деке ~35—40 мс каждая
   LATE.add('mesh', function* () {
+    SNOW_FENCES.build(SMASH);
+    yield* SEAS.fitDrifts();
+    WASTE.buildSnowDrifts(snowDriftFloor, SNOW_FENCES);
+    yield* WINROAD.finishBanks(snowGroundH, snowGroundReceiver, SNOW_FENCES, !SNOW.enabled);
+    const banks = WINSOFTM.mesh(winterSoftMat);
+    for (const mesh of banks.children.slice()) winterSoftGroup.add(mesh);
+    yield 'snow banks';
     let t0 = performance.now(), ms = 0;
     // перенос в клетки — по шагу на список (на Деке все четыре с первой пачкой клеток были одним шагом 0,2—0,25 с; кусок без
     // зерна и случайных чисел — шаги можно двигать)
@@ -17518,7 +17530,7 @@ function startPose () {
 
 /* ─────────────── сборка мира ─────────────── */
 /* времена года: что им нужно от игры (ENV, дождь и небо заводятся ниже — геттерами) */
-SEAS.initSeasons({ snowOwns: SNOW.ownsSurface, THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds,
+SEAS.initSeasons({ snowOwns: SNOW.ownsSurface, snowFloor: snowDriftFloor, snowFences: SNOW_FENCES, THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds,
   put, smashAdd, SMASH, SMASH_MAT, LAMP_SPOTS, ZEBRAS, NODE_IDX, nodeDeg, makeHuman, dropMesh, gibHuman, toast, Snd, CAR_L, CAR_W, isPlaying, sayBubble,
   obb, SOLIDS, PARKED, get COURIER_SLOTS () { return COURIER_SLOTS; },
   get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get rainLines () { return rainLines; }, get hemi () { return hemi; } });
@@ -17873,7 +17885,7 @@ const TRAFFIC_N = 24;
 LATE.add('traffic', () => spawnTraffic(INTRO ? 22 : Math.min(TRAFFIC_N, trafficWant())));
 if (!INTRO) LATE.add('spots', function* () { yield* STARTUP.steps('addresses.buildSpots', buildSpots()); if(ADDRESS_CATALOG)STARTUP.work('addresses.sealCatalog',()=>ADDRESS_CATALOG.sealSpots()); if(ADDRESS_PREPARED17)STARTUP.work('addresses.reconcileSeal',()=>ADDRESS_PREPARED17.sealSpots()); yield 'spots'; STARTUP.work('addresses.buildCollect', buildCollect); });
 /* погода смены (weather.js): сугробы снежной зимы — после адресов, чтобы их не завалить */
-LATE.add('weather', () => WTH.init({ snowOwns: SNOW.ownsSurface, THREE, scene, cam, renderer, Store, MAP, CITY, V, S, SPOTS, ZEBRAS, Snd, toast, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds, jumpBlocks: JUMPS.blocks,
+LATE.add('weather', () => WTH.init({ snowOwns: SNOW.ownsSurface, snowFences: SNOW_FENCES, THREE, scene, cam, renderer, Store, MAP, CITY, V, S, SPOTS, ZEBRAS, Snd, toast, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds, jumpBlocks: JUMPS.blocks,
   makeHuman, dropMesh, gibHuman, CAR_L, CAR_W, isPlaying, intro: INTRO, PIZZERIAS, get PIZZA () { return PIZZA; },
   ARCHES, realAddress, puff, quick: () => QR.on(),   // ураган (hurricane.js): дома с аркой не уносит, адрес в подписи, пыль, быстрый заезд не сохраняет
   get ENV () { return ENV; }, get sun () { return sun; }, get hemi () { return hemi; }, get amb () { return amb; }, get rainLines () { return rainLines; } }));   // струи — ливень гуще (weather.js)
@@ -18747,17 +18759,44 @@ const LIFE_API = {
 // следы колёс (tracks.js): меш — сейчас, до renderer.compile, чтобы шейдер собрался под экраном загрузки
 TRK.init({ THREE, scene, V, IN, CITY, groundH, surfaceAt, iceY: ICEM.iceY, curbAt, inPoly, nearestRoad, car: () => car, pizzerias: () => (PIZZERIAS.length ? PIZZERIAS : [PIZZA]) });
 DRIFTM.init({ groundAt: TRK.groundAt, iceY: ICEM.iceY });
-SNOW.init({ scene, V, IN,
-  groundH: (x, z) => { const h = terrainH(x, z); return RLAND.onLand(x, z) ? h + RLAND.topOffset(x, z, h) : groundH(x, z); },
-  curbAt, inHouse, inBounds, bridges: BRIDGES, deckAt, roofs: ROOFM,
-  roadSample: WINROAD.sampleSurface, pavedLift: TRK.pavedLift, onPave: PAVE.onPave,
-  isRaisedLand: RLAND.onLand,
-  pavedY(x, z) {
-    if (!(RLAND.ST.supportReady || RLAND.ST.built)) return NaN;
+function snowGroundH(x, z) {
+  const h = terrainH(x, z);
+  return RLAND.onLand(x, z) ? h + RLAND.topOffset(x, z, h) : h;
+}
+function snowGroundReceiver(x, z, ground, road, out) {
+  const raised = RLAND.onLand(x, z);
+  let paving = NaN;
+  if (!raised && (RLAND.ST.supportReady || RLAND.ST.built)) {
     const lift = RLAND.cover.height(x, z);
-    return Number.isFinite(lift) && lift < 0.49 ? terrainH(x, z) + lift : NaN;
-  },
-  nearCurb: (x,z) => RLAND.ON && (RLAND.boundaryAt(x,z,1,0) || RLAND.boundaryAt(x,z,-1,0) || RLAND.boundaryAt(x,z,0,1) || RLAND.boundaryAt(x,z,0,-1)),
+    if (Number.isFinite(lift) && lift < 0.49) paving = terrainH(x, z) + lift;
+  }
+  if (!raised && road.onRoad && !road.bridge) {
+    out.baseY = Number.isFinite(paving) ? paving : road.baseY;
+    out.materialId = 1;
+  } else if (!raised) {
+    if (Number.isFinite(paving)) {
+      out.baseY = paving;
+      out.materialId = 2;
+    } else {
+      const pave = TRK.pavedLift(x, z), curb = curbAt(x, z);
+      if (pave >= 0 || curb > 0 || PAVE.onPave(x, z)) {
+        out.baseY = ground + Math.max(0, pave, curb);
+        out.materialId = 2;
+      }
+    }
+  }
+  return out.baseY;
+}
+function snowDriftFloor(x, z) {
+  const ground = snowGroundH(x, z);
+  WINROAD.sampleSurface(x, z, ground, SNOW_FLOOR_ROAD, false);
+  SNOW_FLOOR_RECEIVER.baseY = ground;
+  return snowGroundReceiver(x, z, ground, SNOW_FLOOR_ROAD, SNOW_FLOOR_RECEIVER);
+}
+SNOW.init({ scene, V, IN,
+  groundH: snowGroundH, groundReceiver: snowGroundReceiver, fences: SNOW_FENCES,
+  inHouse, inBounds, bridges: BRIDGES, deckAt, roofs: ROOFM,
+  roadSample: WINROAD.sampleSurface, bankDepth: WINROAD.bankDepth,
   waterAt: STREAMS.under, iceY: ICEM.iceY, driftTop: SEAS.driftTop, lotSnowTop: WASTE.snowTop,
   car: () => car, traffic: () => TACT, walkers: walkersAll,
   benches: BENCHES, canopies: JUNK.DEBUG.STOPS, carSnow: () => DIRT.ST.snow,
@@ -19337,6 +19376,8 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('winterdebug
     snowAmt: SEAS.snowAmt(), car: [V.x, V.z, V.h],
     underCar: WINROAD.softUnderCar(V.x, V.z, V.h, SEAS.snowAmt()), imprints: SNOWPRINT.ST.segments,
     vacantSnow: WASTE.DEBUG.STATS.snowdrifts,
+    playerSnowContacts: SNOW.ST.playerContacts, changedSnowContacts: SNOW.DEBUG.field?.stats.changedContacts,
+    snowTextureUpdates: SNOW.DEBUG.render?.changedLayers,
     sandUnderCar: WINROAD.sandUnderCar(V.x, V.z, V.h, SEAS.snowAmt()), snowUnderCar: WINROAD.snowAt(V.x, V.z),
     rutUnderCar: WINROAD.rutAt(V.x, V.z, V.h, SEAS.snowAmt()) }); }, 350);
 if (window.__dlv) window.__dlv.FLOWL = FL.DEBUG;   // поток: перестроения, уступи, кольца, подрезка (flowlane.js): ST, cut()

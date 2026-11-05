@@ -158,9 +158,13 @@ varying vec3 vSnowWorld;
       if (snowCoords.z >= 0.0 && snowCover > 0.01) {
         snowChange = texture(uSnowDeform, snowCoords).rg;
         vec3 dx = vec3(${DEFORM_TEXEL.toFixed(9)}, 0.0, 0.0), dz = dx.yxz;
-        float sx = texture(uSnowDeform, snowCoords + dx).r - texture(uSnowDeform, snowCoords - dx).r;
-        float sz = texture(uSnowDeform, snowCoords + dz).r - texture(uSnowDeform, snowCoords - dz).r;
-        objectNormal.xz -= vec2(sx, sz) * (4.0 * uSnowSeason * objectNormal.y);
+        float east = texture(uSnowDeform, snowCoords + dx).r, west = texture(uSnowDeform, snowCoords - dx).r;
+        float north = texture(uSnowDeform, snowCoords + dz).r, south = texture(uSnowDeform, snowCoords - dz).r;
+        // A narrow tyre can pass between mesh vertices. Reuse the normal
+        // taps so the wheel's groove is visible on the stationary grid.
+        float dent = min(min(east, west), min(north, south));
+        snowChange.r += 0.45 * min(0.0, min(dent, 0.0) - snowChange.r) * step(dent, -0.01);
+        objectNormal.xz -= vec2(east - west, north - south) * (4.0 * uSnowSeason * objectNormal.y);
         objectNormal = normalize(objectNormal);
       }`);
     shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
@@ -171,7 +175,7 @@ varying vec3 vSnowWorld;
       #include <project_vertex>
       vSnowDepth = localDepth;
       vSnowCover = snowCover;
-      vSnowCompacted = snowChange.g * uSnowSeason;
+      vSnowCompacted = max(snowChange.g, -snowChange.r) * uSnowSeason;
       vSnowWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
     shader.fragmentShader = LEGACY_SNOW_GLSL + `varying float vSnowCover;
 varying float vSnowDepth;
@@ -191,7 +195,7 @@ float snGrain(vec2 p) {
       if (vSnowDepth <= 0.004 || vSnowCover < 0.05) discard;
       float snowNear = 1.0 - smoothstep(12.0, 35.0, length(vSnowWorld.xz - cameraPosition.xz));
       float snowGrain = snGrain(floor(vSnowWorld.xz * 35.0));
-      diffuseColor.rgb *= (0.985 + (snowGrain - 0.5) * 0.018 * snowNear) * (1.0 - min(0.14, vSnowCompacted * 0.36));`);
+      diffuseColor.rgb *= (0.985 + (snowGrain - 0.5) * 0.018 * snowNear) * (1.0 - min(0.18, vSnowCompacted * 0.72));`);
   };
   m.customProgramCacheKey = () => 'living-snow-displacement-1-' + coarse;
   return m;
@@ -278,7 +282,7 @@ function createSnowLayer ({ scene, field, surfaces, baseline, deform, coarse = f
     const tile = { id, tx, tz, key: tileKey(id, tx, tz), page, slot, stale: false, min: Infinity, max: -Infinity,
       restNormal: new Float32Array(VERTS * 2), base: new Float32Array(VERTS), envelope: new Float32Array(VERTS),
       depth: new Float32Array(VERTS), cover: new Uint8Array(VERTS), colours: new Uint8Array(VERTS * 3),
-      valid: new Uint8Array(VERTS), owner: new Uint8Array(QUADS * 4), triangles: 0 };
+      valid: new Uint8Array(VERTS), material: new Uint8Array(VERTS), fence: new Uint8Array(VERTS), owner: new Uint8Array(QUADS * 4), triangles: 0 };
     pending = { tile, original, row: 0, workMs: 0 };
   }
 
@@ -291,12 +295,14 @@ function createSnowLayer ({ scene, field, surfaces, baseline, deform, coarse = f
       const depth = valid && sample.deformable ? sample.thickness : 0;
       tile.valid[k] = valid ? 1 : 0;
       tile.base[k] = valid ? sample.baseY : 0;
-      if (valid) baseline.height(id, x, z, 1, sample.baseY + depth, baselineNormal);
-      tile.restNormal[k * 2] = valid && sample.deformable ? baselineNormal.x : 0;
-      tile.restNormal[k * 2 + 1] = valid && sample.deformable ? baselineNormal.z : 0;
-      tile.depth[k] = valid && sample.deformable ? (Number.isFinite(baselineNormal.depth) ? baselineNormal.depth : depth) : 0;
-      const cover = Number.isFinite(baselineNormal.cover) ? baselineNormal.cover : sample.visualCoverage;
-      tile.cover[k] = valid && sample.deformable ? Math.round(255 * (cover ?? 1)) : 0;
+      tile.material[k] = sample.materialId;
+      tile.fence[k] = Math.round(255 * sample.fenceCover);
+      if (depth > 0) baseline.height(id, x, z, 1, sample.baseY + depth, baselineNormal);
+      tile.restNormal[k * 2] = depth > 0 ? baselineNormal.x : 0;
+      tile.restNormal[k * 2 + 1] = depth > 0 ? baselineNormal.z : 0;
+      const rest = Number.isFinite(baselineNormal.depth) ? baselineNormal.depth : depth;
+      tile.depth[k] = depth > 0 ? Math.min(rest, depth + 0.03) : 0;
+      tile.cover[k] = depth > 0 ? Math.round(255 * sample.visualCoverage) : 0;
       tile.envelope[k] = valid ? Math.max(sample.legacyTopY || sample.baseY + 0.12, sample.baseY + 0.4) : 0;
       const compact = clamp(sample.compaction || 0, 0, 1), wet = clamp(sample.wetness || 0, 0, 1);
       const dirt = clamp((sample.dirt || 0) * 0.6 + (sample.sand || 0) * 0.16, 0, 0.6);
@@ -348,27 +354,31 @@ function createSnowLayer ({ scene, field, surfaces, baseline, deform, coarse = f
     }
     const elements = new Uint16Array(INDICES);
     let count = 0;
-    const support = (a, b) => tile.valid[a] && tile.valid[b] && Math.abs(tile.base[a] - tile.base[b]) <= 0.24;
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-      const k = j * SIDE + i, q = j * N + i, a = offset + k, b = a + 1, c = a + SIDE, d = c + 1;
-      const visible = tile.cover[k] || tile.cover[k + 1] || tile.cover[k + SIDE] || tile.cover[k + SIDE + 1];
-      const ok = visible && support(k, k + 1) && support(k, k + SIDE) && support(k + 1, k + SIDE + 1) && support(k + SIDE, k + SIDE + 1);
-      if (!ok) continue;
+      const k = j * SIDE + i, q = j * N + i, kb = k + 1, kc = k + SIDE, kd = kc + 1;
+      if (!(tile.cover[k] || tile.cover[kb] || tile.cover[kc] || tile.cover[kd])) continue;
+      if (!(tile.valid[k] && tile.valid[kb] && tile.valid[kc] && tile.valid[kd])) continue;
+      // Both diagonals must stay on one receiver. Crossing a curb can
+      // otherwise leave a wedge of snow suspended above the lower side.
+      const base = Math.min(tile.base[k], tile.base[kb], tile.base[kc], tile.base[kd]);
+      const high = Math.max(tile.base[k], tile.base[kb], tile.base[kc], tile.base[kd]);
+      const material = tile.material[k];
+      const mixed = material !== tile.material[kb] || material !== tile.material[kc] || material !== tile.material[kd];
+      if (high - base > (mixed ? 0.065 : 0.20)) continue;
+      if (!tile.fence[k] || !tile.fence[kb] || !tile.fence[kc] || !tile.fence[kd]) continue;
+      const a = offset + k, b = offset + kb, c = offset + kc, d = offset + kd;
       elements[count++] = a; elements[count++] = c; elements[count++] = b;
       elements[count++] = b; elements[count++] = c; elements[count++] = d;
-      // A feathered edge may render only part of this cell. Keep the
-      // rounded distant bank underneath instead of cutting a square hole.
-      if (Math.min(tile.cover[k], tile.cover[k + 1], tile.cover[k + SIDE], tile.cover[k + SIDE + 1]) <= 13
-        || Math.min(tile.depth[k], tile.depth[k + 1], tile.depth[k + SIDE], tile.depth[k + SIDE + 1]) <= 0.004) continue;
-      const base = Math.min(tile.base[k], tile.base[k + 1], tile.base[k + SIDE], tile.base[k + SIDE + 1]);
-      const top = Math.max(tile.envelope[k], tile.envelope[k + 1], tile.envelope[k + SIDE], tile.envelope[k + SIDE + 1]);
+      if (Math.min(tile.cover[k], tile.cover[kb], tile.cover[kc], tile.cover[kd]) <= 13
+        || Math.min(tile.depth[k], tile.depth[kb], tile.depth[kc], tile.depth[kd]) <= 0.004) continue;
+      const top = Math.max(tile.envelope[k], tile.envelope[kb], tile.envelope[kc], tile.envelope[kd]);
       const packed = clamp(Math.round((base + 512) * 32), 0, 65535), at = q * 4;
       tile.owner[at] = packed >> 8; tile.owner[at + 1] = packed & 255;
       tile.owner[at + 2] = clamp(Math.ceil((top - base) * 16), 0, 255); tile.owner[at + 3] = 255;
     }
     tile.elements = elements.subarray(0, count);
     tile.triangles = count / 3;
-    tile.restNormal = tile.base = tile.envelope = tile.depth = tile.cover = tile.colours = tile.valid = null;
+    tile.restNormal = tile.base = tile.envelope = tile.depth = tile.cover = tile.colours = tile.valid = tile.material = tile.fence = null;
     changed(page.p, offset * 3, VERTS * 3); changed(page.n, offset * 3, VERTS * 3);
     changed(page.c, offset * 3, VERTS * 3); changed(coverage, offset, VERTS);
     changed(page.h, offset, VERTS); changed(page.support, offset * 2, VERTS * 2);

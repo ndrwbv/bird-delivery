@@ -6,6 +6,7 @@ import { SNOW, clamp01, density, compactionOf, seasonFactor } from './config.js'
 const N = SNOW.CELLS, COUNT = N * N, DX = SNOW.CELL, AREA = DX * DX;
 const AN = SNOW.ARCHIVE_CELLS, AS = N / AN, ACOUNT = AN * AN;
 const Q = 65535, B = 255;
+const CELL_READY = 1, CELL_COMPACTED = 2, CELL_DEFORMED = 4;
 const tileCode = (x, z) => (x + 32768) + (z + 32768) * 65536;
 const blank = () => ({ valid: false, baseY: 0, thickness: 0, compaction: 0, wetness: 0, ice: 0, dirt: 0, sand: 0, exposure: 1, materialId: 0 });
 
@@ -82,6 +83,7 @@ export function createSnowField ({ initial }) {
   }
 
   function mark (tile, index) {
+    tile.flags[index] |= CELL_DEFORMED;
     const x = index % N, z = (index / N) | 0;
     tile.dirty.minX = Math.min(tile.dirty.minX, x); tile.dirty.maxX = Math.max(tile.dirty.maxX, x);
     tile.dirty.minZ = Math.min(tile.dirty.minZ, z); tile.dirty.maxZ = Math.max(tile.dirty.maxZ, z);
@@ -252,7 +254,7 @@ export function createSnowField ({ initial }) {
       tile.dirt[i] = saved ? a.dirt[ai] : Math.round(clamp01(centre.dirt) * B);
       tile.sand[i] = saved ? a.sand[ai] : Math.round(clamp01(centre.sand) * B);
       tile.exposure[i] = Math.round(clamp01(centre.exposure) * B);
-      tile.flags[i] = 1; tile.indices[tile.count++] = i; stats.initializedCells++;
+      tile.flags[i] = CELL_READY; tile.indices[tile.count++] = i; stats.initializedCells++;
     }
     out.tile = tile;
     return out;
@@ -351,8 +353,8 @@ export function createSnowField ({ initial }) {
             queueSettle(tile.surfaceId, tile.tx * N + i % N, tile.tz * N + Math.floor(i / N));
           }
         }
-        if (Math.abs(tile.deltaM[i]) > 1e-7 || tile.flags[i] & 2) mark(tile, i);
-        tile.flags[i] = 1;
+        if (Math.abs(tile.deltaM[i]) > 1e-7 || tile.flags[i] & CELL_COMPACTED) mark(tile, i);
+        tile.flags[i] &= ~CELL_COMPACTED;
       }
       tile.changedCount = 0;
     }
@@ -385,7 +387,7 @@ export function createSnowField ({ initial }) {
         const rx = gx + (direction === 0 ? -1 : direction === 1 ? 1 : 0);
         const rz = gz + (direction === 2 ? -1 : direction === 3 ? 1 : 0);
         cellState(id, rx, rz, neighbour);
-        if (!neighbour.valid || Math.abs(neighbour.baseY - base.baseY) > SNOW.BARRIER_HEIGHT) continue;
+        if (!neighbour.valid || !neighbour.deformable || Math.abs(neighbour.baseY - base.baseY) > SNOW.BARRIER_HEIGHT) continue;
         const drop = top - neighbour.baseY - neighbour.mass * season / density(neighbour.compaction) - DX * 0.7;
         if (drop <= 0) continue;
         let amount = Math.min(remaining, mass * 0.015, drop * density(c) / Math.max(season, 0.001) * 0.3 * (1 - c) * (1 - ice));
@@ -448,7 +450,7 @@ export function createSnowField ({ initial }) {
       const nextC = Math.max(oldC, oldC + (target - oldC) * (1 - Math.exp(-SNOW.COMPACT_RATE * load * dwell * weight)) * (1 - icy * 0.9));
       pending(tile, i);
       if (Math.round(nextC * Q) !== tile.c[i]) {
-        tile.c[i] = Math.round(nextC * Q); tile.flags[i] |= 2; result.changed = true;
+        tile.c[i] = Math.round(nextC * Q); tile.flags[i] |= CELL_COMPACTED; result.changed = true;
         result.compressedMass += old * AREA * season * (nextC - oldC);
       }
       if (deposit > 0 && old * season < 2) {
@@ -610,7 +612,7 @@ export function createSnowField ({ initial }) {
       for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
         const lx = x - dx * N, lz = z - dz * N;
         const i = lx + lz * N, ai = Math.floor(lx / AS) + Math.floor(lz / AS) * AN;
-        if (tile.archived ? !tile.flags[ai] : !(tile.flags[i] & 2) && !tile.archive?.flags[ai]) continue;
+        if (tile.archived ? !tile.flags[ai] : !(tile.flags[i] & CELL_DEFORMED) && !tile.archive?.flags[ai]) continue;
         cellState(id, tx * N + x, tz * N + z, renderSample);
         if (!renderSample.valid || !renderSample.deformable) continue;
         const depth = renderSample.mass / density(renderSample.compaction);

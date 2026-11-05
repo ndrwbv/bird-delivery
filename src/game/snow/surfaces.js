@@ -104,41 +104,32 @@ export function createSnowSurfaces(A) {
   function rawInitial(surfaceId, x, z, out = {}) {
     base(surfaceId, x, z, out);
     out.deformable = true;
-    out.visualCoverage = 1; out.thickness = 0; out.compaction = 0; out.wetness = 0; out.ice = 0;
+    out.visualCoverage = 1; out.fenceCover = 1; out.thickness = 0; out.compaction = 0; out.wetness = 0; out.ice = 0;
     out.dirt = 0; out.sand = 0; out.rut = 0; out.heading = 0;
     out.normalX = 0; out.normalY = 1; out.normalZ = 0;
     if (!out.valid) { out.legacyY = out.legacyTopY = out.baseY; return out; }
-    const originalY = out.baseY;
     if (surfaceId < 10000 && out.materialId !== 3) {
-      A.roadSample(x, z, originalY, road);
-      const raisedLand = surfaceId === 0 && A.isRaisedLand(x, z);
-      const pavingY = surfaceId === 0 && !raisedLand ? A.pavedY(x, z) : NaN;
-      if (road.onRoad && !raisedLand) {
-        out.baseY = Number.isFinite(pavingY) ? pavingY : road.baseY;
-        out.materialId = 1; out.thickness = road.thickness;
-        out.deformable = road.bank > road.roadThickness + 0.004;
-        out.visualCoverage = out.deformable ? 1 : 0;
+      const bridge = surfaceId !== 0;
+      A.roadSample(x, z, out.baseY, road, bridge);
+      if (!bridge) A.groundReceiver(x, z, out.baseY, road, out);
+      else if (road.onRoad && road.bridge) out.baseY = road.baseY;
+      if (out.materialId === 1) {
+        out.thickness = road.roadThickness;
+        out.deformable = false; out.visualCoverage = 0;
         out.compaction = road.compaction; out.dirt = road.dirt;
         out.sand = road.sand; out.rut = road.rut || 0; out.heading = road.heading || 0;
-        out.legacyY = road.legacyY ?? (out.baseY + out.thickness);
+      } else if (out.materialId === 2) {
+        out.thickness = 0.08 + noise(x, z, 3) * 0.04; out.compaction = 0.65;
+        out.deformable = false; out.visualCoverage = 0;
       } else {
-        const pave = A.pavedLift(x, z), curb = A.curbAt(x, z);
-        if (surfaceId === 0 && !raisedLand && (Number.isFinite(pavingY) || pave >= 0 || curb > 0 || A.onPave(x, z))) {
-          out.baseY = Number.isFinite(pavingY) ? pavingY : originalY + Math.max(0, pave, curb);
-          out.materialId = 2; out.thickness = 0.08 + noise(x, z, 3) * 0.04; out.compaction = 0.65;
-          // Packed paving keeps its continuous winter material. Only a
-          // real bank above it needs geometry or physical cells.
-          out.deformable = false; out.visualCoverage = 0;
-        } else {
-          out.thickness = 0.3 + noise(x + 19, z - 7, 4) * 0.12 + noise(x, z, 1.2) * 0.025;
-          // A low rounded lip beside the actual paved boundary, not white
-          // triangles joining opposite sides of a curb.
-          if (A.nearCurb(x, z)) out.thickness += 0.12;
-        }
-        out.legacyY = out.baseY;
+        out.thickness = 0.3 + noise(x + 19, z - 7, 4) * 0.12 + noise(x, z, 1.2) * 0.025;
       }
-      if (out.materialId !== 1 && road.bank > (out.materialId === 2 ? 0.008 : out.thickness)) {
-        out.thickness = road.bank; out.compaction = 0.12; out.legacyY = out.baseY + road.bank;
+      out.legacyY = out.baseY;
+      const mask = out.materialId === 1 ? road.moundMask : 1;
+      const bank = A.bankDepth(x, z, out.baseY, bridge, mask);
+      const threshold = out.materialId === 1 ? out.thickness + 0.004 : out.materialId === 2 ? 0.008 : out.thickness;
+      if (bank > threshold) {
+        out.thickness = bank; out.compaction = 0.12; out.legacyY = out.baseY + bank;
         out.deformable = true; out.visualCoverage = 1;
       }
     } else {
@@ -166,13 +157,19 @@ export function createSnowSurfaces(A) {
     }
     out.thickness *= out.exposure;
     if (surfaceId === 0 && out.exposure && (out.materialId !== 1 || road.edgeDistance < 1.45)) {
-      const top = Math.max(A.driftTop(x, z), A.lotSnowTop(x, z));
+      const top = Math.max(A.driftTop(x, z, out.baseY), A.lotSnowTop(x, z, out.baseY));
       if (Number.isFinite(top) && top > out.baseY + (out.materialId === 2 && !out.deformable ? 0.008 : out.thickness)) {
         out.thickness = Math.min(8, top - out.baseY);
         out.legacyY = top;
         out.compaction = 0.08;
         out.deformable = true; out.visualCoverage = 1;
       }
+    }
+    if (surfaceId === 0) out.fenceCover = A.fences.cover(x, z);
+    if (out.deformable) {
+      out.thickness *= out.fenceCover;
+      out.visualCoverage *= out.fenceCover;
+      if (out.fenceCover === 0) out.deformable = false;
     }
     out.legacyTopY = Math.max(out.legacyY + 0.12, out.baseY + out.thickness + 0.15, out.baseY + 0.4);
     out.topY = out.baseY + out.thickness;
@@ -188,7 +185,8 @@ export function createSnowSurfaces(A) {
   // Cache exact vertices and cell centres in two 64² planes. Mixed parity
   // coordinates are rare and sampled directly: no 128² allocation of holes.
   const cache = new Map(), floats = ['baseY','thickness','legacyY','legacyTopY','heading'];
-  const bytes = ['compaction','wetness','ice','dirt','sand','exposure','rut','visualCoverage'];
+  const bytes = ['compaction','wetness','ice','dirt','sand','exposure','rut','visualCoverage','fenceCover'];
+  const floatCount = floats.length, byteCount = bytes.length;
   let cacheClock = 0;
   let focusX = 0, focusZ = 0;
   const stats = { bridges: bridges.size, cacheBytes: 0, cacheTiles: 0, samples: 0, hits: 0 };
@@ -212,21 +210,21 @@ export function createSnowSurfaces(A) {
         for(const item of cache.values()) if(!oldest || item.at<oldest.at) oldest=item;
         cache.delete(oldest.key);
       }
-      c={key:k,at:0,flags:new Uint8Array(8192),material:new Uint8Array(8192),f:new Float32Array(8192*5),b:new Uint8Array(8192*8)};
+      c={key:k,at:0,flags:new Uint8Array(8192),material:new Uint8Array(8192),f:new Float32Array(8192*floatCount),b:new Uint8Array(8192*byteCount)};
       cache.set(k,c);
-      stats.cacheTiles=cache.size;stats.cacheBytes=cache.size*(8192*30);
+      stats.cacheTiles=cache.size;stats.cacheBytes=cache.size*(8192*(2 + 4*floatCount + byteCount));
     }
     c.at=++cacheClock;
     const n=Math.floor((iz-tz*128)/2)*64+Math.floor((ix-tx*128)/2)+(ix&1)*4096;
     if(!c.flags[n]) {
       rawInitial(id,x,z,out); stats.samples++;
       c.flags[n]=1 | (out.valid ? 2 : 0) | (out.deformable ? 4 : 0);c.material[n]=out.materialId;
-      for(let j=0;j<5;j++) c.f[n*5+j]=out[floats[j]]||0;
-      for(let j=0;j<8;j++) c.b[n*8+j]=Math.round(clamp(out[bytes[j]]||0)*255);
+      for(let j=0;j<floatCount;j++) c.f[n*floatCount+j]=out[floats[j]]||0;
+      for(let j=0;j<byteCount;j++) c.b[n*byteCount+j]=Math.round(clamp(out[bytes[j]]||0)*255);
     } else {
       stats.hits++;out.valid=!!(c.flags[n]&2);out.deformable=!!(c.flags[n]&4);out.surfaceId=id;out.materialId=c.material[n];
-      for(let j=0;j<5;j++) out[floats[j]]=c.f[n*5+j];
-      for(let j=0;j<8;j++) out[bytes[j]]=c.b[n*8+j]/255;
+      for(let j=0;j<floatCount;j++) out[floats[j]]=c.f[n*floatCount+j];
+      for(let j=0;j<byteCount;j++) out[bytes[j]]=c.b[n*byteCount+j]/255;
       out.normalX=0;out.normalY=1;out.normalZ=0;out.topY=out.baseY+out.thickness;
     }
     return finish(out);

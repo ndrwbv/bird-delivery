@@ -308,6 +308,7 @@ export function winterRoadMat (blended = false) {
   // материал ожидает отсутствующий атрибут normal и чернит дорогу.
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, flatShading: true,
     transparent: false, depthWrite: true });
+  if (!blended) return patchLegacySnow(m);
   m.onBeforeCompile = sh => {
     sh.vertexShader = 'attribute float roadSand; attribute float roadBlend; varying float vRoadSand; varying float vRoadBlend; varying vec2 vRoadXZ;\n' +
       sh.vertexShader.replace('#include <begin_vertex>',
@@ -323,13 +324,13 @@ float winterNoise(vec2 p) {
 float grit = smoothstep(0.65, 0.82, winterNoise(vRoadXZ * 5.0)) * 0.18
            + smoothstep(0.78, 0.9, winterNoise(vRoadXZ * 1.2 + vec2(17.0))) * 0.025;
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.56, 0.47, 0.39), vRoadSand * grit);
-${blended ? `// Same stationary coverage as the detailed surface.
-if (vRoadBlend < 0.05) discard;` : ''}`);
+// Same stationary coverage as the detailed surface.
+if (vRoadBlend < 0.05) discard;`);
   };
-  m.customProgramCacheKey = () => blended ? 'winter-road-grit-blend8' : 'winter-road-grit-opaque8';
+  m.customProgramCacheKey = () => 'winter-road-grit-blend8';
   // Packed roadway never switches to the local deformable grid.
-  if (blended) { m.userData.snowStatic = true; return m; }
-  return patchLegacySnow(m);
+  m.userData.snowStatic = true;
+  return m;
 }
 export function bindWinterRoadGroup (groups) {
   WINTER_ROAD_GROUPS = Array.isArray(groups) ? groups : [groups];
@@ -1003,6 +1004,7 @@ export function* seasonSteps () {
   const drift = (x, z, L, H, W, ry, seed) => {
     if (busy(x, z) || onYard(x, z, Math.max(L, W) * 0.8)) return;   // на дворовые дорожки и выходы к тротуару — нет (yards.js)
     H = driftH(H, W, L);                                       // не уже 2,5 высоты (0п22)
+    if (!C.snowFences.fits(x, z, 1.25 * Math.max(L, W))) return;
     const y = groundH(x, z) + C.curbAt(x, z) + 0.02;
     const at = DRIFTP.add(T.snowMound, x, y, z, W, H, L, 0, ry, 0, DRIFT_HEX, 3, seed);
     const k = Math.floor(x / 20) + ',' + Math.floor(z / 20);
@@ -1438,16 +1440,42 @@ function stepSky (dt) {
    все снова целые). Правим только вершины этого сугроба в его склейке. */
 let driftT = 0, dragT = 0, redressT = 0, CAM_DIR = null, growT = 0;
 const GROW = [];                                          // разбитые — ждут, пока отрастут
+const driftVertex = { x: 0, y: 0, z: 0 };
 function driftShape (d, s) {
   const m = d.mesh;
   if (!m) return;
   const pa = m.geometry.attributes.position;
   if (!pa.array) return;
   (d.pile || DRIFTP).write(d.pile === LEAFP ? tpls().mound : tpls().snowMound, pa.array, d.v0 * 3, d.x, d.y - (1 - s) * 0.05, d.z, d.W * (1 + (1 - s) * 0.25), d.H * s, d.L * (1 + (1 - s) * 0.15), 0, d.ry, 0);
+  if (d.floor !== undefined) {
+    const heights = new Map();
+    const pos = pa.array, box = m.geometry.boundingBox, sphere = m.geometry.boundingSphere;
+    let radiusSq = sphere ? sphere.radius * sphere.radius : 0;
+    for (let i = d.v0 * 3; i < (d.v0 + d.nv) * 3; i += 3) {
+      const x = pos[i], z = pos[i + 2], key = x + ',' + z;
+      let floor = heights.get(key);
+      if (floor === undefined) { floor = C.snowFloor(x, z); heights.set(key, floor); }
+      pos[i + 1] += floor - d.floor;
+      driftVertex.x = x; driftVertex.y = pos[i + 1]; driftVertex.z = z;
+      box?.expandByPoint(driftVertex);
+      if (sphere) radiusSq = Math.max(radiusSq, sphere.center.distanceToSquared(driftVertex));
+    }
+    if (sphere) sphere.radius = Math.sqrt(radiusSq);
+  }
   pa.addUpdateRange(d.v0 * 3, d.nv * 3);
   pa.needsUpdate = true;
   d.s = s;
 }
+export function* fitDrifts () {
+  let count = 0;
+  for (const list of DRIFTS.values()) for (const d of list) {
+    d.floor = C.snowFloor(d.x, d.z);
+    d.y = d.floor + 0.002;
+    driftShape(d, d.s);
+    if (++count % 64 === 0) yield 'snow drifts';
+  }
+}
+
 function burstDrift (d, sp) {
   const V = C.V;
   driftShape(d, 0.18);
@@ -1512,12 +1540,12 @@ function stepCar (dt) {
 const EXTRA_TOP = [];
 /* ещё сугробы со своим верхом (weather.js: снежная зима) */
 export function addDriftTop (fn) { EXTRA_TOP.push(fn); }
-export function driftTop (x, z) {
+export function driftTop (x, z, receiverY) {
   let ex = -Infinity;
   for (const f of EXTRA_TOP) ex = Math.max(ex, f(x, z));
-  return Math.max(ex, driftTop0(x, z));
+  return Math.max(ex, driftTop0(x, z, receiverY));
 }
-function driftTop0 (x, z) {
+function driftTop0 (x, z, receiverY) {
   if ((A.drift || 0) < 0.01) return -Infinity;
   const ci = Math.floor(x / 20), cj = Math.floor(z / 20);
   let top = -Infinity;
@@ -1531,7 +1559,8 @@ function driftTop0 (x, z) {
       const e = Math.hypot(lx / W, lz / L);
       if (e >= 1) continue;
       const k = bankProfile(e);
-      const y = d.y - (1 - s) * 0.05 + d.H * s * k;
+      const floor = d.floor === undefined ? d.y : (receiverY ??= C.snowFloor(x, z)) + 0.002;
+      const y = floor - (1 - s) * 0.05 + d.H * s * k;
       if (y > top) top = y;
     }
   }

@@ -525,7 +525,7 @@ function* buildDeep () {
       const a = k / 16 * Math.PI * 2, px = x + nx * Wd * Math.cos(a) + tx * L * Math.sin(a), pz = z + nz * Wd * Math.cos(a) + tz * L * Math.sin(a);
       if (!inHouse(px, pz) && !offRoad(px, pz, 0.6)) return false;
     }
-    if (onYard(x, z, Math.max(Wd, L))) return false;
+    if (onYard(x, z, Math.max(Wd, L)) || !C.snowFences.fits(x, z, Math.max(Wd, L))) return false;
     return !nearAddr(x, z, Math.max(Wd, L) + 3.5) && !nearPizza(x, z);
   };
   const add = (x, z, nx, nz, Wd, L, H, house) => {

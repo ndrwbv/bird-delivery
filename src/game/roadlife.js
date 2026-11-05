@@ -647,7 +647,11 @@ function* buildFences (A) {
   A.scene.add(mesh);
   // каждая секция (2,5 м) — сбиваемая, как дворовый заборчик: на ходу сносится, летят чёрные обломки
   if (A.smashMesh) {
-    for (const [x, z, vi, l, hex] of PANELS) A.smashMesh('bigfence', x, z, l / 2 * 0.8, mesh, vi, 4, hex);   // обломки — цвета забора
+    for (const [x, z, vi, l, hex] of PANELS) {
+      const it = A.smashMesh('bigfence', x, z, l / 2 * 0.8, mesh, vi, 4, hex);
+      it.fvr = Math.atan2(P[vi * 3 + 2] - P[vi * 3 + 5], P[vi * 3 + 3] - P[vi * 3]);
+      it.snowHalf = l / 2;
+    }
   }
 }
 
