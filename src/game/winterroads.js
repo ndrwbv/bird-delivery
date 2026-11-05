@@ -1,3 +1,5 @@
+import { corridorModes } from './snow/roads.js';
+
 /* Зимнее полотно: на одних улицах песок, на других снег с колеёй.
    Цвет и рыхлые места строятся из одних и тех же отрезков; запрос колеса — по клеткам 32 м.
    Меш скрывается вне снежного сезона в seasons.js. */
@@ -17,6 +19,10 @@ const GRID = new Map();
 const SAND_GRID = new Map();
 const SNOW_GRID = new Map();
 const RUT_GRID = new Map();
+const ROAD_GRID = new Map(), MOUND_GRID = new Map();
+const EMPTY = [];
+let MODES = new Map();
+const RUT_BASE = 0.12, RUT_FLOOR = 0.045, RUT_RIDGE = 0.15;
 const SPOTS = { soft: [], sand: [], clear: [], rut: [], junction: [] };
 let sprayT = 0, spraySide = 1;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -29,6 +35,8 @@ function hash (x, z, salt = 0) {
 const key = (i, j) => i + ',' + j;
 const hasRuts = road => road.c === 5 || road.c === 7;
 function roadMode (road) {
+  const connected = MODES.get(road);
+  if (connected) return connected;
   const pts = road.p, mid = road.mid0 ? road.mid0[1] : road.m0 || pts[(pts.length / 2) | 0];
   const roll = hash(mid[0], mid[1], road.c + 31);
   const sandShare = road.c <= 3 ? WINTER_ROAD.SAND_MAIN : road.c === 7 ? 0.05 : WINTER_ROAD.SAND_LOCAL;
@@ -45,6 +53,115 @@ const rutFade = (progress, total, fade, breaks) => {
   for (const b of breaks) factor = Math.min(factor, smooth(clamp((Math.abs(progress - b.at) - b.core) / b.ramp, 0, 1)));
   return factor;
 };
+
+function indexBox (grid, p, x0, z0, x1, z1) {
+  for (let i = Math.floor(x0 / WINTER_ROAD.CELL); i <= Math.floor(x1 / WINTER_ROAD.CELL); i++)
+    for (let j = Math.floor(z0 / WINTER_ROAD.CELL); j <= Math.floor(z1 / WINTER_ROAD.CELL); j++) {
+      const k = key(i, j), list = grid.get(k);
+      if (list) list.push(p); else grid.set(k, [p]);
+    }
+}
+
+function registerRoad (p) {
+  const margin = p.w / 2 + 10;
+  indexBox(ROAD_GRID, p, Math.min(p.a[0], p.b[0]) - margin, Math.min(p.a[1], p.b[1]) - margin,
+    Math.max(p.a[0], p.b[0]) + margin, Math.max(p.a[1], p.b[1]) + margin);
+}
+
+// И CPU, и дальняя геометрия используют один профиль настоящей выемки.
+function rutProfile (off, w, count = 1) {
+  const step = Math.min(0.78, w / (count * 2.6));
+  const outer = Math.min(0.35, step * 0.48), inner = Math.min(0.13, outer * 0.45);
+  let h = RUT_BASE;
+  for (let lane = 0; lane < count; lane++) for (const side of [-1, 1]) {
+    const d = Math.abs(off - laneCenter(lane, count, w) - side * step);
+    if (d < inner) h = Math.min(h, RUT_FLOOR + (RUT_BASE - RUT_FLOOR) * 0.12 * (d / inner) ** 2);
+    else if (d < outer) h = RUT_FLOOR + (RUT_RIDGE - RUT_FLOOR) * smooth((d - inner) / (outer - inner));
+    else if (d < outer + 0.16) h = Math.max(h, RUT_BASE + (RUT_RIDGE - RUT_BASE) * (1 - smooth((d - outer) / 0.16)));
+  }
+  return h;
+}
+
+const MOUND_T = [0, 0.16, 0.34, 0.52, 0.74, 0.9, 1];
+const MOUND_RISE = [0, 0.35, 0.78, 1, 0.72, 0.24, 0];
+const MOUND_TAPER = [0.03, 0.42, 0.86, 1, 0.8, 0.38, 0.03];
+function moundWobble (p, i) {
+  const along = p.d0 + (p.d1 - p.d0) * MOUND_T[i];
+  return (hash(p.x + p.ux * along, p.z + p.uz * along, 142) - 0.5) * p.width * 0.15;
+}
+function moundAt (p, x, z, y) {
+  const dx = x - p.x, dz = z - p.z, along = dx * p.ux + dz * p.uz;
+  if (along < p.d0 || along > p.d1 || p.source?.broken || Math.abs(p.surfaceY(x, z) - y) > 0.3) return 0;
+  const t = (along - p.d0) / (p.d1 - p.d0 || 1);
+  let i = 1; while (i < MOUND_T.length - 1 && MOUND_T[i] < t) i++;
+  const f = (t - MOUND_T[i - 1]) / (MOUND_T[i] - MOUND_T[i - 1]);
+  const taper = MOUND_TAPER[i - 1] + (MOUND_TAPER[i] - MOUND_TAPER[i - 1]) * f;
+  const rise = MOUND_RISE[i - 1] + (MOUND_RISE[i] - MOUND_RISE[i - 1]) * f;
+  const wobble = moundWobble(p, i - 1) * (1 - f) + moundWobble(p, i) * f;
+  const across = Math.abs(-dx * p.uz + dz * p.ux - p.off - wobble);
+  const edge = clamp(1 - across / Math.max(0.01, p.width * taper / 2), 0, 1);
+  return edge > 0 ? p.base + p.height * rise * edge : 0;
+}
+
+/** Начальный снег на видимом дорожном полотне. surfaceY — выбранная твёрдая
+ * опора (земля/мост), чтобы дорога сверху не меняла снег под мостом.
+ * Никаких аллокаций; out переиспользуется вызывающим кодом. */
+export function sampleSurface (x, z, surfaceY, out = {}) {
+  out.onRoad = false; out.baseY = surfaceY; out.thickness = 0; out.compaction = 0;
+  out.roadThickness = 0; out.sand = 0; out.dirt = 0; out.wetness = 0; out.rut = 0; out.heading = 0; out.coverage = 0; out.bridge = false; out.moundMask = 0;
+  const k = key(Math.floor(x / WINTER_ROAD.CELL), Math.floor(z / WINTER_ROAD.CELL));
+  const list = ROAD_GRID.get(k);
+  if (!list) return out;
+  let winner = null, best = -Infinity, bestOff = 0, bestAlong = 0, base = surfaceY, clearance = 1;
+  for (const p of list) {
+    const dx = x - p.a[0], dz = z - p.a[1], along = dx * p.ux + dz * p.uz, off = -dx * p.uz + dz * p.ux;
+    if (along < -0.1 || along > p.len + 0.1) continue;
+    const y = p.surfaceY(x, z);
+    // Road material lift is ~0.14 m above the old vehicle support.
+    if (Number.isFinite(surfaceY) && Math.abs(y - surfaceY) > 0.55) continue;
+    if (Math.abs(off) > p.w / 2 + 0.03) continue;
+    const score = (8 - p.road.c) * 10000 + (p.clear ? 1000 : p.sand ? 500 : 0) + p.w;
+    if (score > best || (score === best && p.corridor < winner.corridor)) {
+      winner = p; best = score; bestOff = off; bestAlong = along; base = y;
+    }
+  }
+  if (!winner) return out;
+  for (const q of list) {
+    if (!q.clear || q.road.c > winner.road.c || Math.abs(q.surfaceY(x, z) - base) > 0.3) continue;
+    const dx = x - q.a[0], dz = z - q.a[1], along = dx * q.ux + dz * q.uz;
+    if (along < -0.1 || along > q.len + 0.1) continue;
+    const off = -dx * q.uz + dz * q.ux;
+    clearance = Math.min(clearance, smooth(clamp((Math.abs(off) - q.w / 2) / 8, 0, 1)));
+  }
+  const p = winner, edge = smooth(clamp((p.w / 2 - Math.abs(bestOff)) / 0.45, 0, 1));
+  const grain = 0.5 + 0.25 * Math.sin(x * 0.33 + z * 0.17) + 0.25 * Math.sin(z * 0.61 - x * 0.13);
+  let h = p.clear ? 0.002 * grain : p.sand ? 0.055 : p.rutRoad ? RUT_BASE : p.road.c <= 3 ? 0.065 : 0.09;
+  let rut = 0;
+  if (p.rutRoad) {
+    const f = rutFade(p.along + bestAlong, p.total, p.fade, p.breaks);
+    const profile = rutProfile(bestOff, p.w, p.count);
+    h += (profile - RUT_BASE) * f;
+    rut = clamp((RUT_BASE - profile) / (RUT_BASE - RUT_FLOOR), 0, 1) * f;
+  }
+  if (!p.clear) h = (0.003 + (h - 0.003) * clearance) * (0.75 + grain * 0.25);
+  out.roadThickness = h;
+  const moundMask = p.clear ? smooth(clamp((Math.abs(bestOff) - p.w / 2 + 1.15) / 0.6, 0, 1)) : clearance;
+  let moundHeight = 0;
+  // Не пропускаем боковой вал поперёк очищенной главной оси.
+  if (!p.clear || Math.abs(bestOff) > p.w / 2 - 1.15) {
+    for (const mound of MOUND_GRID.get(k) || EMPTY) moundHeight = Math.max(moundHeight, moundAt(mound, x, z, base));
+  }
+  h = Math.max(h, moundHeight * moundMask);
+  out.onRoad = true; out.baseY = base; out.thickness = Math.max(0, h);
+  out.compaction = moundHeight > h * 0.8 ? 0.12 : p.clear ? 0.9 : Math.min(0.88, (p.sand ? 0.6 : 0.28) + rut * 0.5 + (1 - clearance) * 0.38);
+  out.sand = p.sand ? edge * 0.65 : 0; out.dirt = p.clear ? 0.1 : 0.05 + rut * 0.1 + (1 - clearance) * 0.16;
+  out.rut = rut; out.heading = Math.atan2(p.ux, p.uz); out.bridge = !!p.road.b;
+  out.coverage = p.clear ? 0 : edge * clearance;
+  out.moundMask = moundMask;
+  return out;
+}
+
+const COVER_SAMPLE = {};
 
 /* Явный dev-стенд выбирает место рядом с пиццерией. Голый ?winterspot
    оставляет обычный старт смены. */
@@ -120,6 +237,7 @@ function snowSection (cx, cz, ux, uz, length, width, along, total, fadeStart, fa
 }
 
 export function snowAt (x, z) {
+  if (ROAD_GRID.size) return sampleSurface(x, z, NaN, COVER_SAMPLE).coverage;
   const list = SNOW_GRID.get(key(Math.floor(x / WINTER_ROAD.CELL), Math.floor(z / WINTER_ROAD.CELL)));
   if (!list) return 0;
   let best = 0;
@@ -183,7 +301,7 @@ function softPatch (cx, cz, ux, uz, length, offset, width, strength, surfaceY) {
    После наезда осаживаем тот же меш, чтобы снег не оставался висеть в машине. */
 function softMound (M, p, x, z, ux, uz, d0, d1, off, width, base, height, surfaceY) {
   M.front(true).track((mesh, first, count) => p.ranges.push({ mesh, first, count }));
-  mound(M, x, z, ux, uz, d0, d1, off, width, base, height, surfaceY);
+  mound(M, x, z, ux, uz, d0, d1, off, width, base, height, surfaceY, p);
   M.front(false);
 }
 
@@ -271,37 +389,38 @@ function fadedSnowColor (hex, factor) {
 
 function ruts (M, x, z, ux, uz, len, w, surfaceY, count, depth, along, total, fade, breaks = []) {
   const nx = -uz, nz = ux, step = Math.min(0.78, w / (count * 2.6));
-  const outer = Math.min(0.48, step * 0.63), inner = outer * 0.58;
-  const ridge = 0.165 + depth * 0.3, floor = 0.095;
-  const nodes = [{ off: -w / 2, h: 0.062, color: 0xf0f5f5 }];
+  const outer = Math.min(0.35, step * 0.48), inner = Math.min(0.13, outer * 0.45);
+  const ridge = RUT_RIDGE, floor = RUT_FLOOR;
+  const nodes = [{ off: -w / 2, h: RUT_BASE, color: 0xf0f5f5 }];
   const add = (off, h, color) => { nodes.push({ off, h, color }); };
   for (let lane = 0; lane < count; lane++) for (const side of [-1, 1]) {
     const off = laneCenter(lane, count, w) + side * step;
-    add(off - outer, ridge, 0xfafff9);
-    add(off - inner, floor + (ridge - floor) * 0.2, 0xd3dfe0);
-    add(off, floor, 0x93afb5);
-    add(off + inner, floor + (ridge - floor) * 0.2, 0xd3dfe0);
-    add(off + outer, ridge, 0xfafff9);
+    add(off - outer - 0.16, RUT_BASE, 0xf0f5f5);
+    add(off - outer, ridge, 0xf1f5f5);
+    add(off - inner, floor, 0xd8e2e5);
+    add(off, floor, 0xc5d3d7);
+    add(off + inner, floor, 0xd8e2e5);
+    add(off + outer, ridge, 0xf1f5f5);
+    add(off + outer + 0.16, RUT_BASE, 0xf0f5f5);
     ST.tracks++;
   }
-  add(w / 2, 0.062, 0xf0f5f5);
+  add(w / 2, RUT_BASE, 0xf0f5f5);
   const sections = [[0]];
   for (let d = 4; d < len - 0.5; d += 4) sections.push([d]);
   sections.push([len]);
   for (const sec of sections) {
     const d = sec[0], progress = along + d;
-    sec.push(rutFade(progress, total, fade, breaks),
-      (hash(x + ux * d, z + uz * d, 161) - 0.5) * 0.13,
-      0.92 + hash(x + ux * d, z + uz * d, 162) * 0.16);
+    sec.push(rutFade(progress, total, fade, breaks));
   }
+  const sampled = {};
   const point = (sec, node) => {
-    const [d, f, sway, rise] = sec, off = node.off + (Math.abs(node.off) < w / 2 - 0.01 ? sway : 0);
+    const d = sec[0], off = node.off;
     const px = x + ux * d + nx * off, pz = z + uz * d + nz * off;
-    return [px, surfaceY(px, pz, d) + 0.062 + (node.h - 0.062) * f * rise, pz];
+    const base = surfaceY(px, pz, d);
+    sampleSurface(px, pz, base, sampled);
+    return [px, (sampled.onRoad ? sampled.baseY + sampled.roadThickness : base), pz];
   };
   for (let j = 1; j < sections.length; j++) for (let i = 1; i < nodes.length; i++) {
-    const strength = (sections[j - 1][1] + sections[j][1]) / 2;
-    if (strength < 0.005) continue;
     const a = point(sections[j - 1], nodes[i - 1]), b = point(sections[j], nodes[i - 1]);
     const c = point(sections[j], nodes[i]), d = point(sections[j - 1], nodes[i]);
     const c0 = fadedSnowColor(nodes[i - 1].color, sections[j - 1][1]);
@@ -316,12 +435,14 @@ function ruts (M, x, z, ux, uz, len, w, surfaceY, count, depth, along, total, fa
 /* Плавная маска песка — один байт на вершину. В материале она даёт
    мелкую зернистую примесь, не геометрические треугольники на дороге. */
 export function addSandAttribute (group, THREE) {
+  const sampled = {};
   for (const mesh of group.children) {
     const pos = mesh.geometry.attributes.position, mask = new Uint8Array(pos.count), cover = new Uint8Array(pos.count);
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i);
-      mask[i] = Math.round(sandAt(x, z, 1) * 255);
-      cover[i] = Math.round(snowAt(x, z) * 255);
+      sampleSurface(x, z, pos.getY(i) - 0.09, sampled);
+      mask[i] = Math.round(sampled.sand * 255);
+      cover[i] = Math.round(sampled.coverage * 255);
     }
     const a = new THREE.BufferAttribute(mask, 1, true);
     a.onUpload(function () { this.array = null; });
@@ -333,11 +454,13 @@ export function addSandAttribute (group, THREE) {
 }
 
 /* Сугроб клином с неровной вершиной, а не пятно краски на асфальте. */
-function mound (M, x, z, ux, uz, d0, d1, off, width, base, height, surfaceY) {
+function mound (M, x, z, ux, uz, d0, d1, off, width, base, height, surfaceY, source = null) {
   const nx = -uz, nz = ux, h = height * (0.85 + hash(x + ux * d0, z + uz * d0, 141) * 0.3);
-  const ts = [0, 0.16, 0.34, 0.52, 0.74, 0.9, 1];
-  const rise = [0, 0.35, 0.78, 1, 0.72, 0.24, 0];
-  const taper = [0.03, 0.42, 0.86, 1, 0.8, 0.38, 0.03];
+  const ts = MOUND_T, rise = MOUND_RISE, taper = MOUND_TAPER;
+  const p = { x, z, ux, uz, d0, d1, off, width, base, height: h, surfaceY, source };
+  const ax = x + ux * d0 + nx * off, az = z + uz * d0 + nz * off;
+  const bx = x + ux * d1 + nx * off, bz = z + uz * d1 + nz * off;
+  indexBox(MOUND_GRID, p, Math.min(ax, bx) - width, Math.min(az, bz) - width, Math.max(ax, bx) + width, Math.max(az, bz) + width);
   const point = (i, side) => {
     const along = d0 + (d1 - d0) * ts[i];
     const waviness = (hash(x + ux * along, z + uz * along, 142) - 0.5) * width * 0.15;
@@ -345,10 +468,40 @@ function mound (M, x, z, ux, uz, d0, d1, off, width, base, height, surfaceY) {
     const px = x + ux * along + nx * lateral, pz = z + uz * along + nz * lateral;
     return [px, surfaceY(px, pz, along) + base + (side === 0 ? rise[i] * h : 0), pz];
   };
+  const sampled = {};
   for (let i = 1; i < ts.length; i++) for (const side of [-1, 1]) {
     const a = point(i - 1, side), b = point(i, side), c = point(i, 0), d = point(i - 1, 0);
+    const cx = (a[0] + b[0] + c[0] + d[0]) / 4, cz = (a[2] + b[2] + c[2] + d[2]) / 4;
+    sampleSurface(cx, cz, surfaceY(cx, cz), sampled);
+    if (sampled.onRoad && sampled.moundMask < 0.05) continue;
+    if (sampled.onRoad && sampled.moundMask < 1) for (const q of [a, b, c, d]) {
+      const floor = surfaceY(q[0], q[2]);
+      q[1] = floor + (q[1] - floor) * sampled.moundMask;
+    }
     M.color(side < 0 ? '#dbe7e9' : '#edf3f3');
     M.tri(...a, ...b, ...c); M.tri(...a, ...c, ...d);
+  }
+}
+
+function roadSheet (M, p) {
+  const sampled = {}, nx = -p.uz, nz = p.ux;
+  const point = (d, off) => {
+    const x = p.a[0] + p.ux * d + nx * off, z = p.a[1] + p.uz * d + nz * off;
+    const base = p.surfaceY(x, z);
+    sampleSurface(x, z, base, sampled);
+    return [x, (sampled.onRoad ? sampled.baseY + sampled.roadThickness : base), z];
+  };
+  M.color('#edf2f3');
+  // Малые секции у концов не дают интерполяции закрасить пересекающую улицу.
+  for (let d = 0; d < p.len; ) {
+    const step = d < 16 || p.len - d < 20 ? 2 : 6, end = Math.min(p.len, d + step);
+    const bands = Math.max(4, Math.ceil(p.w / 0.75));
+    for (let band = 0; band < bands; band++) {
+      const lo = (band / bands - 0.5) * p.w, hi = ((band + 1) / bands - 0.5) * p.w;
+      const a = point(d, lo), b = point(end, lo), c = point(end, hi), e = point(d, hi);
+      M.tri(...a, ...b, ...c); M.tri(...a, ...c, ...e);
+    }
+    d = end;
   }
 }
 
@@ -359,6 +512,8 @@ export function build ({ M, rutM, softM, roads, roadWidth, yOf, groundH, junctio
   SAND_GRID.clear();
   SNOW_GRID.clear();
   RUT_GRID.clear();
+  ROAD_GRID.clear(); MOUND_GRID.clear();
+  MODES = corridorModes(roads, roadWidth);
   for (const list of Object.values(SPOTS)) list.length = 0;
   ST.snow = ST.clear = ST.sand = ST.tracks = ST.soft = ST.crushed = ST.edges = ST.crossings = ST.sprays = 0;
   ST.exampleSoft = ST.exampleSand = ST.exampleClear = ST.exampleRut = ST.exampleJunction = null;
@@ -401,7 +556,8 @@ export function build ({ M, rutM, softM, roads, roadWidth, yOf, groundH, junctio
         if (al && bl && Math.abs((ax * bx + az * bz) / (al * bl)) > 0.9) return 0;
       }
     }
-    return 12;
+    // Конец полилинии сам по себе не означает очищенную дорогу.
+    return shared && [...shared.roads].some(other => modes.get(other)?.clear) ? 12 : 0;
   };
   const coveredJunctions = new Map();
   const segments = [];
@@ -470,18 +626,9 @@ export function build ({ M, rutM, softM, roads, roadWidth, yOf, groundH, junctio
       const a = pts[i - 1], b = pts[i], dx = b[0] - a[0], dz = b[1] - a[1];
       const len = Math.hypot(dx, dz);
       if (len < 0.01) continue;
-      const ux = dx / len, uz = dz / len, nx = -uz, nz = ux;
-      const line = (d0, d1, off, width, color, lift = 0) => {
-        M.color(color);
-        M.ribbon(a[0] + ux * d0 + nx * off, a[1] + uz * d0 + nz * off,
-          a[0] + ux * d1 + nx * off, a[1] + uz * d1 + nz * off, width, y + lift);
-      };
-      // Базовая снежная корка до самого узла: иначе разрыв выглядел чёрным прямоугольником.
-      for (let d = 0; !clear && d < len; d += 6) {
-        const end = Math.min(len, d + 6);
-        for (let band = 0; band < 4; band++)
-          line(d, end, (band - 1.5) * w / 4, w / 4, '#f0f5f5');
-      }
+      const ux = dx / len, uz = dz / len;
+      // Геометрия строится после регистрации всей сети, чтобы одна улица
+      // знала про очищенную ось пересекающей её дороги.
       if (!clear) snowSection((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, ux, uz, len, w, along, total, snowStart, snowEnd);
       if (clear) ST.clear++; else ST.snow++;
       const coverJunction = p => {
@@ -496,11 +643,15 @@ export function build ({ M, rutM, softM, roads, roadWidth, yOf, groundH, junctio
         return true;
       };
       coverJunction(a); coverJunction(b);
-      segments.push({ a, b, ux, uz, len, w, surfaceY, sand, clear, road, rutRoad, count, depth, fade, breaks, total, along });
+      const segment = { a, b, ux, uz, len, w, surfaceY, sand, clear, road, rutRoad, count, depth, fade, breaks, total, along,
+        corridor: modes.get(road)?.corridor || String(road.c) };
+      segments.push(segment); registerRoad(segment);
       along += len;
     }
   }
-  for (const { a, b, ux, uz, len, w, surfaceY, sand, clear, road, rutRoad, count, depth, fade, breaks, total, along } of segments) {
+  for (const segment of segments) {
+    const { a, b, ux, uz, len, w, surfaceY, sand, clear, road, rutRoad, count, depth, fade, breaks, total, along } = segment;
+    if (!clear && !rutRoad) roadSheet(M, segment);
     if (rutRoad) {
       ruts(rutM, a[0], a[1], ux, uz, len, w, surfaceY, count, depth, along, total, fade, breaks);
       rutSegment((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, ux, uz, len, w, count,
@@ -535,7 +686,7 @@ export function build ({ M, rutM, softM, roads, roadWidth, yOf, groundH, junctio
         mound(softM, a[0], a[1], ux, uz, d, end, off, width, 0.072, 0.11, surfaceY);
         ST.edges++;
         // Иногда рыхлый язык выходит из вала в проезжую часть. Он виден и замедляет колесо.
-        if (!sand && hash(a[0] + ux * d, a[1] + uz * d, 85) > 0.82) {
+        if (!sand && !clear && hash(a[0] + ux * d, a[1] + uz * d, 85) > 0.82) {
           const slen = Math.min(7, end - d), s0 = d + (end - d - slen) / 2;
           const soff = side * Math.max(0.2, w / 2 - 1.15), sw = Math.min(2.1, w / 2);
           const patch = softPatch(a[0] + ux * (s0 + slen / 2), a[1] + uz * (s0 + slen / 2), ux, uz, slen, soff, sw, 0.65, surfaceY);
@@ -543,7 +694,7 @@ export function build ({ M, rutM, softM, roads, roadWidth, yOf, groundH, junctio
         }
       }
       // На непосыпанных улицах небольшие снежные полосы пересекают колею.
-      if (!sand && len > 18) for (let d = 9; d < len - 7; d += 28) {
+      if (!sand && !clear && len > 18) for (let d = 9; d < len - 7; d += 28) {
         if (hash(a[0] + ux * d, a[1] + uz * d, 91) < 0.82) continue;
         const slen = Math.min(5 + hash(a[0] + ux * d, a[1] + uz * d, 92) * 5, len - d);
         const soff = (hash(a[0] + ux * d, a[1] + uz * d, 93) - 0.5) * Math.max(0, w - 3);
@@ -568,15 +719,13 @@ export function bridge ({ M, softM, road, points, width }) {
   for (let i = 1; i < points.length; i++) {
     const a = points[i - 1], b = points[i], dx = b[0] - a[0], dz = b[2] - a[2], len = Math.hypot(dx, dz);
     if (len < 0.01) continue;
-    const ux = dx / len, uz = dz / len, nx = -uz, nz = ux;
-    const line = (off, w, color, lift = 0) => {
-      M.color(color);
-      M.ribbon3(a[0] + nx * off, a[1] + 0.2 + lift, a[2] + nz * off,
-        b[0] + nx * off, b[1] + 0.2 + lift, b[2] + nz * off, w);
-    };
+    const ux = dx / len, uz = dz / len;
     const surfaceY = (x, z, d = (x - a[0]) * ux + (z - a[2]) * uz) => a[1] + (b[1] - a[1]) * d / len + 0.14;
+    const segment = { a: [a[0], a[2]], b: [b[0], b[2]], ux, uz, len, w: width, surfaceY, sand, clear, road,
+      rutRoad: false, count: 1, depth: 0, fade: 0, breaks: [], total, along, corridor: roadMode(road).corridor || 'bridge' };
+    registerRoad(segment);
     if (!clear) {
-      for (let band = 0; band < 4; band++) line((band - 1.5) * width / 4, width / 4, '#f0f5f5');
+      roadSheet(M, segment);
       snowSection((a[0] + b[0]) / 2, (a[2] + b[2]) / 2, ux, uz, len, width, along, total, 12, 12);
       ST.snow++;
     } else ST.clear++;
@@ -588,7 +737,7 @@ export function bridge ({ M, softM, road, points, width }) {
       mound(softM, a[0], a[2], ux, uz, 0, len, off, 1.15, 0.072, 0.17, surfaceY);
       ST.edges++;
     }
-    if (!sand && hash(a[0], a[2], 112) > 0.8) {
+    if (!sand && !clear && hash(a[0], a[2], 112) > 0.8) {
       const off = (hash(a[0], a[2], 113) - 0.5) * Math.max(0, width - 3);
       const patch = softPatch((a[0] + b[0]) / 2, (a[2] + b[2]) / 2, ux, uz, len, off, 2.2, 0.85, surfaceY);
       softMound(softM, patch, a[0], a[2], ux, uz, 0, len, off, 2.2, 0.072, 0.21, surfaceY);

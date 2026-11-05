@@ -124,7 +124,9 @@ const still = o => o.position.x === 0 && o.position.y === 0 && o.position.z === 
   o.scale.x === 1 && o.scale.y === 1 && o.scale.z === 1;
 
 function take (m, parent) {
-  if (TAKEN.has(m)) return;
+  // Living snow owns its page lifetime and changing bounds. A frozen city
+  // entry could otherwise hide a current page or reattach a discarded one.
+  if (m.userData.snowDynamic || TAKEN.has(m)) return;
   TAKEN.add(m);
   m.matrixAutoUpdate = false;
   m.updateMatrix();

@@ -33,7 +33,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { STYLE } from './softcity.js';
 import { pullDepth } from './carshadow.js';   // 0п87: пятна не прячутся под соседнюю поверхность
-import { UNIFORMS as SSU, GLSL_COVER, withSS } from './sunshadow.js';
+import { UNIFORMS as SSU, GLSL_COVER, withSS, bakedSunDirection } from './sunshadow.js';
 import { ON as SUNP_ON } from './sunpath.js';   // путь солнца ниже (2г2): длина тени — по высоте солнца   // 2г2: где настоящие тени от солнца — маски домов нет (sunshadow.js)
 import { car as matCar } from './materials.js';   // 2г11: лак кузова — метка MAT_CAR у всех материалов машин (materials.js)
 
@@ -67,6 +67,7 @@ export const FS = {
 };
 
 const ST = { built: 0, buildMs: 0, houses: 0, tris: 0, draws: 0, lastDrawMs: 0, blobs: 0, by: [0, 0, 0, 0], k: 0, len: 0, dir: [0, 0], stepMs: 0 };
+const BAKED_SUN = new THREE.Vector3();
 
 /* ── униформы для шейдеров земли: маска, окно (середина и 1/ширина), сила ── */
 const U = {
@@ -483,7 +484,9 @@ export function step (E) {
   A = E;
   const V = E.V, ENV = E.ENV, sun = E.sun;
   // солнце: откуда светит (по земле), сила, длина тени
-  let sx = sun.position.x - sun.target.position.x, sz = sun.position.z - sun.target.position.z;
+  const baked = bakedSunDirection(BAKED_SUN);
+  let sx = baked ? BAKED_SUN.x : sun.position.x - sun.target.position.x;
+  let sz = baked ? BAKED_SUN.z : sun.position.z - sun.target.position.z;
   const sl = Math.hypot(sx, sz) || 1; sx /= sl; sz /= sl;
   const night = ENV.night || 0, R0 = ENV.rain || 0;
   const wid = E.weather ? E.weather() : '';
@@ -493,7 +496,7 @@ export function step (E) {
   ST.k = +k.toFixed(3);
   const dt = Math.min(1, Math.abs(((ENV.t || 0) - 0.3)) / 0.35);
   // длина тени: при новом пути солнца (sunpath.js, 2г2) — по его высоте, как у настоящей (днём ~1,4 высоты дома, вечером до FS.LEN_MAX)
-  const sv = sun.position.y - sun.target.position.y;
+  const sv = baked ? BAKED_SUN.y : sun.position.y - sun.target.position.y;
   const len = SUNP_ON ? Math.min(FS.LEN_MAX, Math.max(FS.LEN[0], sl / Math.max(1e-3, sv))) : FS.LEN[0] + (FS.LEN[1] - FS.LEN[0]) * dt;
   if (FS.HOUSES && RT) {
     U.uFsK.value = k;

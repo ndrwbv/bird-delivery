@@ -455,6 +455,7 @@ export function step (dt) {
     const dx = ahead[0] - behind[0], dz = ahead[1] - behind[1];
     R.avatarPhase += dt * 16;
     poseAvatar(p[0], p[1], Math.atan2(dx, dz), R.avatarPhase);
+    A.snowFoot?.(p[0], p[1], A.groundH(p[0], p[1]));
     followAvatar(cam, p[0], p[1], dx, dz, dt);
     fade(1 - ease(R.t / 0.35));
     if (k >= 1) { R.ph = 'return-open'; R.t = 0; }
@@ -554,6 +555,7 @@ export function step (dt) {
     if (R.t >= FP.ENTRY_OPEN) { if (R.st) R.st.carry = true; finish(false); return; }
   }
   if (walking) R.bob += dt * FP.BOB_HZ * Math.PI * 2;
+  if (walking) A.snowFoot?.(x, z, A.groundH(x, z));
   const y = eyeY(x, z) + (walking ? Math.abs(Math.sin(R.bob)) * FP.BOB - FP.BOB * 0.5 : 0);
   if (R.ph === 'take') moveBox(ease(R.t / FP.TAKE));   // R.ph: в этом кадре могла уже лечь в руки (holdBox)
   place(cam, x, y, z, lx, ly, lz, dt, 1);

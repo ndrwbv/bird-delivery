@@ -42,6 +42,7 @@
    костров), trails() — после дворов и лавочек, step(dt) — каждый кадр.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import { patchLegacySnow } from './snow/render.js';
 import { t, N_ } from '../i18n/index.js';
 import * as CONSTR from './construction.js';
 import * as HITS from './hits.js';
@@ -67,6 +68,23 @@ const hash = (x, z, k = 0) => { const s = Math.sin(x * 12.9898 + z * 78.233 + k 
 let A = null;
 const LOTS = [];
 let SNOW_MESH = null;
+const SNOW_TOP = new Map();
+// Actual triangle fan of the old drift, shared with the replacement surface.
+export function snowTop(x,z) {
+  let top = -Infinity;
+  for (const d of SNOW_TOP.get(Math.floor(x/16)+','+Math.floor(z/16)) || []) {
+    if (x<d.x0 || x>d.x1 || z<d.z0 || z>d.z1) continue;
+    for(let i=0;i<d.rim.length;i++) {
+      const a=d.rim[i], b=d.rim[(i+1)%d.rim.length];
+      const ax=a[0]-d.cx,az=a[2]-d.cz,bx=b[0]-d.cx,bz=b[2]-d.cz;
+      const den=ax*bz-az*bx;
+      if(Math.abs(den)<1e-8) continue;
+      const u=((x-d.cx)*bz-(z-d.cz)*bx)/den,v=(ax*(z-d.cz)-az*(x-d.cx))/den;
+      if(u>=0 && v>=0 && u+v<=1) top=Math.max(top,d.cy+(a[1]-d.cy)*u+(b[1]-d.cy)*v);
+    }
+  }
+  return top;
+}
 const STATS = { lots: 0, snowdrifts: 0, kinds: {}, trails: 0, trailM: 0, spots: 0, puddles: [0, 0, 0], smash: 0, solids: 0, npcLive: 0, dogs: 0, people: 0, hitDogs: 0, ms: 0, trailMs: 0, tried: 0 };
 const PUDS = [[], [], []];                         // лужи по ярусам: [x, z, r, seed]
 const SPOTS = [];                                   // вытоптанные пятна: { x, z, r } — для луж
@@ -154,7 +172,7 @@ function buildSnowDrifts () {
   if (SNOW_MESH) { SNOW_MESH.removeFromParent(); SNOW_MESH.geometry.dispose(); SNOW_MESH.material.dispose(); }
   const positions = [], colors = [];
   const vertex = (x, y, z, rgb) => { positions.push(x, y, z); colors.push(rgb >> 16, (rgb >> 8) & 255, rgb & 255); };
-  STATS.snowdrifts = 0;
+  STATS.snowdrifts = 0; SNOW_TOP.clear();
   for (const s of LOTS) {
     if (s.kind === 'football' || s.kind === 'kiosks') continue;
     const c = frame(s), count = s.W > 30 ? 10 : 6;
@@ -171,6 +189,10 @@ function buildSnowDrifts () {
         const [x, z] = c.P(a + Math.cos(ang) * ra * wobble, b + Math.sin(ang) * rb * wobble);
         rim.push([x, A.groundH(x, z) + 0.058, z]);
       }
+      const d={cx,cz,cy,rim,x0:Math.min(...rim.map(p=>p[0])),x1:Math.max(...rim.map(p=>p[0])),z0:Math.min(...rim.map(p=>p[2])),z1:Math.max(...rim.map(p=>p[2]))};
+      for(let x=Math.floor(d.x0/16);x<=Math.floor(d.x1/16);x++) for(let z=Math.floor(d.z0/16);z<=Math.floor(d.z1/16);z++) {
+        const key=x+','+z,list=SNOW_TOP.get(key);if(list) list.push(d);else SNOW_TOP.set(key,[d]);
+      }
       for (let i = 0; i < rim.length; i++) {
         const next = rim[(i + 1) % rim.length], current = rim[i];
         vertex(cx, cy, cz, 0xe7eff0); vertex(...next, 0xdce6e9); vertex(...current, 0xdce6e9);
@@ -184,6 +206,7 @@ function buildSnowDrifts () {
   g.setAttribute('color', new THREE.Uint8BufferAttribute(new Uint8Array(colors), 3, true));
   g.computeBoundingSphere();
   SNOW_MESH = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }));
+  patchLegacySnow(SNOW_MESH.material);
   SNOW_MESH.visible = SEAS.snowAmt() > 0.45;
   A.scene.add(SNOW_MESH);
 }

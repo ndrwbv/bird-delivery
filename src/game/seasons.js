@@ -31,6 +31,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 
 import { t } from '../i18n/index.js';
+import { LEGACY_SNOW_GLSL, bindSnowUniforms, patchLegacySnow } from './snow/render.js';
 import { setPeopleSeason, redressHumans } from './people.js';
 import { growTree } from './trees.js';
 import * as EDL from './editlayer.js';         // редактор города: прятать убранные деревья на месте
@@ -149,6 +150,7 @@ vec2 seasonPatch (vec2 p) {
 }`;
 
 const TINT = `
+${LEGACY_SNOW_GLSL}
 #ifdef USE_COLOR_ALPHA
 #define S_LAND (vColor.a < 0.5)
 #else
@@ -182,7 +184,7 @@ vec3 autPal (float p, float seed) {
   a *= 0.86 + 0.28 * fract(seed * 13.7);
   return mix(a, a * vec3(1.12, 1.08, 1.0) + vec3(0.04, 0.02, 0.0), uGold);
 }
-vec3 seasonTint (vec3 c, float dryK, float snowK) {
+vec3 seasonTint (vec3 c, float dryK, float snowK, float landK) {
   vec3 ydd = abs(c - uYardP);
   float yardP = step(max(ydd.r, max(ydd.g, ydd.b)), 0.0022);   // дворовая дорожка (цвет-метка)
   vec3 N = normalize(cross(dFdx(vSW), dFdy(vSW)));
@@ -246,6 +248,14 @@ vec3 seasonTint (vec3 c, float dryK, float snowK) {
   vec3 snowC = mix(vec3(0.88, 0.91, 0.97), vec3(0.46, 0.48, 0.52), road * 0.6);
   snowC = mix(snowC, vec3(0.66, 0.68, 0.72), yardP * 0.55);   // утоптанный снег — серее
   c = mix(c, vec3(0.55, 0.7, 0.8), uSnow * water * up * 0.85);
+  cov *= 1.0 - snowOwned(vSW);
+  // The deformable layer replaces snow geometry, not the winter colour of
+  // the earth underneath it. Keep a packed white base on land, including
+  // grass-coloured raised edges: seams and compressed tracks cannot reveal
+  // summer-green soil during full winter. Cleared asphalt remains distinct.
+  float winterLand = landK * smoothstep(0.5, 0.82, uSnow)
+    * clamp(snowK, 0.0, 1.0) * (1.0 - water) * (1.0 - road);
+  cov = max(cov, winterLand * max(up, step(0.02, green)));
   return mix(c, snowC, cov);
 }
 `;
@@ -277,15 +287,15 @@ float sjDry = S_LAND ? ${dryK.toFixed(2)} : sjF > 254.5 ? ${propK.toFixed(2)} : 
 #else
 float sjDry = ${dryK.toFixed(2)};
 #endif
-diffuseColor.rgb = seasonTint(diffuseColor.rgb, sjDry, 1.0);`;
+diffuseColor.rgb = seasonTint(diffuseColor.rgb, sjDry, 1.0, S_LAND ? 1.0 : 0.0);`;
 export function seasonMat (m, dryK = 1, propK, smashJ) {
   const dry = propK === undefined ? dryK.toFixed(2) : '(S_LAND ? ' + dryK.toFixed(2) + ' : ' + propK.toFixed(2) + ')';
   m.onBeforeCompile = sh => {
     yardMark();
-    Object.assign(sh.uniforms, U);
+    Object.assign(sh.uniforms, U); bindSnowUniforms(sh);
     sh.vertexShader = 'varying vec3 vSW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
     sh.fragmentShader = (smashJ ? 'uniform float uYellow, uLeaf;\n' : '') + TINT + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' +
-      (smashJ ? SMJ_FRAG(dryK, propK === undefined ? dryK : propK) : 'diffuseColor.rgb = seasonTint(diffuseColor.rgb, ' + dry + ', 1.0);'));
+      (smashJ ? SMJ_FRAG(dryK, propK === undefined ? dryK : propK) : 'diffuseColor.rgb = seasonTint(diffuseColor.rgb, ' + dry + ', 1.0, S_LAND ? 1.0 : 0.0);'));
   };
   m.customProgramCacheKey = () => 'season' + dryK + (propK === undefined ? '' : 'p' + propK) + (smashJ ? 's' : '');
   return m;
@@ -296,7 +306,7 @@ export function winterRoadMat (blended = false) {
   // Нормаль берётся из настоящих граней колеи и сугробов; без flatShading
   // материал ожидает отсутствующий атрибут normal и чернит дорогу.
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, flatShading: true,
-    transparent: blended, depthWrite: !blended });
+    transparent: false, depthWrite: true });
   m.onBeforeCompile = sh => {
     sh.vertexShader = 'attribute float roadSand; attribute float roadBlend; varying float vRoadSand; varying float vRoadBlend; varying vec2 vRoadXZ;\n' +
       sh.vertexShader.replace('#include <begin_vertex>',
@@ -312,16 +322,11 @@ float winterNoise(vec2 p) {
 float grit = smoothstep(0.65, 0.82, winterNoise(vRoadXZ * 5.0)) * 0.18
            + smoothstep(0.78, 0.9, winterNoise(vRoadXZ * 1.2 + vec2(17.0))) * 0.025;
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.56, 0.47, 0.39), vRoadSand * grit);
-${blended ? `float feather = winterNoise(vRoadXZ * 0.8 + vec2(23.0));
-float patches = winterNoise(vRoadXZ * 0.28 + vec2(47.0)) * 0.72
-              + winterNoise(vRoadXZ * 1.05 + vec2(9.0)) * 0.28;
-float snowCover = mix(0.92, 1.0, smoothstep(0.26, 0.76, patches));
-diffuseColor.rgb *= mix(0.96, 1.0, patches);
-diffuseColor.a *= vRoadBlend * snowCover * smoothstep(0.04, 0.94, vRoadBlend + (feather - 0.5) * 0.18);
-if (diffuseColor.a < 0.005) discard;` : ''}`);
+${blended ? `// Same stationary coverage as the detailed surface.
+if (vRoadBlend < 0.05) discard;` : ''}`);
   };
-  m.customProgramCacheKey = () => blended ? 'winter-road-grit-blend6' : 'winter-road-grit-opaque6';
-  return m;
+  m.customProgramCacheKey = () => blended ? 'winter-road-grit-blend8' : 'winter-road-grit-opaque8';
+  return patchLegacySnow(m);
 }
 export function bindWinterRoadGroup (groups) {
   WINTER_ROAD_GROUPS = Array.isArray(groups) ? groups : [groups];
@@ -334,7 +339,7 @@ export function bindWinterRoadGroup (groups) {
    зелёные вершины: кашпо и цветы у пиццерии не перекрашиваются. */
 function smashMat (m) {
   m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, U);
+    Object.assign(sh.uniforms, U); bindSnowUniforms(sh);
     sh.vertexShader = 'attribute vec4 aux;\nvarying vec3 vSW;\nvarying float vK, vP, vSeed;\n' +
       sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvK = floor(aux.x * 255.0 + 0.5); vSeed = aux.y; vP = floor(aux.z * 255.0 + 0.5);')
         .replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
@@ -350,7 +355,7 @@ function smashMat (m) {
         c = mix(c, vec3(0.2, 0.5, 0.08), uFresh * 0.5);
         diffuseColor.rgb = mix(c0, c, leafy);
       }
-      diffuseColor.rgb = seasonTint(diffuseColor.rgb, vK == 1.0 ? 0.0 : 0.6, 1.0);`);
+      diffuseColor.rgb = seasonTint(diffuseColor.rgb, vK == 1.0 ? 0.0 : 0.6, 1.0, 0.0);`);
   };
   m.customProgramCacheKey = () => 'seasonSmash';
   return m;
@@ -361,7 +366,7 @@ function pileMat () {
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   m.defines = { MAT_LEAF: '' };                   // 2г11: зелень склейки (листва) — на просвет против солнца (materials.js)
   m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, U);
+    Object.assign(sh.uniforms, U); bindSnowUniforms(sh);
     sh.vertexShader = 'attribute vec4 aux;\nuniform float uLeaf, uFallen, uDrift, uNY, uGale, uTime, uBloom, uBerry, uSnow;\nuniform vec2 uGaleD;\nvarying vec3 vSW;\nvarying float vK, vP, vSeed;\n' + (WOOD_ON ? 'varying vec3 vFolN;\n' : '') +
       sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         vK = floor(aux.x * 255.0 + 0.5); vSeed = aux.y; vP = floor(aux.z * 255.0 + 0.5);${WOOD_ON ? `
@@ -380,6 +385,7 @@ function pileMat () {
         .replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
     sh.uniforms.uSeeP = SEE_U;
     sh.fragmentShader = 'uniform float uYellow;\nvarying float vK, vP, vSeed;\n' + (WOOD_ON ? 'varying vec3 vFolN;\n' : '') + TINT + BAYER_FN + SEE_FN + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      if (vK == 3.0 && snowOwned(vSW) > 0.5) discard;
       if (vK != 2.0 && vK != 3.0) seeCut(vSW);       // между камерой и машиной — тает (seethru.js); листья и сугробы на земле — нет
       if (vK == 1.0) {
         vec3 pal = autPal(vP, vSeed);                 // яркая сухая осень — сочнее (uGold внутри)
@@ -389,7 +395,7 @@ function pileMat () {
       if ((vK == 0.0 || vK == 7.0) && vP > 0.5 && vP < 1.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.88, 0.91, 0.97), uSnow);   // снег на верхней стороне веток (палитра 1 у ствола и веток — trees.js)
       float wEver = vK == 0.0 && vP > 1.5 && vP < 2.5 ? 1.0 : 0.0;   // хвоя новых сосен и елей (палитра 2, treeform.js): снег гуще
       float wFol = vK == 1.0 ? 1.0 : wEver;
-      diffuseColor.rgb = seasonTint(diffuseColor.rgb, 0.0, wEver > 0.5 ? ${WOOD_ON ? '1.45' : '0.62'} : vK == 0.0 || vK == 4.0 || vK == 7.0 ? 0.62 : 1.0);`);
+      diffuseColor.rgb = seasonTint(diffuseColor.rgb, 0.0, wEver > 0.5 ? ${WOOD_ON ? '1.45' : '0.62'} : vK == 0.0 || vK == 4.0 || vK == 7.0 ? 0.62 : 1.0, 0.0);`);
     if (WOOD_ON) sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
       if (wFol > 0.5) {
         // мягкая крона (2г6): нормаль — плавная, от середины комка и кроны, свет без граней
@@ -422,7 +428,7 @@ function garlandMat () {
   const m = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
   m.userData.glow = 1;                        // игра не темнит его ночью (FLAT_MATS)
   m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, U);
+    Object.assign(sh.uniforms, U); bindSnowUniforms(sh);
     sh.vertexShader = 'attribute vec4 aux;\nuniform float uNY;\nvarying float vPh;\n' +
       sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         vPh = aux.z; if (aux.y >= uNY) transformed = vec3(0.0, -3000.0, 0.0);`);
@@ -1470,6 +1476,7 @@ function stepCar (dt) {
   for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
     for (const d of DRIFTS.get(i + ',' + j) || []) {
       if (d.seed >= A.drift || d.s < 0.5) continue;
+      if (C.snowOwns?.(V.x, V.z, C.groundH(V.x, V.z))) continue;
       const dx = V.x - d.x, dz = V.z - d.z;
       if (Math.abs(dx) > d.L + 2.5 || Math.abs(dz) > d.L + 2.5) continue;
       const lx = dx * d.cs - dz * d.sn, lz = dx * d.sn + dz * d.cs;         // в осях сугроба

@@ -239,6 +239,7 @@ import * as RELIEF from './relief.js';          // неровный газон: 
 import * as OSKM from './osk.js';                // экранная клавиатура Стима в полях ввода: поднять, гасить автоповтор, геймпад — не игре (osk.js)
 import * as RW from './roadwear.js';            // асфальт разный: свежий, ровный, в заплатках, старый, разбитый (roadwear.js)
 import * as WINROAD from './winterroads.js';     // зимняя дорога: местами песок, колея, сгребённый снег и рыхлые участки
+import * as SNOW from './snow/index.js';
 import * as SNOWPRINT from './snowimprint.js';   // примятый снег под колёсами вне дороги
 import * as LAWN from './lawn.js';              // пятна на газоне — в краске земли (lawn.js)
 import * as SHORT from './shortcuts.js';        // тропинки-срезки через газоны дворов (shortcuts.js, 2г9)
@@ -2944,6 +2945,7 @@ function* smashBuild () {
    LITM (smashSwap) — до неё вещи правят старые (вершины те же: копия берётся здесь, в том же шаге поздней сборки) */
 const SMJ_OLD = [];
 function smashToMesher (M) {
+  SNOW.captureBenches(BENCHES);                    // маленькие опоры досок до освобождения индексов склейки
   let nv = 0;
   for (const ch of SM_CHUNKS.values()) {
     const m = ch.mesh;
@@ -6688,7 +6690,7 @@ const sparkGeo = new THREE.BoxGeometry(0.11, 0.11, 0.11);
 const bitGeo = new THREE.BoxGeometry(0.22, 0.22, 0.22);
 const puffGeo = new THREE.IcosahedronGeometry(0.5, 0);
 FXP.init({ scene, cam, geo: { spark: sparkGeo, bit: bitGeo, puff: puffGeo }, fxLow: GFX.fxLow, fxDrop: GFX.fxDrop, fxLife: GFX.fxLife, legacy: (m, o, f) => fxAdd(m, o, f) });
-SNOWPRINT.init(scene);
+if (!SNOW.enabled) SNOWPRINT.init(scene);
 const fxPart = FXP.part;
 
 /* Высоты у эффектов передаются от земли: пол под частицей берём один
@@ -7998,6 +8000,7 @@ function seatIn (p, b, dt) {
   const r = p.grp.rotation.y, dr = Math.atan2(Math.sin(b.ry - r), Math.cos(b.ry - r));
   p.grp.rotation.y = r + dr * Math.min(1, dt * 10);
   p.grp.userData.qSeat = PV.benchSeat(b);
+  if (Math.hypot(p.x-b.x,p.z-b.z)<0.2) SNOW.press(b, p.x, p.z);
 }
 function offBench (p, ry) {
   if (p.grp) p.grp.userData.qSeat = 0;
@@ -8009,6 +8012,7 @@ function offBench (p, ry) {
    полежал, встал, погрозил кулаком) и дальше как жил: гуляющий — по тротуару, гость — ждёт пиццу стоя, клиент с пиццей
    на лавочке — роняет коробку, подбирает (carried.js) и злой уходит домой; подъезда рядом нет — коробки нет */
 function benchDown (pr, nx, nz) {
+  SNOW.hit(pr, 1);
   for (const p of PEOPLE) {
     if (p.dead || p.fall) continue;
     const ab = p.after && p.after.b;
@@ -12939,7 +12943,8 @@ let SUP_ROOF = false;
 function supportAt (x, z, y) {
   const g = iceSurf(x, z, y), r = ROOFM.at(x, z, y);
   SUP_ROOF = r > g;
-  return SUP_ROOF ? r : g;
+  const bare = SUP_ROOF ? r : g;
+  return bare;
 }
 /* твёрдое у точки для кузова: стены, стволы, ракушки газона, стволы ельника (список — до следующего вызова) */
 const carSolids = (x, z) => FOREST.withTrees(LAWNP.withSolids(solidsNear(x, z), x, z), x, z);
@@ -12970,11 +12975,13 @@ function driveStep (dt) {
   NOS.was = NOS.burn;
 
   const sand = V.air || flyOn ? 0 : BEACH.sandAt(V.x, V.z);  // песок пляжа: вязнет — разгон меньше, тормозит, сильнее заносит (beach.js SAND)
-  const softSnow = V.air || flyOn ? 0 : WINROAD.softUnderCar(V.x, V.z, V.h, SEAS.snowAmt());
-  const roadSand = V.air || flyOn ? 0 : WINROAD.sandUnderCar(V.x, V.z, V.h, SEAS.snowAmt());
-  const inRut = V.air || flyOn ? 0 : WINROAD.rutAt(V.x, V.z, V.h, SEAS.snowAmt());
+  const snowOwned = !flyOn && SNOW.ownsSurface(V.x, V.z, V.y);
+  const snowGrip = snowOwned ? SNOW.grip(V, car) : null;
+  const softSnow = V.air || flyOn ? 0 : snowGrip ? snowGrip.soft : WINROAD.softUnderCar(V.x, V.z, V.h, SEAS.snowAmt());
+  const roadSand = V.air || flyOn ? 0 : snowGrip ? snowGrip.sand : WINROAD.sandUnderCar(V.x, V.z, V.h, SEAS.snowAmt());
+  const inRut = V.air || flyOn ? 0 : snowGrip ? snowGrip.rut : WINROAD.rutAt(V.x, V.z, V.h, SEAS.snowAmt());
   if (IN.gas && !V.air && !dead) vf += acc * Math.max(flyOn ? 0 : 0.25, 1 - vf / vmax) * (sand ? 1 - BEACH.SAND.ACC * Math.min(1, sand) : 1) * (1 - softSnow * WINROAD.WINTER_ROAD.SOFT_ACC) * dt;
-  const wet = Math.min(1, ENV.rain + SEAS.slip()) * (1 - 0.45 * roadSand) * (1 - 0.18 * inRut);   // в колее и на посыпанном снегу лучше держит
+  const wet = Math.min(1, ENV.rain + SEAS.slip() * (snowGrip ? snowGrip.snow : 1) * (1 - 0.45 * roadSand) * (1 - 0.18 * inRut));   // в колее и на посыпанном снегу лучше держит
   if (IN.brake) vf -= (vf > 0.4 ? BRK * (1 - wet * WET.BRAKE) : dead ? 0 : ACC * 0.5) * dt;
   if (dead) vf -= vf * 0.55 * dt;                 // без мотора — накатом до остановки
   vf = clamp(vf, -15, beast ? VMAX * BEAST.NITRO : Math.max(VBOOST, vmax));
@@ -13009,9 +13016,9 @@ function driveStep (dt) {
   V.x += V.vx * dt;
   V.z += V.vz * dt;
   V.wheel += (vf + (IN.gas && !dead ? softSnow * WINROAD.WINTER_ROAD.WHEEL_SPIN : 0)) * dt / 0.46;
-  WINROAD.spray(V, IN.gas && !dead, softSnow, dt, fxPart);
-  if (!V.air && !flyOn) WINROAD.scatter(V, Math.abs(vf), SEAS.snowAmt(), fxPart);
-  { const snow = SEAS.snowAmt();
+  if (!snowOwned) WINROAD.spray(V, IN.gas && !dead, softSnow, dt, fxPart);
+  if (!snowOwned && !V.air && !flyOn) WINROAD.scatter(V, Math.abs(vf), SEAS.snowAmt(), fxPart);
+  if (!SNOW.enabled) { const snow = SEAS.snowAmt();
     if (snow > 0.55 && !flyOn) {
       const road = nearestRoad(V.x, V.z, 7, 1);
       SNOWPRINT.step(V, snow, !PAVE.onPave(V.x, V.z, 2) && !PZD.blocks(V.x, V.z, 2) &&
@@ -13374,11 +13381,15 @@ function driveStep (dt) {
   // Опора — supportAt: земля, мост, лёд или крыша низкого дома (roofs.js); у большого трамплина свой размер (jumps.js)
   const lift = rampLift(V.x, V.z);
   if (lift > 0) V.ramp = RAMP_ON;
-  const gnd = supportAt(V.x, V.z, V.y - (V.rlift || 0)) + lift;
+  let gnd = supportAt(V.x, V.z, V.y - (V.rlift || 0)) + lift;
   const onRoof = SUP_ROOF && !lift;
   const landSupport = (RLAND.ST.supportReady||RLAND.ST.built) && !V.air && !flyOn && !onRoof && !lift && Math.abs(gnd-groundH(V.x,V.z))<.05
     ? landCarSupport(V,landDriveOffset,dt) : null;
   if(!landSupport)V.landPose=null;
+  // Snow is a compliant four-wheel offset, independent of visual tile loading.
+  // Decide solid-land support before adding it so snow cannot toggle that mode.
+  const snowPose = SNOW.vehicleSupport(V, car, dt, !V.air && !flyOn && !lift && !V.wade && V.sink === undefined);
+  gnd += snowPose.lift;
   const rp = V.ramp || RAMP_SMALL;
   if (flyOn) {
     // летающий родстер (flycar.js): взлёт, держит высоту, снижается и садится на опору (земля, мост, твёрдая крыша) без удара
@@ -13430,6 +13441,8 @@ function driveStep (dt) {
     l2+=landSupport.left-landDriveOffset(V.x+sx*.9,V.z+sz*.9);
     r2+=landSupport.right-landDriveOffset(V.x-sx*.9,V.z-sz*.9);
   }
+  f2 += snowPose.front; t2 += snowPose.back;
+  l2 += snowPose.left; r2 += snowPose.right;
   // в полёте нос идёт за траекторией, на земле — за уклоном
   if (V.sink !== undefined) { f2 = t2 + clamp(V.sink - 0.5, 0, 1) * -1.3; l2 = r2 = 0; }
   const flyNow = FLYC.on();                        // в полёте родстера кузов ровный: нос чуть вверх на взлёте (flycar.js pitch)
@@ -13506,6 +13519,7 @@ function hurtCar (dmg, vn, hx, hz, mat) {          // mat — во что (зв�
   if (DLG.isOpen()) return;                        // окно разговора: мир идёт, а руль не твой — машину не бьют (ни поток, ни таран)
   if (FXS.shieldT > 0) { sparks(hx === undefined ? V.x : hx, 1, hz === undefined ? V.z : hz, 6); return; }
   dentCar(car, hx === undefined ? V.x : hx, hz === undefined ? V.z : hz, vn);   // мятина видна на кузове
+  if (vn > 2) SNOW.hit(car, Math.min(0.5, vn / 60));
   REPLAY.crash(vn);                                // авария (от 15 м/с): короткое замедление, тряска, «вуух» (replay.js)
   if (!(dmg > 0)) { rumble(0.3, 120); return; }    // толчок: без урона и без «удара» (смена без ударов цела)
   if (S.hurt > 0) return;
@@ -13574,7 +13588,7 @@ HCAM.init({ THREE, cam, scene, V, S, IN, pad: PAD, car: () => car, mode: () => C
 DLG.gate(HCAM.gate);                              // окно разговора с клиентом сразу после вручения — сначала сцена
 /* подъезд в 3D (minigames/stairs3d.js, 12ас): люди — как в городе, но не в «дальних» (humanLod считает от камеры города) */
 /* доставка от первого лица (fpdeliver.js, Д2, проба ?fpdeliver): перед подъездом — глазами курьера от машины до двери */
-FPD.init({ THREE, cam, scene, V, S, pad: PAD, car: () => car, groundH, courier: () => STORY.PERSON.courier(), box: n => pizzaBox(n),
+FPD.init({ THREE, cam, scene, V, S, pad: PAD, car: () => car, groundH, snowFoot: SNOW.foot, courier: () => STORY.PERSON.courier(), box: n => pizzaBox(n),
   human: (p, o) => { const g = makeHuman(p, o); HUMANS.delete(g); return g; }, drop: dropMesh,
   door: (x, z) => nearEntrance(x, z, ECON.DOOR.DOOR_R), setTrunk, trunk: () => trunkPoint(), seatOf: t => CEX.DEBUG.seatOf(t),
   parking: { road: (x, z) => nearestRoad(x, z, 7, 3), route: (x0, z0, x1, z1) => lanePath(x0, z0, x1, z1),
@@ -16888,7 +16902,7 @@ function startRun (ride) {
   S.state = 'drive'; S.hp = S.hpMax; S.money = 0; S.orders = 0; S.burgers = 0; S.shiftT = 0;
   S.people = 0; S.wrecks = 0; S.delivered = 0; S.scoots = 0; S.revives = 0;
   JUMPS.reset();                                   // Толик про крышу — снова раз за смену (jumps.js)
-  SNOWPRINT.reset();                               // зимние следы от прошлого выезда
+  if (!SNOW.enabled) SNOWPRINT.reset();                               // зимние следы от прошлого выезда
   GUN.shiftStart();                                // гранатомёт: полный ящик на смену (turret.js)
   JUNK.reset();                                    // снесённые остановки и контейнеры — на место, S.stops = 0 (junk.js)
   HAV.reset();                                     // счёт разрушений за смену — с нуля (havoc.js)
@@ -17356,7 +17370,7 @@ function startPose () {
 
 /* ─────────────── сборка мира ─────────────── */
 /* времена года: что им нужно от игры (ENV, дождь и небо заводятся ниже — геттерами) */
-SEAS.initSeasons({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds,
+SEAS.initSeasons({ snowOwns: SNOW.ownsSurface, THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds,
   put, smashAdd, SMASH, SMASH_MAT, LAMP_SPOTS, ZEBRAS, NODE_IDX, nodeDeg, makeHuman, dropMesh, gibHuman, toast, Snd, CAR_L, CAR_W, isPlaying, sayBubble,
   obb, SOLIDS, PARKED, get COURIER_SLOTS () { return COURIER_SLOTS; },
   get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get rainLines () { return rainLines; }, get hemi () { return hemi; } });
@@ -17432,7 +17446,7 @@ ZN.init({ CITY, MAP, donated, groundH });      // groundH — Томь не кв
 DLG.init({ pause: on => { for (const k in IN) IN[k] = 0; touchReset(); }, face: (p, size) => faceDataURL(p, size),
   sfx: name => DOOR.talkSfx(name),
   clock: () => CAREER && !S.free && ['drive', 'back', 'side'].includes(S.state) ? dashState() : null });
-HITS.init({ THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, nearestRoad, driftTop: SEAS.driftTop, pavedLift: TRK.pavedLift, groundNormal, emote, puff, pushOut, Snd,
+HITS.init({ THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, nearestRoad, driftTop: (x, z, y) => SNOW.top(x, z, y, SEAS.driftTop(x, z)), snowImpact: SNOW.body, pavedLift: TRK.pavedLift, groundNormal, emote, puff, pushOut, Snd,
   burst: burstHuman, scare, callAmbulance, adult: GORE_ON, shred: shredHit, spray: bloodSpray, bounce: bounceBody });
 /* проба: настоящие машины в потоке (realcar.js TRAFFIC). realSwap — лёгкую машину потока меняет на настоящую «Семёрку» /
    «Копейку» с вероятностью SHARE: когда модели загрузились (первые машины смены ставятся раньше) — те, что сейчас не
@@ -17707,7 +17721,7 @@ const TRAFFIC_N = 24;
 LATE.add('traffic', () => spawnTraffic(INTRO ? 22 : Math.min(TRAFFIC_N, trafficWant())));
 if (!INTRO) LATE.add('spots', function* () { yield* STARTUP.steps('addresses.buildSpots', buildSpots()); if(ADDRESS_CATALOG)STARTUP.work('addresses.sealCatalog',()=>ADDRESS_CATALOG.sealSpots()); if(ADDRESS_PREPARED17)STARTUP.work('addresses.reconcileSeal',()=>ADDRESS_PREPARED17.sealSpots()); yield 'spots'; STARTUP.work('addresses.buildCollect', buildCollect); });
 /* погода смены (weather.js): сугробы снежной зимы — после адресов, чтобы их не завалить */
-LATE.add('weather', () => WTH.init({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, SPOTS, ZEBRAS, Snd, toast, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds, jumpBlocks: JUMPS.blocks,
+LATE.add('weather', () => WTH.init({ snowOwns: SNOW.ownsSurface, THREE, scene, cam, renderer, Store, MAP, CITY, V, S, SPOTS, ZEBRAS, Snd, toast, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds, jumpBlocks: JUMPS.blocks,
   makeHuman, dropMesh, gibHuman, CAR_L, CAR_W, isPlaying, intro: INTRO, PIZZERIAS, get PIZZA () { return PIZZA; },
   ARCHES, realAddress, puff, quick: () => QR.on(),   // ураган (hurricane.js): дома с аркой не уносит, адрес в подписи, пыль, быстрый заезд не сохраняет
   get ENV () { return ENV; }, get sun () { return sun; }, get hemi () { return hemi; }, get amb () { return amb; }, get rainLines () { return rainLines; } }));   // струи — ливень гуще (weather.js)
@@ -18581,6 +18595,29 @@ const LIFE_API = {
 // следы колёс (tracks.js): меш — сейчас, до renderer.compile, чтобы шейдер собрался под экраном загрузки
 TRK.init({ THREE, scene, V, IN, CITY, groundH, surfaceAt, iceY: ICEM.iceY, curbAt, inPoly, nearestRoad, car: () => car, pizzerias: () => (PIZZERIAS.length ? PIZZERIAS : [PIZZA]) });
 DRIFTM.init({ groundAt: TRK.groundAt, iceY: ICEM.iceY });
+SNOW.init({ scene, V, IN,
+  groundH: (x, z) => { const h = terrainH(x, z); return RLAND.onLand(x, z) ? h + RLAND.topOffset(x, z, h) : groundH(x, z); },
+  curbAt, inHouse, inBounds, bridges: BRIDGES, deckAt, roofs: ROOFM,
+  roadSample: WINROAD.sampleSurface, pavedLift: TRK.pavedLift, onPave: PAVE.onPave,
+  isRaisedLand: RLAND.onLand,
+  pavedY(x, z) {
+    if (!(RLAND.ST.supportReady || RLAND.ST.built)) return NaN;
+    const lift = RLAND.cover.height(x, z);
+    return Number.isFinite(lift) && lift < 0.49 ? terrainH(x, z) + lift : NaN;
+  },
+  nearCurb: (x,z) => RLAND.ON && (RLAND.boundaryAt(x,z,1,0) || RLAND.boundaryAt(x,z,-1,0) || RLAND.boundaryAt(x,z,0,1) || RLAND.boundaryAt(x,z,0,-1)),
+  waterAt: STREAMS.under, iceY: ICEM.iceY, driftTop: SEAS.driftTop, lotSnowTop: WASTE.snowTop,
+  car: () => car, traffic: () => TACT, walkers: walkersAll,
+  benches: BENCHES, canopies: JUNK.DEBUG.STOPS, carSnow: () => DIRT.ST.snow,
+  onShed: (root, amount) => { if (root === car) DIRT.DEBUG.set(undefined, Math.max(0, DIRT.ST.snow - amount)); },
+  profile: () => WTH.id(),
+  ready: () => !LATE.busy(), live: () => isPlaying() && S.state !== 'loading', flying: () => FLYC.on(),
+  snowAmount: SEAS.snowAmt, snowfall: SEAS.snowFall, wetness: SEAS.wetAmt,
+  thaw: () => WTH.id() === 'thaw' ? 1 : SEAS.snowAmt() < 0.2 ? 0.5 : 0,
+  wind: SEAS.blizzard, material: m => { FSH.mat(m); SUNSH.receive(m); },
+  spray: e => fxPart('puff',e.x,e.y,e.z,0xeaf2f4,e.size || 0.13,0.5,
+    {vx:e.vx,vz:e.vz,vy:e.vy,life:0.35,max:0.35,grow:1.3,gravity:4})
+});
 
 /* ─────────────── цикл ─────────────── */
 let last = performance.now(), tG = 0;
@@ -18806,6 +18843,7 @@ function frameStep (now) {
   if (CAREER) CL.step('daily', DAILY.step, dt);   // задания на день: удары, сбитые, кофе, записка в начале смены (daily.js)
   CL.at.ph = 'world';
   CL.step('seasons', SEAS.updateSeasons, dt);                         // снег, небо, снежки
+  CL.step('snow.surface', SNOW.step, dt);
   CL.step('weather', WTH.update, dt);                                // жара, гроза с молниями, сугробы и ледянки (weather.js)
   CL.step('impact', IMPACT.step, dt);                                 // скрежет бортом — петля, пока трёшься (impact.js)
   CL.step('ambience', AMBI.step, dt);                                 // город шумит: птицы, сверчки, дождь по крыше, толпа, стройка (ambience.js)
@@ -19011,6 +19049,7 @@ WARM.init({ THREE, renderer, scene, cam, drop: dropMesh, variants: objs => SUNSH
     }
     return out;
   } });
+LATE.add('snow.surface', SNOW.prepare);
 LATE.add('warm', WARM.compile);
 LATE.add('warmUse', WARM.ready);
 LATE.add('freeze', () => CULL.freeze(scene, cam, PROPS));   // город собран: неподвижное — в заморозку и отсечение
@@ -19135,6 +19174,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   // песочница: сюжет, карта, сохранения, старт смены, кошелёк, читы
   STORY, STORY_DBG: STORY.DEBUG, MAP, Store, SBX, CARSM: AUTO, startRun, goRun, endShift, wallet, addWallet, hudHearts, marker, updateEnv, humanLod, get SPOTS_N () { return SPOTS.length; },
   DRIVERS, SMOKERS, NITRO_CANS, NOS, RESPECT: RESPECT.DEBUG, RESPECT_API: RESPECT, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, SKY: SKYM.SKY, SKY_LIGHT: SKYM.LIGHT, MATS: MATS.MAT, PIGEONS, FLOCKS, AMB, INCIDENTS, scare, RIVALS, FOES, RIVSTAT: RIVAL_STATS, rivalBoard: () => rivalBoard(), THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, drivingPath: (x0, z0, x1, z1, h, deck) => roadPath(x0, z0, x1, z1, h, deck, true), FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, XLIFE, askRevive, addWallet, RQ: RQ.DEBUG, HINTS_API: HINTS };
+if (window.__dlv) window.__dlv.SNOW = SNOW.DEBUG;
 if (window.__dlv) Object.assign(window.__dlv, { FXP: { S: FXP.STATS, count: FXP.count, part: fxPart, FX, puff, fire, nosFlame, steam, splash, crumbs, emote }, FXQ: FXP.FXP });   // частицы из запаса (fxpool.js): S — родилось / живо / пик / рост / ?oldfx
 if (window.__dlv) Object.assign(window.__dlv, { IXS, MESHM: () => ({ lit: LITM.memStat(), flat: FLATM.memStat() }), WINROAD: { ST: WINROAD.ST, softAt: WINROAD.softAt, softUnderCar: WINROAD.softUnderCar, sandAt: WINROAD.sandAt, sandUnderCar: WINROAD.sandUnderCar, rutAt: WINROAD.rutAt, snowAmt: SEAS.snowAmt }, LITN: () => { let b = 0; for (const L of [LIT, FLAT, LAMPH]) for (const g of L) b += g.p ? g.p.byteLength : g.attributes.position.array.byteLength * 2; return { lit: LIT.length, flat: FLAT.length, lamph: LAMPH.length, mb: +(b / 1048576).toFixed(1), smash: SMASH.length }; }, HPOOL: HPOOL.DEBUG, HSK: HSTATS, holdFixed, FAHEAD: FAHEAD.STATS, makeHuman, freshHuman, makePerson, setSeason: SEAS.setSeason, SEASMEM: SEAS.pileMem, CSNOW: CSNOW.DEBUG, PETW: PETW.DEBUG });   // запас готовых людей: собрано на ходу / из запаса, ключи (humanpool.js)
 if (import.meta.env.DEV && new URLSearchParams(location.search).has('winterdebug'))

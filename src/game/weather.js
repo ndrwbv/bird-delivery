@@ -618,6 +618,7 @@ function deepTop (x, z) {
 let deepT = 0, inDeep = false;
 function stepDeep (dt) {
   const V = C.V, sp = Math.hypot(V.vx, V.vz);
+  if (C.snowOwns?.(V.x, V.z, C.groundH(V.x, V.z))) { inDeep = false; return; }
   deepT -= dt;
   if (sp < 1) { inDeep = false; return; }
   const ci = Math.floor(V.x / 20), cj = Math.floor(V.z / 20);

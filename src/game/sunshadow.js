@@ -10,8 +10,8 @@
       точек (2048² — 8,6 см на точку). Карт две (2г16, автор 25.10: «тени меняются очень дёргано, будто солнце постоянно
       идёт»): одна показана, вторая — запасная, в неё рисуется следующая по частям (SS.KMAX кадров, не больше SS.BUDGET
       треугольников за кадр — без рывка кадра), потом карты меняются местами.
-      — Солнце для теней держится на месте, пока настоящее не уйдёт на SS.STEP°; тогда новая карта (с направлением чуть
-        наперёд — ошибка ±STEP/2) и плавное перетекание старой в новую за SS.FADE с (обе выборки только на это время).
+      — Направление теней сохраняется на SS.SUN_EVERY с. Если солнце ушло на SS.STEP°, новая карта плавно
+        перетекает из старой за SS.FADE с (обе выборки только на это время). Снег принимает тень города.
         Свет (сила, цвет, какая грань от солнца) идёт как раньше — плавно каждый кадр.
       — Фокус отъехал от середины карты на SS.MOVE м или прошло SS.EVERY с (сбили фонарь, сменился сезон) — та же
         карта с новой серединой, переключение сразу: середина — по точкам карты, тот же кусок тени попиксельно тот же.
@@ -22,7 +22,7 @@
       матрицей, материал — копия своего, где шейдер сразу после вершин пишет только глубину (вершины двигает та же
       программа: сезонная листва, ураган). Горизонтальное (земля, дороги, крыши, низ балконов) тень не отбрасывает —
       тень дома дают стены, лишних «прыщей» на земле нет.
-      Кто отбрасывает: склейки города (дома, балконы, реквизит, фонари, провода — LITM), деревья и сугробы (PILE),
+      Кто отбрасывает: склейки города (дома, балконы, реквизит, фонари, провода — LITM), деревья (PILE),
       ельник (forest.js), набор балконов (balconyKit), всё неподвижное Lambert-овое на сцене; и что передали
       cast(mesh). Машины, люди и звери — нет (у них свои пятна, fakeshadows.js); трава газона — нет.
    2. КТО ПРИНИМАЕТ. Каждый материал города (Lambert: земля, дороги, стены, крыши, деревья, трава, балконы; Basic:
@@ -50,6 +50,7 @@ import * as THREE from '../vendor/three.module.min.js';
 const Q = typeof location === 'undefined' ? new URLSearchParams() : new URLSearchParams(location.search);
 const BAN = Q.has('noshadows') || Q.has('oldlook');
 const FORCE = Q.has('shadows');
+const LIVING_SNOW = Q.get('snowv2') !== '0';
 
 export const SS = {
   N: +Q.get('ssn') || 2048,  // сторона карты, точек
@@ -58,7 +59,8 @@ export const SS = {
   MOVE: 14,                  // фокус отъехал от середины карты на столько м — та же карта с новой серединой
   COV: [51, 67],             // тень растворяется от фокуса (м поперёк лучей): с запасом на MOVE до края карты
   STEP: 1,                   // солнце ушло от солнца теней на столько градусов — новая карта с перетеканием
-  FADE: 1,                   // перетекание старой карты в новую, с
+  FADE: 6,                   // мягкое обновление запечённого направления, с
+  SUN_EVERY: 20,             // направление теней обновляется не чаще этого, с реального времени
   EVERY: 4,                  // и в любом случае раз в столько секунд (сбили фонарь, сменился сезон) — сразу, без перетекания
   BUDGET: 300000,            // треугольников карты за кадр (больше — карта рисуется по частям за несколько кадров)
   KMAX: 6,                   // не больше стольких частей
@@ -189,11 +191,19 @@ vec2 ssShade () {
 `;
 
 /* приёмник: Lambert / Phong / Standard — прямой свет солнца и рассеянный; Basic — весь цвет */
-function inject (sh, lit, thin) {
+function inject (sh, lit, thin, snow = false) {
   if (sh.fragmentShader.indexOf('ssShade') >= 0) return;
   Object.assign(sh.uniforms, U);
   sh.vertexShader = 'varying vec3 vSsW;\n' + sh.vertexShader.replace('#include <project_vertex>', VERT);
   let f = (thin ? '#define SS_THIN\n' : '') + withSS(HEAD + sh.fragmentShader, true);
+  if (snow) {
+    // Snow normals are continuous across the shared rest grid. Triangle
+    // derivatives would turn a LOD seam or a tyre stamp into a moving shadow.
+    sh.vertexShader = 'varying vec3 vSsSnowNormal;\n' + sh.vertexShader.replace('#include <beginnormal_vertex>',
+      '#include <beginnormal_vertex>\nvSsSnowNormal = normalize(mat3(modelMatrix) * objectNormal);');
+    f = 'varying vec3 vSsSnowNormal;\n' + f.replace(
+      'vec3 N = normalize(cross(dFdx(vSsW), dFdy(vSsW)));', 'vec3 N = normalize(vSsSnowNormal);');
+  }
   if (lit && f.indexOf('#include <lights_fragment_begin>') >= 0) {
     const ch = THREE.ShaderChunk.lights_fragment_begin.replace('getDirectionalLightInfo( directionalLight, directLight );',
       'getDirectionalLightInfo( directionalLight, directLight );\n\t\tdirectLight.color *= ssDirK;');
@@ -224,9 +234,9 @@ export function receive (m, thin = false) {
   const prev = m.onBeforeCompile, key = Object.prototype.hasOwnProperty.call(m, 'customProgramCacheKey') ? m.customProgramCacheKey : null, pk = prev ? String(prev) : '';
   m.onBeforeCompile = function (sh, r) {
     if (prev) prev.call(this, sh, r);
-    inject(sh, lit, thin);
+    inject(sh, lit, thin, !!m.userData.snowSurface);
   };
-  m.customProgramCacheKey = function () { return (key ? key.call(this) : pk) + (thin ? '|sst' : '|ss'); };
+  m.customProgramCacheKey = function () { return (key ? key.call(this) : pk) + (m.userData.snowSurface ? '|ss-snow' : thin ? '|sst' : '|ss'); };
   m.needsUpdate = true;
   ST.mats++;
   return m;
@@ -253,6 +263,8 @@ function depthOf (m) {
       : /forestSnow/.test(d.customProgramCacheKey()) && sh.fragmentShader.indexOf('varying float vSnow') >= 0 ? 'vSnow < -0.5' : '';
     const lace = !leaf ? '' : `    if (${leaf}) { vec3 lq = fract(floor(vSsD * 2.6) * 0.1031); lq += dot(lq, lq.yzx + 33.33);
       if (fract((lq.x + lq.y) * lq.z) < ${SS.LACE.toFixed(2)}) discard; }`;
+    const groundSnow = LIVING_SNOW && sh.fragmentShader.indexOf('varying float vK, vP, vSeed') >= 0
+      ? 'if (vK == 3.0) discard;' : '';
     sh.vertexShader = 'varying vec3 vSsD;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
 { vec4 ssP = vec4(transformed, 1.0);
 #ifdef USE_INSTANCING
@@ -262,6 +274,7 @@ function depthOf (m) {
     // фрагмент: сразу глубина — ни цвета, ни сезонных правок, ни растворения у камеры; горизонтальное — мимо
     sh.fragmentShader = 'varying vec3 vSsD;\n' + sh.fragmentShader.replace(/void\s+main\s*\(\s*\)\s*\{/, `void main() {
   { vec3 ssN = normalize(cross(dFdx(vSsD), dFdy(vSsD)));
+    ${groundSnow}
     if (abs(ssN.y) > ${SS.FLAT.toFixed(3)}) discard;
 ${lace}
 #if defined(USE_COLOR) || defined(USE_COLOR_ALPHA)
@@ -277,7 +290,7 @@ ${lace}
   ST.depthMats++;
   return d;
 }
-const castable = m => m && m.isMaterial && !m.userData.fsCar && !m.userData.dirt && !m.isShaderMaterial && !m.isRawShaderMaterial && !m.isMeshBasicMaterial && m.visible !== false && m.fog !== false &&
+const castable = m => m && m.isMaterial && !m.userData.fsCar && !m.userData.dirt && !m.userData.snowSurface && !(LIVING_SNOW && m.userData.livingSnowOwner) && !m.isShaderMaterial && !m.isRawShaderMaterial && !m.isMeshBasicMaterial && m.visible !== false && m.fog !== false &&
   (m.isMeshLambertMaterial || m.isMeshPhongMaterial || m.isMeshStandardMaterial) && !(m.transparent && m.opacity < 0.6) && m.depthWrite !== false;   // глубину не пишет (следы шин, пятна) — тень не отбрасывает
 
 let SCENE = null, R = null, SHS = null, LCAM = null;
@@ -288,6 +301,9 @@ export function cast (mesh) { if (mesh) { CAST.add(mesh); NOCAST.delete(mesh); S
 export function noCast (mesh) { if (mesh) NOCAST.add(mesh); return mesh; }
 
 function proxyOf (o) {
+  // Streaming/deforming snow receives the city's cached shadow. It must not
+  // become a static caster each time a tile is published or a tyre passes.
+  if (o.userData.snowDynamic) return null;
   const mats = [].concat(o.material);
   if (!mats.every(castable)) return null;
   const dm = Array.isArray(o.material) ? o.material.map(depthOf) : depthOf(o.material);
@@ -436,7 +452,7 @@ function twins (objs) {
       const ms = src.map(m => (RECV.has(m) ? m : receive(twin(m), thin)));
       if (!ms.some(m => RECV.has(m))) return;
       const k = like(o, Array.isArray(o.material) ? ms : ms[0]); k.frustumCulled = false; gm.add(k);
-      if (!thin && ms.every(castable)) { const q = like(o, Array.isArray(o.material) ? ms.map(depthOf) : depthOf(ms[0])); q.frustumCulled = false; gd.add(q); }
+      if (!o.userData.snowDynamic && !thin && ms.every(castable)) { const q = like(o, Array.isArray(o.material) ? ms.map(depthOf) : depthOf(ms[0])); q.frustumCulled = false; gd.add(q); }
     };
     for (const o0 of objs) if (o0 && o0.traverse) o0.traverse(o => {
       if (!o.isMesh || !o.material || o.isBatchedMesh) return;
@@ -501,6 +517,13 @@ function heat (cam) {
 
 /* две карты: показанная (cur) и запасная — в неё рисуется следующая по частям; после перетекания — прошлая */
 const MAPS = [];
+/** The far building mask must use the same baked sun as nearby shadows. */
+export function bakedSunDirection (out) {
+  const map = MAPS[cur];
+  if (!ST.on || !map?.ok || U.uSsP.value.z <= 0) return false;
+  out.copy(map.dir);
+  return true;
+}
 function mkMap () {
   const dt = new THREE.DepthTexture(SS.N, SS.N, THREE.UnsignedIntType);
   dt.format = THREE.DepthFormat;
@@ -522,7 +545,7 @@ function setup () {
 }
 
 /* ── каждый кадр перед отрисовкой: E — { V, cam, sun, ENV, weather } ── */
-let built = false, lastScan = 0, lastT = -1e9, lastNow = 0, cur = 0, fade = 0, job = null, want = '';
+let built = false, lastScan = 0, lastT = -1e9, lastSunT = -1e9, lastNow = 0, cur = 0, fade = 0, job = null, want = '';
 const D = new THREE.Vector3(), DT = new THREE.Vector3(), FW = new THREE.Vector3(), FP = new THREE.Vector3(), V4 = new THREE.Vector4();
 const BIASM = new THREE.Matrix4().set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
 const RV = new THREE.Vector3(), UV = new THREE.Vector3(), C = new THREE.Vector3();
@@ -556,19 +579,19 @@ export function step (E) {
   FP.set(E.V.x + FW.x * SS.HALF * SS.AHEAD, E.groundY !== undefined ? E.groundY : (E.V.y || 0), E.V.z + FW.z * SS.HALF * SS.AHEAD);
   const drift = M.ok ? (uvOf(M, FP, UVF), Math.max(Math.abs(UVF.x - 0.5), Math.abs(UVF.y - 0.5)) * 2 * SS.HALF) : 1e9;
   // перетекание прошлой карты в показанную
-  if (fade > 0) fade = Math.max(0, fade - dt / (drift > SS.MOVE ? 0.25 : SS.FADE));   // быстро едем — фокус у края карты: дотечь скорее
+  if (fade > 0) fade = Math.max(0, fade - dt / (drift > SS.MOVE ? 0.5 : SS.FADE));
   // следующая карта: солнце ушло, фокус отъехал, давно не рисовали
   if (!job && fade <= 0) {
     const turn = M.ok ? angle(D, M.dir) : 1e9;
     let why = want;
     if (!M.ok) why = 'first';
-    else if (turn > SS.STEP) why = 'sun';
+    else if (turn > SS.STEP && (now - lastSunT >= SS.SUN_EVERY * 1000 || turn > 45)) why = 'sun';
     else if (drift > SS.MOVE) why = 'move';
     else if (now - lastT > SS.EVERY * 1000) why = 'time';
     if (why) {
-      // солнце теней — чуть наперёд (настоящее ушло на STEP — ставим на STEP/2 дальше): ошибка ±STEP/2, а не 0…STEP
-      if (why === 'sun' && turn < SS.STEP * 3) DT.copy(D).sub(M.dir).multiplyScalar(0.5).add(D).normalize();
-      else if (why === 'sun' || why === 'first' || !M.ok) DT.copy(D);
+      // Keep a baked direction while streaming/moving. Refresh from the
+      // actual sun without extrapolating it ahead of the sky.
+      if (why === 'sun' || why === 'first' || !M.ok) DT.copy(D);
       else DT.copy(M.dir);
       want = '';
       quiet(() => begin(why, DT, FP));
@@ -690,6 +713,7 @@ function part () {
   cur = job.m;
   fade = fadeIn ? 1 : 0;
   lastT = performance.now();
+  if (job.why === 'sun' || job.why === 'first') lastSunT = lastT;
   ST.jobMs = +(lastT - job.t0).toFixed(1);
   job = null;
 }

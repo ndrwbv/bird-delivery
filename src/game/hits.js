@@ -91,7 +91,7 @@ export function topAt (x, z, prevY) {
     const p = A.pavedLift ? A.pavedLift(x, z) : -1;   // дорожка, плитка, площадка, парковка (tracks.js)
     if (p + 0.005 > y) y = p + 0.005;
   }
-  const d = A.driftTop ? A.driftTop(x, z) : -Infinity;   // сугроб — сверху всего
+  const d = A.driftTop ? A.driftTop(x, z, prevY ?? s) : -Infinity;   // сугроб — сверху всего
   return Math.max(s + y, d);
 }
 /* верх поднятого тротуара. Плита (game.js osmCurbs) — ровные куски по 6 м: поперёк улицы она на
@@ -370,6 +370,10 @@ export function fallStep (p, dt) {
   if (F.pick) return CARRYM.pickStep(p, dt) || fallEnd(p);   // встал — идёт за своими вещами (carried.js)
   const t = (F.t += dt);
   const T1 = 0.35, T2 = T1 + TIME.FALL_LIE, T3 = T2 + 0.6, T4 = T3 + 1.1;
+  if (!F.snowMarked && t >= T1) {
+    F.snowMarked = true;
+    A.snowImpact?.(p.x, p.z, g.position.y, F.yaw);
+  }
   if (u.q) {                                         // модель Quaternius (qpeople.js): падает навзничь клипом художника,
     // то, что игра надела прямо на группу (шуба, галстук), с моделью не ложится — пока лежит, не видно
     if (!F.decor) { F.decor = decorOf(g); for (const o of F.decor) { o.visible = false; o.userData.fallHid = 1; } }
@@ -897,7 +901,10 @@ function stepBody (B, dt) {
     if (lo < B.floor + 0.01) {
       r.position.y += B.floor + 0.01 - lo;
       if (B.shatter) { shatter(B); return; }
-      if (!B.landed) { B.landed = 1; B.lx = nearest(r.rotation.x, Math.PI, Math.PI / 2); B.lz = nearest(r.rotation.z, TAU, 0); lieTargets(B); }
+      if (!B.landed) {
+        A.snowImpact?.(r.position.x, r.position.z, B.floor, r.rotation.y);
+        B.landed = 1; B.lx = nearest(r.rotation.x, Math.PI, Math.PI / 2); B.lz = nearest(r.rotation.z, TAU, 0); lieTargets(B);
+      }
       // след: где тело ударилось или проехало по земле — пятно крови, не чаще чем через THROW.TRAIL м
       const hv = Math.hypot(B.vx, B.vz);
       if (A.adult && !B.up && (hv > 2 || B.vy < -3) && Math.hypot(r.position.x - (B.tx ?? 1e9), r.position.z - (B.tz ?? 1e9)) > THROW.TRAIL) {
