@@ -1,5 +1,5 @@
 /* Presentation only: the authoritative payment has already happened in checkArrival.
-   One queue item protects the entire handover, including the SAME cash pile flying to the HUD.
+   One queue item protects the entire handover and its payment result (inside the HUD phone on Deck/desktop).
    All clocks are game-frame clocks; cancellation invalidates flight/scene callbacks. */
 import * as NQ from './notifyq.js';
 
@@ -73,7 +73,7 @@ export function cancel () {
   NQ.cancel(j.item);
 }
 export const busy = () => !!current;
-export const handling = () => !!current;          // do not open the next order's brief over the still-flying cash
+export const handling = () => !!current;          // do not open the next order's brief over the delivery result
 export const cargo = () => {
   if (!current) return 0;
   const waiting = current.list.filter(q => !q.done && !q.fired && !q.external && !q.pre).length;

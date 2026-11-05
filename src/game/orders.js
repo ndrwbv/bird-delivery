@@ -37,6 +37,7 @@ import * as QR from './quickrun.js';
 import * as TEL from './telemetry.js';          // анонимная статистика: поручения и опоздания (telemetry.js)
 import { t, tn } from '../i18n/index.js';
 import * as ECON from './econ.js';
+import * as PCOLD from './pizzacold.js';
 import * as DLG from './dialog.js';
 import * as CHAT from './chat.js';
 import * as ZN from './zones.js';
@@ -1014,6 +1015,7 @@ export function payStop (o, st, onTime, tier) {
   const zone = st.zone || sp.zone;
   const cw = A.wear ? ECON.coldCut(A.wear()) : { k: 0, why: '' };
   const cold = cw.k >= ECON.PRESS.COLD_BAD;         // существующий порог холодной пиццы, без нового числа
+  const coldResult = PCOLD.result(st, cold, cw.why);
   markUsed(st.key);
   st.done = true;                                         // отдали: пины карты и накладная в паузе
   if (sp.type !== 'staff' && !o.tut) SKILL.stop(onTime, !!st.bumped, !!sp.bundle);   // умение курьера: вовремя и чисто — растёт, опоздал — падает (skill.js)
@@ -1025,7 +1027,7 @@ export function payStop (o, st, onTime, tier) {
   if (!onTime) {
     const gop = DOOR.stairsAdjust(st, fee, 0, 0).gop;     // откупился от гопников в подъезде, а всё равно опоздал — «чаевые» им уже отданы
     if (sp.type !== 'staff' && !o.tut) SKILL.rated(false, 'опоздал', !!sp.bundle);   // ужатие срока: «рейтинг» упал (press.js)
-    st.pay = { fee, bonus: 0, tip: 0, late: true, story: !!sp.story, stairsGop: gop, cold, coldWhy: cold ? cw.why : '' };
+    st.pay = { fee, bonus: 0, tip: 0, late: true, story: !!sp.story, stairsGop: gop, ...coldResult };
     return Math.round(fee * PAY.LATE) - gop;
   }
   const bonus = 0;                                // tier остаётся статистикой, не частью выплаты
@@ -1050,7 +1052,7 @@ export function payStop (o, st, onTime, tier) {
   const stairs = DOOR.stairsAdjust(st, fee, bonus, tip);
   // ужатие срока (press.js): вовремя, пицца не холодная, клиента не задел — хорошо; иначе «рейтинг» упал — срок отпускает
   if (sp.type !== 'staff' && !o.tut) {
-    const bad = st.bumped ? 'задел клиента' : cw.k >= ECON.PRESS.COLD_BAD ? 'пицца холодная' : '';
+    const bad = st.bumped ? 'задел клиента' : coldResult.coldUpset ? 'пицца холодная' : '';
     SKILL.rated(!bad, bad, !!sp.bundle);
   }
   // из чего сложилась оплата — game.js покажет кучкой денег и чеком (popPay); сюжет — катсцена сама покажет награду
@@ -1062,7 +1064,7 @@ export function payStop (o, st, onTime, tier) {
   const actualTip = cold ? 0 : Math.max(0, tip + talk.add - tipCuts - cooling);
   st.pay = { fee, bonus: 0, tip: actualTip, rich: rich && actualTip > 0, late: false, story: !!sp.story, doorAdd: door.add, doorCut: door.cut, doorMode: st.door ? st.door.mode : '',
     talkAdd: talk.add, talkCut: talk.cut, talkKind: talk.kind, stairsAdd: stairs.add, stairsCut: stairs.cut, stairsGop: stairs.gop,
-    cold, coldWhy: cold ? cw.why : '' };
+    ...coldResult };
   S.tips = (S.tips || 0) + actualTip;               // только фактические чаевые, без скорости и откупа
   return fee + actualTip - stairs.gop;
 }

@@ -83,7 +83,7 @@ function build (o) {
     const du = document.createElement('span'); du.className = 'ot-t'; du.hidden = true;   // срок заказа — печатью справа (11бх)
     el.append(img, nm, m, du);
     T.el.appendChild(el);
-    const it = { st, i, el, img, nm, m, du, due: '', lvl: '', p: ps[0] || null, mood: null, txt: '', cur: null, done: false, goneT: 0 };
+    const it = { st, i, el, img, nm, m, du, name: nm.textContent, avatar: '', due: '', lvl: '', p: ps[0] || null, mood: null, txt: '', cur: null, done: false, goneT: 0 };
     setMood(it, '');
     if (it.p && NICK.isFace(it.p) && A.faceDataURL.soon) A.faceDataURL.soon(it.p, OTAG.FACE, ['ok', 'angry', 'happy'], [0]);   // другие лица карточки — заранее, в спокойные кадры (people.js)
     T.items.push(it);
@@ -98,6 +98,7 @@ function setMood (it, mood) {
   const first = it.mood === null;
   it.mood = mood;
   if (it.p) { const src = NICK.avatar(it.p, OTAG.FACE, mood);   // аватарка из приложения: лицо или мазня с наклейкой настроения (nicks.js)
+    it.avatar = src || '';
     if (src && it.img.src !== src) it.img.src = src; }
   if (!first) { T.stats.moods++; reanim(it.el, 'jolt'); }
 }
@@ -234,6 +235,14 @@ export function land (delay = 0.4) {
   if (!T.el) return;
   T.holdT = delay;
   reanim(T.el, 'land');
+}
+
+/* Телефон использует те же имя, лицо, метры и срок: второго расчёта карточки нет. */
+export function current () {
+  if (!A || A.S.ride || !T.order || T.order !== A.S.order) return null;
+  const it = T.items.find(item => item.i === T.order.idx);
+  if (!it || delivered(T.order, it.st, it.i)) return null;
+  return { name: it.name, avatar: it.avatar, distance: it.txt, time: it.due, urgency: it.lvl };
 }
 
 export const DEBUG = { T, OTAG, get items () { return T.items.map(it => ({ nm: it.nm.textContent, m: it.m.textContent, mood: it.mood, cur: it.cur, done: it.done })); } };

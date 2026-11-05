@@ -545,7 +545,7 @@ body.brief #view { filter: blur(6px) brightness(0.72); transition: filter .25s; 
 
 /* ── оплата за адрес (popPay в game.js): под машиной падает кучка — купюры за заказ,
    монеты за чаевые и скорость; рядом крупно «+N ₽» и чек «заказ — X · чаевые — Y».
-   Через полторы секунды куча улетает в кошелёк справа сверху. Ввод не перехватывает. ── */
+   Через полторы секунды куча улетает к деньгам смены, в телефоне — в его статус бар. Ввод не перехватывает. ── */
 #payfx { position: fixed; left: 50%; top: 77%; z-index: 12; transform: translate(-50%, -50%); pointer-events: none;
          display: flex; align-items: flex-end; gap: clamp(10px, 2vw, 22px); }
 #payfx[hidden] { display: none; }
@@ -558,7 +558,7 @@ body.brief #view { filter: blur(6px) brightness(0.72); transition: filter .25s; 
                background: radial-gradient(circle at 35% 35%, #fff0a8, #ffd85e 45%, #c99a2e); box-shadow: 0 2px 0 rgba(0, 0, 0, .35); }
 .pf-pile i.x { display: none; }
 #payfx.on .pf-pile i { animation: pf-fall .45s cubic-bezier(.3, 1.5, .6, 1) var(--d) both; }
-#payfx.on.fly .pf-pile i { animation: pf-fly .55s cubic-bezier(.5, 0, .8, .4) var(--fd) both; }
+#payfx.on.fly .pf-pile i { animation: pf-fly .65s cubic-bezier(.5, 0, .8, .4) var(--fd) both; }
 @keyframes pf-fall { from { transform: translateY(-260px) rotate(calc(var(--r) * -3)); opacity: 0; } 30% { opacity: 1; } to { transform: rotate(var(--r)); opacity: 1; } }
 @keyframes pf-fly { from { transform: rotate(var(--r)); opacity: 1; } to { transform: translate(var(--fx), var(--fy)) rotate(90deg) scale(.35); opacity: .2; } }
 .pf-r { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }

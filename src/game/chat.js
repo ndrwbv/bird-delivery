@@ -77,7 +77,7 @@ const ADULT_LINES = {
 };
 const KIDS_LINES = ADULT_LINES;
 
-const C = { el: null, face: null, person: null, adult: false, blip: null, fx: null, speed: null, items: [], last: {}, wait: 0, pl: 0, ph: false, bot: 0 };
+const C = { el: null, face: null, person: null, adult: false, blip: null, fx: null, speed: null, hud: null, items: [], last: {}, wait: 0, pl: 0, ph: false, bot: 0 };
 const PEND = new Set();                                  // отложенные сообщения (later)
 const ANGRY = new Set(['late', 'bump', 'kill', 'urgent', 'back']);
 
@@ -85,6 +85,7 @@ const ANGRY = new Set(['late', 'bump', 'kill', 'urgent', 'back']);
 export function init ({ face, person, adult, blip, fx, speed }) {
   C.face = face; C.person = person; C.adult = !!adult; C.blip = blip || null; C.fx = fx || null; C.speed = speed || null;
 }
+export function bindPhone (hud) { C.hud = hud; }
 /* телефон: касания и низкий (боком) или узкий экран. Дека, компьютер, планшет боком — как было */
 export const phone = () => document.body.classList.contains('touch') && (innerHeight <= 500 || innerWidth <= 900);
 
@@ -267,9 +268,9 @@ export function say (text, onShow, angry, who, o) {
   const slot = TYPE_S + Math.max(C.ph ? PH.BIG_HOLD : Math.min(BIG.MAX, BIG.MIN + text.length / BIG.PER),
     Math.min(SLOT.MAX, Math.max(SLOT.MIN, SLOT.BASE + SLOT.PER * text.length)));
   NQ.push({
-    kind: crew ? 'crew' : 'boss', text, ms: slot * 1000, fresh: SLOT.FRESH, key: o && o.key,
+    kind: crew ? 'crew' : 'boss', text, ms: slot * 1000, fresh: SLOT.FRESH, key: o && o.key, urgent: !!o?.urgent,
     wait: crew ? SLOT.CREW_WAIT : SLOT.BOSS_WAIT, group: crew ? 'crew' : undefined, max: crew ? 1 : undefined,
-    show: () => { QN--; const f = rec.onShow; rec.onShow = null; rec.m = sayNow(text, f, angry, who); },
+    show: () => { QN--; const f = rec.onShow; rec.onShow = null; rec.m = sayNow(text, f, angry, who, o?.channel || who?.channel || 'crew'); },
     // перебило срочное или чек оплаты: только пришло — убираем из ленты, покажется заново целиком (вычет — один раз);
     // уже прочитали крупно — остаётся в ленте мелко
     hide: (it, again) => { if (!rec.m) return; if (again) { QN++; drop(rec.m); rec.m = null; } else { rec.m.calm = true; shrink(rec.m); } },
@@ -277,7 +278,7 @@ export function say (text, onShow, angry, who, o) {
   });
   return rec;
 }
-function sayNow (text, onShow, angry, who) {
+function sayNow (text, onShow, angry, who, channel = 'crew') {
   const el = box();
   place();
   // хад мог появиться или спрятаться, пока сообщения висят (написал в катсцене — хада нет, чат встал в самый верх;
@@ -312,12 +313,13 @@ function sayNow (text, onShow, angry, who) {
     place();                                              // текст пришёл — влезает ли по высоте (fit), до «крупно»
     m.said = true;
     shown(m);
+    if (C.hud && C.hud.active()) C.hud.receive({ name: nm0, role, text, avatar: img ? img.src : '', manager: !who?.name, channel });
     ding(angry);
     if (img) TF.talk(img, TF.talkTime(text));
-    const big = !m.calm && grow(m) ? bigHold(text) : 0;
+    const big = !m.calm && !(C.hud && C.hud.active()) && grow(m) ? bigHold(text) : 0;
     if (big) m.t3 = setTimeout(() => shrink(m), big * 1000);
     m.t2 = setTimeout(() => drop(m), (big + hold(text)) * 1000);
-  }, TYPE_S * 1000);
+  }, C.hud && C.hud.active() ? 0 : TYPE_S * 1000);
   return m;
 }
 
@@ -347,7 +349,7 @@ export function shiftLine (mood) {
   return t(pool[Math.floor(Math.random() * pool.length)]);
 }
 
-export function clear () { NQ.clear(['boss', 'crew']); for (const m of C.items.slice()) drop(m); }   // ждущие в очереди — тоже (вычеты — всё равно)
+export function clear () { NQ.clear(['boss', 'crew']); for (const m of C.items.slice()) drop(m); C.hud?.clearReplies?.(); }   // ждущие в очереди — тоже (вычеты — всё равно)
 
 /* отложенное сообщение: пока таймер не вышел, чат «занят» (конец смены его подождёт); clear() его не
    отменяет — вычет за опоздание должен случиться и после конца смены */

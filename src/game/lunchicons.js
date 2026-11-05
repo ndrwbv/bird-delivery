@@ -18,6 +18,8 @@ export const HEART_ICON =
   '<path d="M16 23C17 19 21 18 24 20" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>' +
   '</svg>';
 
+export const REPAIR_ICON = '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M39 9a15 15 0 0 0-18 19L8 41a9 9 0 0 0 13 13l13-13A15 15 0 0 0 53 23L42 34l-12-4-4-12Z" fill="#8fb7cb" stroke="' + INK + '" stroke-width="3.5" stroke-linejoin="round"/><circle cx="15" cy="47" r="3" fill="#fff8dc"/></svg>';
+
 export const MONEY_ICON =
   '<svg viewBox="0 0 64 64" aria-hidden="true">' +
   '<circle cx="32" cy="34" r="25" fill="#ffc93c" stroke="' + INK + '" stroke-width="3.5"/>' +

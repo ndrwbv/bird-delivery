@@ -17,6 +17,8 @@
 import * as ECON from '../game/econ.js';
 import * as DIST from '../game/districts.js';
 import * as CHAT from '../game/chat.js';
+import * as HUDFONE from '../game/hudphone.js';
+import * as HUDMAP from '../game/hudmapios.js';
 import * as DLG from '../game/dialog.js';
 import * as END from '../game/shiftend.js';
 import * as CAREERM from '../game/career.js';
@@ -29,6 +31,7 @@ import { t, tn, LANGS, LANG_NAMES } from '../i18n/index.js';
 import { memStore, makeApi } from './mock.js';
 import shiftEndScreens from './screens/shiftend.js';
 import hudScreens from './screens/hud.js';
+import iphoneScreens from './screens/iphone.js';
 import dialogScreens from './screens/dialogs.js';
 import paperScreens from './screens/paper.js';
 import soundScreens from './screens/sounds.js';
@@ -60,6 +63,8 @@ export async function boot ({ adult, lang }) {
   try { useMap(MAP); } catch (e) { /* — */ }
   DIST.init({ MAP, Store });
   CHAT.init({ adult, person: makePerson({ seed: 0x2E4A17, fem: false }), face: (p, size) => faceDataURL(p, size), blip: null });
+  HUDFONE.init();
+  CHAT.bindPhone(HUDFONE);
   DLG.init({ pause: () => {}, face: (p, size) => faceDataURL(p, size) });
   window.__dlv = window.__dlv || {};                 // career.js кладёт сюда свою отладку (__dlv.CAREERM: SH, skipTo, openSpend…)
   CAREERM.init(A);
@@ -79,6 +84,8 @@ export async function boot ({ adult, lang }) {
     TOK.dead = true;
     for (let i = 0; i < 6 && DLG.isOpen(); i++) DLG.dismiss();
     CHAT.clear();
+    HUDFONE.reset(); HUDFONE.setVisible(false);
+    HUDMAP.hideDemo();
     const ov = $('over'); if (ov) ov.hidden = true;
     const pay = $('cr-payout'); if (pay) pay.remove();
     for (const id of ['cr-spend', 'payfx', 'choice', 'wasted', 'ul-mg']) { const e = $(id); if (e) { e.hidden = true; e.classList.remove('on', 'fly'); } }
@@ -91,10 +98,10 @@ export async function boot ({ adult, lang }) {
 
   const ctx = {
     A, Store, ADULT: !!adult, LANG: lang, money, t, tn, log, sleep, $, reset, cleanup: null,
-    CM, END, CHAT, DLG, DIST, ECON, ORD, HQ, makePerson, faceDataURL,
+    CM, END, CHAT, HUDFONE, HUDMAP, DLG, DIST, ECON, ORD, HQ, makePerson, faceDataURL,
     setCar: k => { CAR = CARS[k] ? k : 'home'; }, carNow,
   };
-  const SCREENS = [...shiftEndScreens(ctx), ...dialogScreens(ctx), ...hudScreens(ctx), ...paperScreens(ctx), ...soundScreens(ctx), ...minigameScreens(ctx)];
+  const SCREENS = [...iphoneScreens(ctx), ...shiftEndScreens(ctx), ...dialogScreens(ctx), ...hudScreens(ctx), ...paperScreens(ctx), ...soundScreens(ctx), ...minigameScreens(ctx)];
   const byId = new Map(SCREENS.map(s => [s.id, s]));
   let cur = '';
 

@@ -1,0 +1,265 @@
+/* iPhone 4 / iOS 5–6: экран курьера и сообщений в HUD. */
+#hud-phone { position: absolute; inset: 0; z-index: 29; display: none; pointer-events: none; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #25272c; text-shadow: none; }
+#hud-phone.hp-visible { display: block; }
+#hud-phone * { box-sizing: border-box; }
+#hud-phone button { font-family: inherit; cursor: pointer; }
+#hud-phone [hidden] { display: none !important; }
+#hud-phone .hp-backdrop { position: absolute; inset: 0; background: rgba(4, 11, 23, .12); opacity: 0; transition: opacity .45s; }
+#hud-phone.hp-expanded .hp-backdrop { opacity: 1; }
+#hud-phone .hp-device { position: absolute; left: calc(100% - 155px); top: calc(100% + 70px); width: 330px; height: 648px;
+  border-radius: 43px; border: 4px solid #aeb5bb; background: linear-gradient(114deg, #121417, #030405 32%, #14171a 74%, #030405);
+  box-shadow: inset 0 0 0 2px #45494d, inset 0 0 0 5px #050608, inset 0 1px 1px 6px #666a70, 0 0 0 1px #34393e, 0 18px 40px rgba(0,0,0,.62);
+  transform: translate(-50%, -50%) scale(.85) rotate(2deg); transform-origin: center; opacity: .76;
+  transition: left .58s cubic-bezier(.2,.8,.2,1), top .58s cubic-bezier(.2,.8,.2,1), transform .58s cubic-bezier(.2,.8,.2,1), opacity .58s;
+  pointer-events: auto; cursor: pointer; overflow: hidden; }
+#hud-phone.hp-expanded .hp-device { left: calc(100% - 190px); top: calc(100% - 355px); transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; cursor: default; }
+#hud-phone.hp-enter .hp-device { animation: hp-emerge .65s cubic-bezier(.18,.82,.22,1) both; }
+@keyframes hp-emerge { from { transform: translate(-50%, 64%) scale(.43) rotate(8deg); opacity: .35; } }
+#hud-phone .hp-device::before { content: ''; position: absolute; inset: 3px; border-radius: 36px; border: 1px solid #4d5158; box-shadow: inset 1px 1px 2px #b1b7bf66; pointer-events: none; }
+#hud-phone .hp-device::after { content: ''; position: absolute; inset: 7px 8px 9px; border-radius: 32px; background: linear-gradient(112deg, #ffffff0d, transparent 24% 78%, #ffffff06); pointer-events: none; }
+#hud-phone .hp-mute-switch, #hud-phone .hp-volume { position: absolute; left: 0; z-index: 3; width: 4px; border-radius: 2px; background: linear-gradient(90deg, #5b6269, #cbd1d7 65%, #777f87); box-shadow: 1px 0 1px #111; }
+#hud-phone .hp-mute-switch { top: 107px; height: 18px; } #hud-phone .hp-volume-up { top: 151px; height: 28px; } #hud-phone .hp-volume-down { top: 191px; height: 28px; }
+#hud-phone .hp-camera { position: absolute; top: 34px; left: calc(50% - 82px); width: 11px; height: 11px; border: 2px solid #282d34; border-radius: 50%; background: radial-gradient(circle at 60% 40%, #23405d, #05070c 58%); box-shadow: 0 0 0 2px #08090a; }
+#hud-phone .hp-speaker { position: absolute; top: 37px; left: calc(50% - 27px); width: 54px; height: 7px; border-radius: 5px; background: repeating-linear-gradient(90deg, #050607 0 2px, #171a1d 2px 3px); box-shadow: inset 0 1px 2px #000, 0 1px 1px #6669; }
+#hud-phone .hp-glass { position: absolute; left: 18px; right: 18px; top: 69px; bottom: 58px; overflow: hidden; background: #e8e9eb; border: 2px solid #08090c; border-radius: 13px; box-shadow: 0 0 0 1px #3b3d40, inset 0 0 6px #0005; }
+#hud-phone .hp-home-button { position: absolute; bottom: 11px; left: calc(50% - 22px); width: 44px; height: 44px; border: 2px solid #2a2d31; border-radius: 50%; background: radial-gradient(circle at 45% 37%, #202329, #07090c 70%); box-shadow: inset 0 0 0 2px #080a0d, 0 0 0 1px #52555a, 0 2px 5px #000b; }
+#hud-phone .hp-status { height: 20px; padding: 2px 6px 0; display: flex; justify-content: space-between; align-items: center; position: absolute; z-index: 8; inset: 0 0 auto; color: #fff; background: linear-gradient(#646971, #252a30); border-bottom: 1px solid #15181d; font-size: 11px; font-weight: 600; letter-spacing: -.02em; text-shadow: 0 -1px 0 #0008; }
+#hud-phone .hp-device[data-app="home"] .hp-status { background: linear-gradient(#0c182970, #070e1b7a); }
+#hud-phone .hp-clock { position: absolute; left: 50%; transform: translateX(-50%); font-size: 10px; }
+#hud-phone .hp-money-slot { margin-left: auto; max-width: 50%; min-width: 0; display: flex; justify-content: flex-end; align-items: center; color: #fff; font-size: 10px; white-space: nowrap; }
+#hud-phone #shiftcash { position: relative; display: flex; align-items: center; gap: 2px; padding: 0; margin: 0; opacity: 1; transform-origin: 100% 50%; }
+#hud-phone #shiftcash svg { width: 11px; height: 9px; flex: none; filter: none; }
+#hud-phone #shiftcash b { font: 600 10px/1 "Helvetica Neue", Helvetica, Arial, sans-serif; color: #fff; text-shadow: 0 -1px #0007; white-space: nowrap; }
+#hud-phone #shiftcash.hot { transform: scale(1.1); }
+#hud-phone #shiftcash .sc-pop { position: absolute; top: 11px; right: 0; font-size: 10px; white-space: nowrap; color: #23654b; }
+#hud-phone .hp-app { height: 100%; padding-top: 20px; background: repeating-linear-gradient(0deg, #dfe1e1 0 1px, #e7e8e8 1px 3px); }
+#hud-phone .hp-app .hp-nav { height: 44px; flex: none; background: linear-gradient(#d5dce8 0%, #b5c1d2 47%, #92a2b9 49%, #7b8ca7 100%); border-top: 1px solid #edf2f8; border-bottom: 1px solid #52647e; display: flex; align-items: center; justify-content: space-between; position: relative; padding: 0 8px; color: #fff; box-shadow: inset 0 1px 0 #fff9, 0 1px 3px #0003; }
+#hud-phone .hp-nav b { font-size: 15px; font-weight: 700; color: #fff; text-shadow: 0 -1px 1px #41516b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hud-phone .hp-nav button { min-width: 69px; min-height: 28px; padding: 2px 8px 3px; color: #fff; border: 1px solid #536987; border-radius: 5px; background: linear-gradient(#a4b6ce, #7086a5 52%, #4f688c); box-shadow: inset 0 1px 0 #e5effba8, 0 1px 1px #415675; font-size: 20px; font-weight: 600; line-height: 20px; text-shadow: 0 -1px #334d71; text-align: left; }
+#hud-phone .hp-nav button span { font-size: 12px; vertical-align: 2px; }
+#hud-phone .hp-nav-space { min-width: 69px; }
+#hud-phone .hp-courier-app, #hud-phone .hp-messages, #hud-phone .hp-rating-app { display: flex; flex-direction: column; }
+#hud-phone .hp-courier-app .hp-nav { padding-left: 13px; }
+#hud-phone .hp-courier-app .hp-nav b { font-size: 17px; }
+#hud-phone .hp-courier-app .hp-nav button { width: 30px; min-width: 30px; height: 30px; min-height: 30px; padding: 1px; }
+#hud-phone .hp-courier-app .hp-nav .hp-icon { width: 26px; height: 26px; border-radius: 6px; }
+#hud-phone .hp-courier-app .hp-nav .hp-icon i { transform: scale(.48); transform-origin: top left; left: 5px; top: 6px; }
+#hud-phone .hp-icon { display: inline-block; width: 53px; height: 53px; flex: none; border-radius: 11px; position: relative; border: 1px solid #19232b88; box-shadow: inset 0 1px rgba(255,255,255,.8), inset 0 -2px 4px #0003, 0 2px 4px rgba(0,0,0,.45); }
+#hud-phone .hp-icon::after { content: ''; position: absolute; z-index: 2; left: 2px; right: 2px; top: 2px; height: 48%; border-radius: 9px 9px 50% 50% / 8px 8px 20% 20%; background: linear-gradient(#fff9, #fff0); pointer-events: none; }
+#hud-phone .hp-icon-messages { background: linear-gradient(#9af468 0%, #4eca31 54%, #1d9e12); }
+#hud-phone .hp-icon-messages i { position: absolute; left: 10px; top: 12px; width: 33px; height: 25px; border-radius: 50%; background: white; }
+#hud-phone .hp-icon-messages i::after { content: ''; position: absolute; bottom: -3px; left: 4px; width: 10px; height: 10px; background: white; clip-path: polygon(0 100%, 100% 0, 80% 100%); }
+#hud-phone .hp-icon-courier { background: linear-gradient(#ffe66d, #f79830 45%, #c73d28 100%); }
+#hud-phone .hp-icon-courier i { position: absolute; left: 12px; top: 10px; width: 29px; height: 34px; border-radius: 3px; background: linear-gradient(#fffdf0, #e8d7b6); box-shadow: inset 0 0 0 2px #b89567, 1px 2px 2px #48220f; }
+#hud-phone .hp-icon-courier i::after { content: ''; position: absolute; left: 6px; right: 6px; top: 9px; height: 2px; background: #e98753; box-shadow: 0 7px #e98753, 0 14px #e98753; }
+#hud-phone .hp-courier-scroll { flex: 1; min-height: 0; overflow: auto; padding: 13px 10px; scrollbar-width: none; }
+#hud-phone .hp-courier-scroll::-webkit-scrollbar, #hud-phone .hp-thread::-webkit-scrollbar { display: none; }
+#hud-phone .hp-shift-earn { padding: 14px 12px 16px; border: 1px solid #9ba9b8; border-radius: 8px; background: linear-gradient(#fff, #edf3f7 48%, #dae2ea); box-shadow: inset 0 1px #fff, 0 2px 4px #0003; display: flex; flex-direction: column; gap: 5px; }
+#hud-phone .hp-shift-earn small, #hud-phone .hp-last-rating small { color: #6b7f98; font-size: 10px; font-weight: 700; letter-spacing: .03em; }
+#hud-phone .hp-shift-earn strong { font-size: 27px; line-height: 1.1; color: #2b6846; text-shadow: 0 1px #fff; }
+#hud-phone .hp-current, #hud-phone .hp-last-rating { margin-top: 11px; padding: 12px; border: 1px solid #a8b2bf; border-radius: 8px; background: linear-gradient(#fff, #e6e9ed); box-shadow: inset 0 1px #fff, 0 2px 4px #0002; display: flex; flex-direction: column; gap: 5px; }
+#hud-phone .hp-current b, #hud-phone .hp-last-rating b { color: #252d39; font-size: 14px; }
+#hud-phone .hp-courier-nav { height: 43px; flex: none; display: flex; align-items: center; gap: 5px; padding: 5px 6px; border-top: 1px solid #7f8c9f; background: linear-gradient(#dfe5ec, #a6b4c6); box-shadow: inset 0 1px #fff; }
+#hud-phone .hp-courier-nav button { flex: 1; height: 30px; border: 1px solid #687e9c; border-radius: 5px; background: linear-gradient(#f8fafd, #c6d0dd); color: #354d6a; font-size: 11px; font-weight: 700; text-shadow: 0 1px #fff; box-shadow: inset 0 1px #fff, 0 1px 1px #536880; }
+#hud-phone .hp-thread { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; padding: 12px 10px 8px; scrollbar-width: none; background: repeating-linear-gradient(0deg, #e3e5e8 0 2px, #e9eaed 2px 4px); }
+#hud-phone .hp-thread::before { content: ''; flex: 1 0 0; }
+#hud-phone .hp-message { flex: none; display: flex; align-items: flex-start; flex-direction: column; margin-bottom: 10px; }
+#hud-phone .hp-message:last-child { margin-bottom: 0; }
+#hud-phone .hp-message-meta { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; color: #515d69; }
+#hud-phone .hp-message-meta img { width: 30px; height: 30px; border: 1px solid #858c94; border-radius: 5px; object-fit: cover; }
+#hud-phone .hp-message-meta span { display: flex; flex-direction: column; }
+#hud-phone .hp-message-meta b { font-size: 10px; }
+#hud-phone .hp-message-meta small { font-size: 9px; }
+#hud-phone .hp-message p { position: relative; max-width: 96%; margin: 0 0 0 5px; padding: 10px 12px; border: 1px solid #66a654; border-radius: 14px; background: linear-gradient(#f5fff1, #d6f3c7 55%, #b8e89d); box-shadow: inset 0 1px #fff, 0 2px 2px #0002; color: #171b22; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+#hud-phone .hp-message p::before { content: ''; position: absolute; left: -7px; bottom: 7px; width: 11px; height: 11px; border-left: 1px solid #66a654; border-bottom: 1px solid #66a654; background: #b8e89d; transform: rotate(45deg); }
+#hud-phone.hp-new-message .hp-message.latest p { box-shadow: inset 0 1px #fff, 0 0 0 3px #b1e89888, 0 3px 8px #27471e55; animation: hp-message-pop .48s cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes hp-message-pop { from { transform: translateY(20px) scale(.92); opacity: .2; } }
+#hud-phone .hp-order-modal { position: absolute; z-index: 14; inset: 20px 0 0; display: flex; }
+#hud-phone .hp-order-dialog { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; background: #f4f5f4; box-shadow: inset 0 1px #fff; }
+#hud-phone .hp-order-dialog.hp-arrive { animation: hp-order-arrive .55s cubic-bezier(.2,.85,.3,1.18) both; }
+@keyframes hp-order-arrive { from { transform: translateY(-160px) scale(1.06); opacity: .2; } to { transform: none; opacity: 1; } }
+#hud-phone .hp-order-title { padding: 6px 14px 8px; display: flex; flex-direction: column; gap: 1px; background: linear-gradient(#edf2f7, #bac9db); border-bottom: 1px solid #8d9fb2; color: #31435b; text-shadow: 0 1px #fff; }
+#hud-phone .hp-order-title small { font-size: 12px; font-weight: 700; }
+#hud-phone .hp-order-title b { font-size: 18px; }
+#hud-phone .hp-order-title b span { font-size: 14px; }
+#hud-phone .hp-order-list { flex: 1; min-height: 0; overflow: auto; padding: 13px 14px; color: #343a42; font-size: 15px; line-height: 1.45; }
+#hud-phone .hp-order-recipient { display: flex; align-items: center; gap: 10px; min-height: 52px; margin-bottom: 10px; }
+#hud-phone .hp-order-avatar { flex: none; width: 48px; height: 48px; display: grid; place-items: center; overflow: hidden; border: 2px solid #fff; border-radius: 8px; background: linear-gradient(#fcd4a4, #bf6244); box-shadow: 0 0 0 1px #a46a45, 0 2px 4px #0004; color: #713623; font: 700 25px/1 Georgia, serif; }
+#hud-phone .hp-order-avatar img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+#hud-phone .hp-order-recipient div { min-width: 0; display: flex; flex-direction: column; }
+#hud-phone .hp-order-recipient small { color: #9b5a28; font-size: 11px; }
+#hud-phone .hp-order-recipient b { color: #4d2d1d; font-size: 17px; line-height: 1.15; overflow-wrap: anywhere; }
+#hud-phone .hp-order-map { position: relative; width: 100%; height: 102px; margin-bottom: 7px; overflow: hidden; border: 1px solid #bf8649; border-radius: 7px; background: #f4ebd2; box-shadow: inset 0 0 0 1px #fff8, 0 2px 4px #0003; }
+#hud-phone .hp-order-map canvas, #hud-phone .hp-order-map svg { width: 100%; height: 100%; display: block; }
+#hud-phone .hp-order-map svg { position: absolute; inset: 0; }
+#hud-phone .hp-order-modal:not(.hp-order-many) .hp-order-details .oc-inv tr[data-k="who"] { display: none; }
+#hud-phone .hp-order-details .oc-photos { display: none; }
+#hud-phone .hp-order-details .oc-sheet { display: block; }
+#hud-phone .hp-order-list .oc-sheet { grid-template-columns: minmax(0, 1fr) 72px; gap: 5px; }
+#hud-phone .hp-order-list .oc-inv { font: 16px/1.38 "Helvetica Neue", Arial, sans-serif; color: #24262a; }
+#hud-phone .hp-order-list .oc-inv th { width: 35%; padding: 14px 5px 14px 0; font-size: 13px; color: #677685; }
+#hud-phone .hp-order-list .oc-inv td { padding: 14px 0; }
+#hud-phone .hp-order-list .oc-inv td b { font-size: 17px; font-weight: 600; }
+#hud-phone .hp-order-list .oc-photos .oc-p img, #hud-phone .hp-order-list .oc-photos .oc-p i { width: 68px; height: 68px; border-width: 3px; border-bottom-width: 9px; }
+#hud-phone .hp-order-list .oc-go { display: none; }
+#hud-phone .hp-order-go { flex: none; min-height: 65px; padding: 11px 14px; display: flex; align-items: center; gap: 10px; border-top: 1px solid #9cacbd; background: linear-gradient(#e6eef5, #b7c8d9); color: #304a64; font-size: 14px; font-weight: 700; text-shadow: 0 1px #fff; }
+#hud-phone .hp-order-go kbd { min-width: 35px; padding: 6px; border: 1px solid #657e99; border-radius: 5px; background: linear-gradient(#fff, #d4e0ec); box-shadow: inset 0 1px #fff, 0 2px 2px #0003; color: #2f4d6d; font: 700 17px/1 "Helvetica Neue", Arial, sans-serif; text-align: center; }
+#hud-phone .hp-rating-app { background: #e6e8eb; }
+#hud-phone .hp-rating-head { padding: 19px 14px 16px; display: flex; flex-direction: column; gap: 6px; background: linear-gradient(#f8fafb, #d8e0e9); border-bottom: 1px solid #9faebb; }
+#hud-phone .hp-rating-head small { color: #657a96; font-size: 10px; font-weight: 700; }
+#hud-phone .hp-rating-head strong { color: #304f78; font-size: 24px; }
+#hud-phone .hp-rating-head span { color: #596978; font-size: 11px; }
+#hud-phone .hp-rating-rows { overflow: auto; flex: 1; }
+#hud-phone .hp-rating-row { display: grid; grid-template-columns: 27px 1fr; padding: 10px 12px; border-bottom: 1px solid #c2cad1; background: #fff; align-items: center; }
+#hud-phone .hp-rating-row:nth-child(even) { background: #f3f5f7; }
+#hud-phone .hp-rating-row.me { background: #dbeccf; }
+#hud-phone .hp-rating-row span { grid-row: 1 / 3; color: #6580a1; font-size: 17px; font-weight: 700; }
+#hud-phone .hp-rating-row b { font-size: 12px; }
+#hud-phone .hp-rating-row small { color: #7c858f; font-size: 10px; }
+#hud-phone .hp-home { height: 100%; position: relative; color: white; }
+#hud-phone .hp-wallpaper { position: absolute; inset: 0; background: radial-gradient(ellipse 26px 38px at 33% 20%, #f9feffbc 0 5%, #bce4f087 9%, #ffffff26 25%, transparent 66%), radial-gradient(ellipse 20px 29px at 72% 38%, #f9feffb8 0 7%, #c1e2ec69 14%, transparent 68%), linear-gradient(146deg, #315d83, #658aa3 38%, #203e5b 71%, #0b233a); }
+#hud-phone .hp-home-head { position: relative; padding-top: 42px; text-align: center; font-size: 13px; font-weight: 600; text-shadow: 0 1px 3px #07172b; }
+#hud-phone .hp-app-grid { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px 5px; padding: 25px 11px; }
+#hud-phone .hp-app-grid button, #hud-phone .hp-home-dock button { background: none; border: 0; padding: 0; color: white; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; text-shadow: 0 1px 3px #294065; }
+#hud-phone .hp-home-dock { position: absolute; left: 0; right: 0; bottom: 0; height: 75px; display: flex; align-items: center; gap: 18px; padding: 0 20px; background: linear-gradient(#d8e6ef88, #839bb2ab 40%, #334e6db5); border-top: 1px solid #ffffffa8; }
+/* Птица Пицца — тёплый фирменный акцент поверх узнаваемой фактуры iOS 6. */
+#hud-phone .hp-courier-app { background: repeating-linear-gradient(0deg, #f8f3e9 0 2px, #f5efe4 2px 4px); }
+#hud-phone .hp-courier-app .hp-nav, #hud-phone .hp-rating-app .hp-nav { background: linear-gradient(#c99e7e 0%, #aa775c 48%, #916148 50%, #7d4d3b 100%); border-bottom-color: #704637; }
+#hud-phone .hp-messages .hp-nav { background: linear-gradient(#92b59b 0%, #6b9778 48%, #538466 50%, #416e56 100%); border-bottom-color: #385f4b; }
+#hud-phone .hp-shift-earn { border-color: #c6ae8b; background: linear-gradient(#fffdf6, #f5e8cf 53%, #e9d5b3); }
+#hud-phone .hp-shift-earn small, #hud-phone .hp-last-rating small { color: #907254; }
+#hud-phone .hp-shift-earn strong { color: #437354; }
+#hud-phone .hp-current, #hud-phone .hp-last-rating { border-color: #cbb69b; background: linear-gradient(#fffdf8, #eee2cf); }
+#hud-phone .hp-courier-nav { background: linear-gradient(#e6d8c4, #cba98a); border-top-color: #9c806b; }
+#hud-phone .hp-courier-nav button { border-color: #9e806b; background: linear-gradient(#fffaf2, #e8d3bb); color: #674b3b; }
+#hud-phone .hp-order-dialog { background: #f9f5eb; }
+#hud-phone .hp-order-title { background: linear-gradient(#c99e7e, #a8795e 48%, #916148 50%, #7d4d3b); border-bottom-color: #704637; color: #fff; text-shadow: 0 -1px #5e3a2e; }
+#hud-phone .hp-order-list { color: #3c2d24; }
+#hud-phone .hp-order-list .oc-inv { color: #35271c; }
+#hud-phone .hp-order-list .oc-inv th { color: #927253; }
+#hud-phone .hp-order-go { border-top-color: #c6ad90; background: linear-gradient(#f4e7d3, #e3c5a3); color: #674738; }
+#hud-phone .hp-order-go kbd { border-color: #aa876c; background: linear-gradient(#fffefa, #ebd7bd); color: #684635; }
+#hud-phone .hp-rating-head { background: linear-gradient(#fbf7eb, #ead7ba); border-bottom-color: #bca183; }
+#hud-phone .hp-rating-head strong { color: #8c5b47; }
+#hud-phone .hp-thread { background: repeating-linear-gradient(0deg, #e5f0e5 0 2px, #edf6ed 2px 4px); }
+/* Курьерское приложение: дерево в шапке, кожа под карточками и тёплая бумага. */
+#hud-phone .hp-courier-app { background-image: linear-gradient(#24140824, #24140824), url('/textures/phone-leather.svg'); background-position: center; background-size: auto, cover; background-repeat: no-repeat; }
+#hud-phone .hp-courier-app { position: relative; }
+#hud-phone .hp-courier-app .hp-nav, #hud-phone .hp-rating-app .hp-nav { background: linear-gradient(#fff5 0%, #fff0 42%, #20100666 52%, #12090388 100%), url('/textures/phone-wood.svg') repeat-x; background-size: auto, auto 100%; border-bottom-color: #56341e; }
+#hud-phone .hp-courier-app .hp-nav b { color: #fff7df; text-shadow: 0 1px 2px #2e170e, 0 -1px #fff5; }
+#hud-phone .hp-courier-scroll { padding: 5px 10px 16px; }
+#hud-phone .hp-competition { width: 100%; padding: 3px 6px 4px; display: flex; flex-direction: column; gap: 1px; text-align: left; border: 1px solid #dab673; border-radius: 7px; background: linear-gradient(#fffcf0, #f6e7c7 70%, #ecd3a4); box-shadow: inset 0 1px #fff9, inset 0 -1px #b9975b66, 0 3px 7px #26140780; color: #57331b; }
+#hud-phone .hp-rank-heading { width: 100%; height: 11px; display: flex; justify-content: space-between; align-items: center; color: #94652b; font-size: 9px; letter-spacing: .07em; }
+#hud-phone .hp-rank-heading b { font-weight: 800; }
+#hud-phone .hp-rank-arrow { font-size: 16px; line-height: 8px; }
+#hud-phone .hp-rank-list { display: flex; flex-direction: column; width: 100%; }
+#hud-phone .hp-rank-line { display: grid; grid-template-columns: 17px minmax(0, 1fr) auto; align-items: center; gap: 4px; width: 100%; height: 18px; border-top: 1px solid #aa81543d; white-space: nowrap; }
+#hud-phone .hp-rank-line i { width: 15px; height: 15px; display: grid; place-items: center; border-radius: 50%; background: linear-gradient(#ffe49e, #c88c3d); color: #6c421c; font: 800 10px/1 Georgia, serif; box-shadow: inset 0 1px #fff9, 0 1px 1px #73461b66; }
+#hud-phone .hp-rank-line:nth-child(2) i { background: linear-gradient(#f5f5ef, #a8a79b); color: #55564f; }
+#hud-phone .hp-rank-line:nth-child(3) i { background: linear-gradient(#eeb985, #a5623f); color: #60351f; }
+#hud-phone .hp-rank-line b { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+#hud-phone .hp-rank-line small { color: #775633; font-size: 9px; font-weight: 700; }
+#hud-phone .hp-rank-line.me { padding: 0 3px; margin-left: -3px; width: calc(100% + 6px); border-radius: 3px; background: #f7cd7770; }
+#hud-phone .hp-shift-earn, #hud-phone .hp-current, #hud-phone .hp-last-rating { position: relative; background: linear-gradient(#ffffff75, #ffffff00 48%), repeating-linear-gradient(0deg, #fbf3df 0 2px, #f5e8cf 2px 4px); border-color: #cfb78d; box-shadow: inset 0 1px #fff, 0 3px 7px #21140670; }
+#hud-phone .hp-shift-earn { margin-top: 10px; }
+#hud-phone .hp-current { margin-top: 0; min-height: 76px; padding: 10px 8px; display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; align-items: center; gap: 8px; border: 1px solid #d49a42; border-left: 5px solid #e57d31; border-radius: 10px; background: linear-gradient(#fff9da, #ffe6a7 54%, #f6cc7b); box-shadow: inset 0 1px #fffde9, inset 0 -1px #d5a05766, 0 3px 7px #21140670; }
+#hud-phone .hp-current-avatar { display: grid; place-items: center; width: 46px; height: 46px; overflow: hidden; border: 2px solid #fff9df; border-radius: 9px; background: linear-gradient(#ffd378, #e98c42); box-shadow: 0 0 0 1px #bb8039, 0 2px 3px #8d481b44; color: #824423; font-size: 24px; font-weight: 700; }
+#hud-phone .hp-current-avatar img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+#hud-phone .hp-current-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+#hud-phone .hp-current-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#hud-phone .hp-current b { color: #61361e; font-size: 16px; line-height: 1.15; text-shadow: 0 1px #fff9; }
+#hud-phone .hp-current-distance { color: #965722; font-size: 12px; font-weight: 700; white-space: nowrap; }
+#hud-phone .hp-current-time { padding: 7px 5px; border: 1px solid #367a49; border-radius: 7px; background: linear-gradient(#77b46a, #43884e); box-shadow: inset 0 1px #d3f2baaa, 0 2px 3px #79502933; color: #fffce8; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; text-shadow: 0 -1px #367343; }
+#hud-phone .hp-current.warn .hp-current-time { border-color: #bc6825; background: linear-gradient(#f7b94e, #e7842c); color: #60330e; text-shadow: 0 1px #ffe6a6; }
+#hud-phone .hp-current.low { border-left-color: #cc483b; background: linear-gradient(#fff2d0, #ffd3a0); }
+#hud-phone .hp-current.low .hp-current-time { border-color: #a43c32; background: linear-gradient(#ed8263, #c84c3f); color: #fff7de; text-shadow: 0 -1px #9b392e; }
+#hud-phone .hp-competition { margin-top: 10px; }
+#hud-phone .hp-shift-earn::before { content: ''; position: absolute; inset: 4px; border: 1px dashed #bd966153; border-radius: 5px; pointer-events: none; }
+#hud-phone .hp-order-list { background: linear-gradient(#fffef8e6, #fffef8e6), repeating-linear-gradient(0deg, #e2cdac 0 1px, #f6e6cc 1px 4px); }
+#hud-phone .hp-order-title { background: linear-gradient(#fff4 0%, #12090355 52%, #12090388), url('/textures/phone-wood.svg') repeat-x; background-size: auto, auto 100%; }
+#hud-phone .hp-rating-app { background: url('/textures/phone-leather.svg') center / cover no-repeat; }
+#hud-phone .hp-rating-row { background: #fff7e7; border-bottom-color: #c8aa7a; }
+#hud-phone .hp-rating-row:nth-child(even) { background: #f2e1c5; }
+#hud-phone .hp-rating-row.me { background: #f9d999; }
+#hud-phone .hp-thread { background: linear-gradient(#ffffff66, #ffffff00), repeating-linear-gradient(0deg, #d7e6d2 0 1px, #e8f0e2 1px 4px); }
+#hud-phone .hp-messages .hp-nav button { border-color: #315b42; background: linear-gradient(#a5d4ac, #65a574 52%, #3e7856); box-shadow: inset 0 1px #e6ffe6a8, 0 1px 1px #284d39; text-shadow: 0 -1px #315b42; }
+#hud-phone.hp-focus-latest .hp-message:not(.latest) { display: none; }
+#hud-phone.hp-app-launching .hp-messages { animation: hp-app-open .5s cubic-bezier(.17,.89,.32,1.15) both; transform-origin: 85% 8%; }
+@keyframes hp-app-open { from { opacity: .45; transform: scale(.38); filter: blur(3px); } to { opacity: 1; transform: scale(1); filter: none; } }
+body.hud-phone-active #hearts, body.hud-phone-active #cash, body.hud-phone-active #phone { visibility: hidden !important; }
+body.hud-phone-active #chat { display: none !important; }
+body.hud-phone-active #payfx { z-index: 31; }
+/* Праздничный итог занимает только экран телефона, без денег и карточек снаружи. */
+#hud-phone .hp-paid-modal { position: absolute; z-index: 22; inset: 20px 0 0; display: flex; flex-direction: column; overflow: hidden; background: repeating-linear-gradient(0deg, #fff9e9 0 2px, #f9eed6 2px 4px); color: #583b25; animation: hp-paid-arrive .4s cubic-bezier(.18,.85,.35,1.12) both; }
+#hud-phone .hp-paid-head { flex: none; position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 13px 8px 15px; background: radial-gradient(ellipse at 50% 0, #a6d57a, #569654 65%, #35733f); border-bottom: 1px solid #31633b; box-shadow: inset 0 1px #e5ffca9c, 0 2px 4px #422b2244; color: #fffdf0; text-shadow: 0 1px 2px #28582f; }
+#hud-phone .hp-paid-head > span { color: #ffe391; font-size: 29px; line-height: 1; }
+#hud-phone .hp-paid-head b { font-size: 20px; line-height: 1.15; text-align: center; }
+#hud-phone .hp-paid-praise { color: #e6f6d0; font-size: 13px; }
+#hud-phone .hp-paid-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 13px 9px; }
+#hud-phone .hp-paid-guest { display: flex; align-items: center; gap: 9px; padding: 15px 0 12px; }
+#hud-phone .hp-paid-guest > div { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+#hud-phone .hp-paid-avatar { width: 52px; height: 52px; flex: none; display: grid; place-items: center; overflow: hidden; border: 2px solid #fff9; border-radius: 8px; background: linear-gradient(#ffe2bd, #c87952); box-shadow: 0 0 0 1px #a97848, 0 2px 4px #0003; color: #66381e; font: 700 25px Georgia, serif; }
+#hud-phone .hp-paid-avatar img { width: 100%; height: 100%; object-fit: cover; }
+#hud-phone .hp-paid-name { overflow-wrap: anywhere; color: #563622; font-size: 15px; }
+#hud-phone .hp-paid-reaction { color: #6c5941; font-size: 12px; font-weight: 700; }
+#hud-phone .hp-paid-reaction.happy { color: #3c8044; }
+#hud-phone .hp-paid-reaction.angry { color: #ad503d; }
+#hud-phone .hp-paid-receipt { border-top: 1px dashed #b89d76; }
+#hud-phone .hp-paid-line { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; font-size: 13px; }
+#hud-phone .hp-paid-line + .hp-paid-line { border-top: 1px dashed #d6c7ac; }
+#hud-phone .hp-paid-line b { white-space: nowrap; color: #62452d; }
+#hud-phone .hp-paid-line.tip b { color: #a97416; }
+#hud-phone .hp-paid-line.neg b { color: #bd5037; }
+#hud-phone .hp-paid-bottom { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 11px 0 9px; border-top: 2px solid #b5976a; font-size: 13px; font-weight: 800; }
+#hud-phone .hp-paid-gain { color: #3d8145; font: 800 27px/1 Georgia, serif; text-shadow: 0 1px #fff; }
+#hud-phone .hp-paid-modal.negative .hp-paid-gain { color: #bd5037; }
+#hud-phone .hp-paid-shift { display: flex; justify-content: space-between; gap: 8px; padding: 8px; border-radius: 5px; background: #e8d4af; font-size: 12px; }
+#hud-phone .hp-paid-close { flex: none; min-height: 38px; margin: 0 13px 13px; border: 1px solid #397140; border-radius: 7px; background: linear-gradient(#9bcb78, #639e53 48%, #4c8748 51%, #38713d); box-shadow: inset 0 1px #eaffd6, 0 2px 3px #69472144; color: #fffdf0; font-size: 15px; font-weight: 700; text-shadow: 0 -1px #37643b; }
+#hud-phone .hp-paid-confetti { position: absolute; z-index: 2; inset: 0; overflow: hidden; pointer-events: none; }
+#hud-phone .hp-paid-confetti i { position: absolute; left: calc(6% + var(--i) * 6.7%); top: -12px; width: 6px; height: 11px; border-radius: 1px; background: #e96554; animation: hp-paid-confetti 1.6s calc(var(--i) * .035s) ease-out both; }
+#hud-phone .hp-paid-confetti i:nth-child(3n) { background: #f5c749; }
+#hud-phone .hp-paid-confetti i:nth-child(3n+1) { background: #7bc9ad; }
+@keyframes hp-paid-arrive { from { opacity: .3; transform: translateY(35px) scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes hp-paid-confetti { 0% { opacity: 0; transform: translateY(0) rotate(0); } 10%, 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(300px) rotate(330deg); } }
+@media (max-height: 690px) { #hud-phone.hp-expanded .hp-device { top: calc(100% - 306px); transform: translate(-50%, -50%) scale(.87) rotate(0deg); } }
+@media (prefers-reduced-motion: reduce) { #hud-phone .hp-device, #hud-phone .hp-backdrop, #hud-phone .hp-paid-modal, #hud-phone .hp-paid-confetti i { transition-duration: .01ms; animation-duration: .01ms; animation-delay: 0s; } }
+/* Два чата: курьеры текущей смены и личный диалог управляющей. */
+#hud-phone .hp-chat-tabs { display: flex; flex: none; gap: 4px; padding: 6px 8px; border-bottom: 1px solid #a5bc9e; background: linear-gradient(#e9f3e3, #c9dfbd); }
+#hud-phone .hp-chat-tabs button { flex: 1; min-height: 28px; border: 1px solid #91ad87; border-radius: 6px; background: linear-gradient(#fff, #e0ecd9); color: #4b6b46; font-size: 12px; font-weight: 700; }
+#hud-phone .hp-chat-tabs button.selected { border-color: #4c8050; background: linear-gradient(#83b374, #538652); color: #fff; box-shadow: inset 0 1px #c9e9ba; text-shadow: 0 -1px #426c43; }
+#hud-phone .hp-chat-context { position: relative; flex: none; }
+#hud-phone .hp-chat-members { display: flex; align-items: center; justify-content: space-between; gap: 5px; width: 100%; padding: 6px 11px; border: 0; border-bottom: 1px solid #c7d5bf; background: #edf4e7; color: #60745b; font-size: 11px; font-weight: 600; text-align: left; }
+#hud-phone .hp-chat-roster { position: absolute; z-index: 10; inset: 100% 5px auto; max-height: 250px; overflow: auto; padding: 6px; border: 1px solid #91a58a; border-radius: 0 0 8px 8px; background: #f4f8ee; box-shadow: 0 5px 12px #24401f55; }
+#hud-phone .hp-chat-member { display: flex; align-items: center; gap: 8px; padding: 6px; }
+#hud-phone .hp-chat-member > span:last-child { display: flex; flex-direction: column; gap: 2px; }
+#hud-phone .hp-chat-member b { font-size: 12px; }
+#hud-phone .hp-chat-member small { color: #73816b; font-size: 10px; }
+#hud-phone .hp-chat-member-face { display: grid; place-items: center; flex: none; width: 30px; height: 30px; overflow: hidden; border: 1px solid #a3b796; border-radius: 6px; background: #dceacb; color: #55734b; font-size: 17px; font-weight: 700; }
+#hud-phone .hp-chat-member-face img { width: 100%; height: 100%; object-fit: cover; }
+#hud-phone .hp-chat-empty { margin: auto 10px; padding: 14px 9px; border-radius: 9px; background: #f7fbf0a8; color: #83917a; text-align: center; font-size: 12px; line-height: 1.4; }
+#hud-phone .hp-message.hp-outgoing { align-items: flex-end; }
+#hud-phone .hp-outgoing .hp-message-meta { text-align: right; }
+#hud-phone .hp-outgoing p { margin: 0 5px 0 0; background: linear-gradient(#d7edff, #a8d4f1 55%, #8fc2e6); border-color: #72a5c5; }
+#hud-phone .hp-outgoing p::before { left: auto; right: -7px; border-left: 0; border-right: 1px solid #72a5c5; border-bottom-color: #72a5c5; background: #8fc2e6; transform: rotate(-45deg); }
+#hud-phone .hp-system-message p { background: linear-gradient(#fff6cf, #f5e5b3); border-color: #cbb36e; }
+#hud-phone .hp-system-message p::before { display: none; }
+/* Выбор обеда использует прежний диалог и ввод, но живёт в экране приложения. */
+#hud-phone .hp-dialog-host { position: absolute; z-index: 24; inset: 20px 0 0; background: #e8f0e2; }
+#hud-phone #dlg.dlg-in-phone { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; background: none; align-items: stretch; justify-content: stretch; overflow: hidden; pointer-events: auto; font-family: inherit; }
+#hud-phone #dlg.dlg-in-phone .dlg-box { display: flex; flex-direction: column; width: 100%; height: 100%; max-height: 100%; min-width: 0; margin: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none; transform: none; background: repeating-linear-gradient(0deg, #d7e6d2 0 1px, #e8f0e2 1px 4px); font-family: inherit; }
+#hud-phone #dlg.dlg-in-phone .dlg-top { flex: none; min-height: 44px; margin: 0; padding: 6px 9px; border-bottom: 1px solid #385f4b; background: linear-gradient(#92b59b, #6b9778 48%, #538466 50%, #416e56); color: #fff; font: 700 13px/1.3 "Helvetica Neue", Helvetica, Arial, sans-serif; }
+#hud-phone #dlg.dlg-in-phone .dlg-what { color: #fff; font-size: 13px; text-transform: none; text-shadow: 0 -1px #385f4b; }
+#hud-phone #dlg.dlg-in-phone .dlg-phone-exit { flex: none; width: 27px; height: 27px; margin-left: 5px; border-radius: 6px; background: #d4e8cc; color: #416e46; font: 21px/1 Arial, sans-serif; }
+#hud-phone #dlg.dlg-in-phone .dlg-row { display: flex; flex: 1; min-height: 0; overflow: auto; padding: 12px 10px; align-items: stretch; }
+#hud-phone #dlg.dlg-in-phone .dlg-head, #hud-phone #dlg.dlg-in-phone .dlg-skip, #hud-phone #dlg.dlg-in-phone .dlg-bar { display: none; }
+#hud-phone #dlg.dlg-in-phone .dlg-col { display: flex; flex-direction: column; width: 100%; gap: 9px; }
+#hud-phone #dlg.dlg-in-phone .dlg-bubble, #hud-phone #dlg.dlg-in-phone .dph-message { padding: 9px 11px; border: 1px solid #83af72; border-radius: 12px; background: linear-gradient(#f5fff1, #c7eaaa); box-shadow: inset 0 1px #fff, 0 2px 2px #0002; color: #252c23; font: 13px/1.35 "Helvetica Neue", Helvetica, Arial, sans-serif; }
+#hud-phone #dlg.dlg-in-phone.dlg-phone-courier .dlg-bubble, #hud-phone #dlg.dlg-in-phone .dph-out { background: linear-gradient(#d7edff, #9bccea); border-color: #72a5c5; }
+#hud-phone #dlg.dlg-in-phone .dlg-phone-sender, #hud-phone #dlg.dlg-in-phone .dph-message > b { color: #63795b; font: 700 10px/1.3 "Helvetica Neue", Helvetica, Arial, sans-serif; }
+#hud-phone #dlg.dlg-in-phone .dlg-text { font: inherit; line-height: inherit; }
+#hud-phone #dlg.dlg-in-phone .dlg-btns { flex: none; display: flex; flex-direction: column; width: 100%; max-width: none; margin: 5px 0 0; padding: 0; gap: 7px; }
+#hud-phone #dlg.dlg-in-phone .dlg-option { min-height: 52px; padding: 9px 10px 9px 24px; border: 1px solid #9f8b58; border-radius: 8px; background: linear-gradient(#fff8db, #efd6a2); color: #6d4d2b; box-shadow: inset 0 1px #fff, 0 2px 3px #5c583733; font: 700 13px/1.25 "Helvetica Neue", Helvetica, Arial, sans-serif; }
+#hud-phone #dlg.dlg-in-phone .dlg-option small { margin-top: 4px; color: #94754f; font: 11px/1.3 "Helvetica Neue", Helvetica, Arial, sans-serif; }
+#hud-phone #dlg.dlg-in-phone .dlg-option.dlg-cur { outline: 2px solid #da9c3c; outline-offset: 1px; background: linear-gradient(#fff0b7, #f2cb7e); }
+#hud-phone #dlg.dlg-in-phone .dlg-hint { margin: 3px 0 0; color: #718067; font: 10px/1.3 "Helvetica Neue", Helvetica, Arial, sans-serif; }
+#hud-phone #dlg.dlg-in-phone .dlg-pop { animation: none; }
