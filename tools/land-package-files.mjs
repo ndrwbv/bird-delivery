@@ -8,6 +8,20 @@ import {makeSourceKey} from './land-package-source-key.mjs';
 import {limitsOf} from '../src/game/landcache17a/checkpoint-limits.js';
 
 export const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
+
+// Finish every started export before returning a failure. Never start another batch after one fails.
+export async function runPreparationExports(slots,prepare,workers){
+ const rows=[];
+ for(let start=0;start<slots.length;start+=workers){
+  const batch=await Promise.allSettled(slots.slice(start,start+workers).map(prepare));
+  for(const result of batch){
+   if(result.status==='rejected')throw result.reason;
+   rows.push(result.value);
+  }
+ }
+ return rows;
+}
+
 // Code only: no output/catalog/build-tree digest participates in source identity.
 export const PREPARATION_HELPERS=Object.freeze(['tools/land-package-files.mjs','tools/land-package-source-key.mjs','tools/land-package-build.mjs','tools/land-package-prepare.mjs','tools/probe-checks/land-package-district-export.js','tools/address-package-build.mjs','tools/address-package-prepare.mjs','tools/probe-checks/address-package-export.js','tools/probe-checks/address-package-fresh-export.js','tools/startup-environment.cjs']);
 const slash=value=>value.split(path.sep).join('/');

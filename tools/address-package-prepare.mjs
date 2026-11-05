@@ -1,4 +1,4 @@
-/* Two ordinary independent B1 exports; no retry, no timing claim, no scene serialization. */
+/* Offline address exports; no retry, no timing claim, no scene serialization. */
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
@@ -6,7 +6,7 @@ import {finished} from 'node:stream/promises';
 import {fileURLToPath} from 'node:url';
 import {createRequire} from 'node:module';
 import {randomUUID,webcrypto} from 'node:crypto';
-import {captureSource,captureBuild,newExternalPath,sha256} from './land-package-files.mjs';
+import {captureSource,captureBuild,newExternalPath,runPreparationExports,sha256} from './land-package-files.mjs';
 import {validateStartupReport} from './startup-report.mjs';
 import {assertOrdinaryEDL} from '../src/game/landdata/land-package-key.js';
 import {encodeAddressCatalog,decodeAddressCatalog} from '../src/game/addresscodec17b.js';
@@ -116,12 +116,15 @@ export function checkAddressRepeats(a,b){
  need(a.wireSha256===b.wireSha256&&a.bytes.equals(b.bytes),'INDEPENDENT_WIRE_DIFFERENCE');
  for(const key of ['menuExact','fixedQueriesExact','exactQueryTables'])need(same(a.proof[key],b.proof[key]),'INDEPENDENT_QUERY_'+key);
 }
-export function addressProductCatalog(rows){
- need(Array.isArray(rows)&&rows.length===4&&new Set(rows.map(r=>r.session)).size===4&&rows.every(r=>typeof r.session==='string'&&r.session.length>0),'PRODUCT_FOUR_INDEPENDENT_EXPORTS');
+export function addressProductCatalog(rows,repeats=[1,2]){
+ const count=2*repeats.length;
+ need(Array.isArray(rows)&&rows.length===count&&new Set(rows.map(r=>r.session)).size===count&&rows.every(r=>typeof r.session==='string'&&r.session.length>0),
+  count===4?'PRODUCT_FOUR_INDEPENDENT_EXPORTS':'PRODUCT_TWO_INDEPENDENT_EXPORTS');
  const slots=[];
  for(const graphics of ['mid','high']){
-  const pair=rows.filter(row=>row.graphics===graphics);need(pair.length===2&&new Set(pair.map(r=>r.repeat)).size===2&&pair.every(r=>[1,2].includes(r.repeat)),'PRODUCT_PRESET_REPEATS');
-  checkAddressRepeats(pair[0].checked,pair[1].checked);const first=pair[0].checked;
+  const pair=rows.filter(row=>row.graphics===graphics);need(pair.length===repeats.length&&repeats.every(repeat=>pair.some(row=>row.repeat===repeat)),'PRODUCT_PRESET_REPEATS');
+  const first=pair[0].checked;
+  if(pair[1])checkAddressRepeats(first,pair[1].checked);
   slots.push({graphics,identity:first.identity,entry:{path:'address-data/'+first.wireSha256+'.addr',bytes:first.bytes.length,sha256:first.wireSha256}});
  }
  need(typeof AddressPackages.assertProductAddressCatalog==='function','PRODUCT_CATALOG_API');
@@ -138,10 +141,15 @@ export function earlyQueryInit(artifact,observerSource){
  return'/* Host proof points only: not a source/key input. Observer SHA256 '+observerSha256+' */\n'+observerSource+'\n(()=>{const freeze=v=>{if(v&&typeof v==="object"){for(const item of Object.values(v))freeze(item);Object.freeze(v);}return v;};Object.defineProperty(window,"__addressPackage17bEarlyQueryInput",{value:freeze('+JSON.stringify(artifact)+'),writable:false,configurable:false});Object.defineProperty(window,"__addressPackage17bEarlyQueryObserver",{value:Object.freeze({file:"tools/probe-checks/startup-bootstrap-observe.js",sha256:"'+observerSha256+'"}),writable:false,configurable:false});})();\n';
 }
 async function main(){
- const {ordinary,out:requestedOut}=parseAddressPreparationArgs(process.argv.slice(2));
+ const args=process.argv.slice(2),single=args.includes('--single-export');
+ if(single)args.splice(args.indexOf('--single-export'),1);
+ const {ordinary,out:requestedOut}=parseAddressPreparationArgs(args);
+ need(!single||ordinary,'SINGLE_EXPORT_REQUIRES_ORDINARY');
  const schedule=addressPreparationSchedule(ordinary);
+ const repeats=single?[1]:[1,2],workers=single?2:1;
+ const slots=(ordinary?['mid','high']:['high']).flatMap(graphics=>repeats.map(repeat=>({graphics,repeat})));
  const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),out=newExternalPath(repo,requestedOut);fs.mkdirSync(out,{recursive:true});
- const journal={version:1,kind:'ordinary-address-preparation',out,startedAt:new Date().toISOString(),protocol:{exports:ordinary?4:2,fixture:ordinary?'ordinary-first-career-mid-high-ru':'exact-B1-mature0-high-semerka-ru',query:ordinary?FRESH_ADDRESS_EXPORT_QUERY:ADDRESS_EXPORT_QUERY,seed:null,cpu:1,fresh:true,maxWireBytes:WIRE_LIMIT,maxReportBytes:REPORT_LIMIT},...(ordinary?{schedule}:{}),runs:[]};
+ const journal={version:1,kind:'ordinary-address-preparation',out,startedAt:new Date().toISOString(),protocol:{exports:slots.length,workers,fixture:ordinary?'ordinary-first-career-mid-high-ru':'exact-B1-mature0-high-semerka-ru',query:ordinary?FRESH_ADDRESS_EXPORT_QUERY:ADDRESS_EXPORT_QUERY,seed:null,cpu:1,fresh:true,maxWireBytes:WIRE_LIMIT,maxReportBytes:REPORT_LIMIT},...(ordinary?{schedule}:{}),runs:[]};
  const harness=()=>HARNESS.map(file=>{const bytes=fs.readFileSync(path.join(repo,file));return{file,bytes:bytes.length,sha256:sha256(bytes)};});journal.harness=harness();
  const save=()=>fs.writeFileSync(path.join(out,'preparation.json'),JSON.stringify(journal,null,2));save();
  const env={...process.env};for(const key of ['BIRD_EDITOR','BIRD_LAND_DATA_DIR','BIRD_ADDRESS_DATA_DIR'])delete env[key];
@@ -160,17 +168,18 @@ async function main(){
   const source=captureSource(repo);journal.source=source;save();
   const dist=path.join(out,'prepare-steam');await run('build',process.execPath,[path.join(repo,'node_modules/vite/bin/vite.js'),'build','--mode','steam','--outDir',dist],300000);
   need(same(captureSource(repo),source),'SOURCE_CHANGED_DURING_BUILD');const build=captureBuild(dist);journal.build=build;save();
-  const electron=createRequire(path.join(repo,'package.json'))('electron'),checked=[];journal.exports=[];
-  for(const graphics of ordinary?['mid','high']:['high'])for(const repeat of [1,2]){
+  const electron=createRequire(path.join(repo,'package.json'))('electron');journal.exports=[];
+  const checked=await runPreparationExports(slots,async ({graphics,repeat})=>{
    const label=ordinary?'fresh-'+graphics+'-'+repeat:'B1-'+repeat,folder=path.join(out,label);fs.mkdirSync(folder);const fixtureFile=path.join(folder,'fixture.json'),report=path.join(folder,'raw.json'),wireFile=path.join(folder,'catalog.addr'),session='address17b-'+randomUUID();
    const fixtureText=JSON.stringify(ordinary?freshAddressPreparationFixture(graphics):addressPreparationFixture(),null,2)+'\n';fs.writeFileSync(fixtureFile,fixtureText,{flag:'wx'});
    const args=[path.join(repo,'tools/probe.cjs'),...(process.platform==='linux'?['--no-sandbox','--disable-gpu-sandbox']:[]),'--mode=steam','--dir='+dist,'--startup-trace','--startup-cold','--startup-session='+session,'--startup-fixture='+fixtureFile,...(ordinary?['--startup-no-lang','--startup-deck']:[]),'--fresh',...(schedule.early?['--early']:['--startup-admission=settled']),'--size=deck','--cpu=1','--bootcpu','--init-script='+path.join(repo,'tools/probe-checks/startup-bootstrap-observe.js'),'--q='+(ordinary?FRESH_ADDRESS_EXPORT_QUERY:ADDRESS_EXPORT_QUERY),'--eval='+path.join(repo,ordinary?'tools/probe-checks/address-package-fresh-export.js':'tools/probe-checks/address-package-export.js'),'--bootwait='+schedule.bootWaitSec,'--timeout='+schedule.probeTimeoutSec,'--max=0','--errors','--report='+report];
    const child=await run(label,electron,args,schedule.hardTimeoutMs);need(fs.statSync(report).size>0&&fs.statSync(report).size<=REPORT_LIMIT,'REPORT_BUDGET');const raw=fs.readFileSync(report),value=JSON.parse(raw),accepted=await checkAddressExport(value,{base:source.base,ordinary,graphics});
-   fs.writeFileSync(wireFile,accepted.bytes,{flag:'wx'});checked.push({graphics,repeat,session,checked:accepted});journal.exports.push({label,graphics,repeat,session,report,reportSha256:sha256(raw),fixtureFile,fixtureSha256:sha256(Buffer.from(fixtureText)),wireFile,bytes:accepted.bytes.length,sha256:accepted.wireSha256,identity:accepted.identity,inputDescriptorExact:accepted.descriptorExact,processStatus:child.processStatus,signal:child.signal});save();
-  }
+   fs.writeFileSync(wireFile,accepted.bytes,{flag:'wx'});journal.exports.push({label,graphics,repeat,session,report,reportSha256:sha256(raw),fixtureFile,fixtureSha256:sha256(Buffer.from(fixtureText)),wireFile,bytes:accepted.bytes.length,sha256:accepted.wireSha256,identity:accepted.identity,inputDescriptorExact:accepted.descriptorExact,processStatus:child.processStatus,signal:child.signal});save();
+   return {graphics,repeat,session,checked:accepted};
+  },workers);
   need(new Set(journal.exports.map(row=>row.session)).size===journal.exports.length,'INDEPENDENT_SESSIONS');if(!ordinary)checkAddressRepeats(checked[0].checked,checked[1].checked);
   need(same(captureSource(repo),source)&&same(captureBuild(dist),build)&&same(harness(),journal.harness),'FINAL_PROVENANCE_CHANGED');
-  const packet=ordinary?addressProductCatalog(checked):checkAddressPackageCatalog({version:1,kind:'address-package17b',identity:checked[0].checked.identity,entry:{path:'address-data/'+checked[0].checked.wireSha256+'.addr',bytes:checked[0].checked.bytes.length,sha256:checked[0].checked.wireSha256}});
+  const packet=ordinary?addressProductCatalog(checked,repeats):checkAddressPackageCatalog({version:1,kind:'address-package17b',identity:checked[0].checked.identity,entry:{path:'address-data/'+checked[0].checked.wireSha256+'.addr',bytes:checked[0].checked.bytes.length,sha256:checked[0].checked.wireSha256}});
   const observer=fs.readFileSync(path.join(repo,'tools/probe-checks/startup-bootstrap-observe.js'),'utf8'),sidecars=[];
   for(const graphics of ordinary?['mid','high']:['high']){
    const row=checked.find(row=>row.graphics===graphics),record=journal.exports.find(row=>row.graphics===graphics),artifact=earlyQueryArtifact(row.checked,record.reportSha256),prefix=ordinary?'early-queries-'+graphics:'early-queries';

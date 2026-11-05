@@ -32,7 +32,7 @@ on:
         type: boolean
         default: false
       prepared_from:
-        description: 'Номер прогона с уже подготовленными совместимыми данными города (пусто — подготовить при сборке)'
+        description: 'Номер прогона с готовыми совместимыми данными города (пусто — взять из кеша или подготовить)'
         type: string
         required: false
         default: ''
@@ -95,6 +95,20 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci
+        if: inputs.prepared_from == ''
+      - name: Ключ совместимости данных города
+        id: source
+        if: inputs.prepared_from == '' && !inputs.checks
+        run: |
+          SOURCE_KEY=$(node --input-type=module -e "import { captureSource } from './tools/land-package-files.mjs'; console.log(captureSource('.').base.sourceHash)")
+          echo "key=$SOURCE_KEY" >> "$GITHUB_OUTPUT"
+      - name: Кеш готовой земли
+        id: prepared
+        if: inputs.prepared_from == '' && !inputs.checks
+        uses: actions/cache@v4
+        with:
+          key: prepared-land-v1-${{ steps.source.outputs.key }}
+          path: ${{ runner.temp }}/bird-land-preparation/package
       - name: Взять уже подготовленные данные
         if: inputs.prepared_from != ''
         uses: actions/download-artifact@v4
@@ -103,11 +117,15 @@ jobs:
           path: ${{ runner.temp }}/bird-land-preparation/package
           run-id: ${{ inputs.prepared_from }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Подготовить обычный город и проверить повторяемость
-        if: inputs.prepared_from == ''
+      - name: Подготовить землю города
+        if: inputs.prepared_from == '' && steps.prepared.outputs.cache-hit != 'true'
         env:
           BUILD_VERSION: ${{ needs.meta.outputs.version }}
-        run: xvfb-run -a node tools/land-package-prepare.mjs "--out=$RUNNER_TEMP/bird-land-preparation"
+          CHECKS: ${{ inputs.checks }}
+        run: |
+          args=("--out=$RUNNER_TEMP/bird-land-preparation")
+          if [ "$CHECKS" != true ]; then args+=(--single-export); fi
+          xvfb-run -a node tools/land-package-prepare.mjs "${args[@]}"
       - uses: actions/upload-artifact@v4
         with:
           name: prepared-land-data
@@ -115,7 +133,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.prepared.outputs.cache-hit != 'true' && inputs.prepared_from == ''
         with:
           name: prepared-land-proof
           path: |
@@ -134,6 +152,20 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci
+        if: inputs.prepared_from == ''
+      - name: Ключ совместимости данных города
+        id: source
+        if: inputs.prepared_from == '' && !inputs.checks
+        run: |
+          SOURCE_KEY=$(node --input-type=module -e "import { captureSource } from './tools/land-package-files.mjs'; console.log(captureSource('.').base.sourceHash)")
+          echo "key=$SOURCE_KEY" >> "$GITHUB_OUTPUT"
+      - name: Кеш готовых адресов
+        id: prepared
+        if: inputs.prepared_from == '' && !inputs.checks
+        uses: actions/cache@v4
+        with:
+          key: prepared-address-v1-${{ steps.source.outputs.key }}
+          path: ${{ runner.temp }}/bird-address-preparation/package
       - name: Взять уже подготовленные данные
         if: inputs.prepared_from != ''
         uses: actions/download-artifact@v4
@@ -142,13 +174,16 @@ jobs:
           path: ${{ runner.temp }}/bird-address-preparation/package
           run-id: ${{ inputs.prepared_from }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Подготовить обычные адреса mid/high и проверить повторяемость
-        if: inputs.prepared_from == ''
+      - name: Подготовить адреса mid/high
+        if: inputs.prepared_from == '' && steps.prepared.outputs.cache-hit != 'true'
         env:
           BUILD_VERSION: ${{ needs.meta.outputs.version }}
+          CHECKS: ${{ inputs.checks }}
         run: |
           set -o pipefail
-          xvfb-run -a node tools/address-package-prepare.mjs --ordinary "--out=$RUNNER_TEMP/bird-address-preparation" 2>&1 | tee "$RUNNER_TEMP/bird-address-preparation.log"
+          args=(--ordinary "--out=$RUNNER_TEMP/bird-address-preparation")
+          if [ "$CHECKS" != true ]; then args+=(--single-export); fi
+          xvfb-run -a node tools/address-package-prepare.mjs "${args[@]}" 2>&1 | tee "$RUNNER_TEMP/bird-address-preparation.log"
       - uses: actions/upload-artifact@v4
         with:
           name: prepared-address-data
@@ -156,7 +191,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.prepared.outputs.cache-hit != 'true' && inputs.prepared_from == ''
         with:
           name: prepared-address-proof
           path: |

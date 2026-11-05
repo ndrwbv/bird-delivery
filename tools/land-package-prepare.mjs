@@ -1,4 +1,4 @@
-/* Offline ordinary-EDL preparation. Sequential, fail closed, never retries a failed export. */
+/* Offline ordinary-EDL preparation. Fail closed, never retry a failed export. */
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -7,7 +7,7 @@ import {finished} from 'node:stream/promises';
 import {createRequire} from 'node:module';
 import {randomUUID} from 'node:crypto';
 import {gzipSync,gunzipSync} from 'node:zlib';
-import {captureSource,writeExportReceipt,readExportReceipt,sha256,newExternalPath,PREPARATION_HELPERS} from './land-package-files.mjs';
+import {captureSource,writeExportReceipt,readExportReceipt,sha256,newExternalPath,runPreparationExports,PREPARATION_HELPERS} from './land-package-files.mjs';
 import {createCatalog,PRODUCT_LAND_COVERAGE,assertProductCoverage} from '../src/game/landdata/land-package-catalog.js';
 import {canonical,need,makeIdentity,makeManifest,assertOrdinaryEDL} from '../src/game/landdata/land-package-key.js';
 import {LAND_PACKAGE_LIMITS} from '../src/game/landdata/land-package-config.js';
@@ -45,17 +45,20 @@ function readRaw(row){
  const size=fs.statSync(row.file).size;need(size>0&&size<=rawCeiling&&size===row.bytes,'EXPORT_FILE_BUDGET');
  const bytes=fs.readFileSync(row.file);need(bytes.length===row.bytes&&sha256(bytes)===row.sha256,'EXPORT_FILE_SHA');return bytes;
 }
-// Read only already exported files: independently generated repeats must match exactly before deduplication.
-export function checkPreparationRepeats(rows){
- need(Array.isArray(rows)&&rows.length===PRODUCT_LAND_COVERAGE.length*2,'PREPARATION_EXPORT_COUNT');
+// Always check coverage and deduplication. An audit also compares independent exports byte for byte.
+export function checkPreparationRepeats(rows,repeats=[1,2]){
+ need(Array.isArray(rows)&&rows.length===PRODUCT_LAND_COVERAGE.length*repeats.length,'PREPARATION_EXPORT_COUNT');
  need(rows.every(row=>typeof row.session==='string'&&row.session.length>0)&&new Set(rows.map(row=>row.session)).size===rows.length,'PREPARATION_INDEPENDENT_SESSIONS');
  need(new Set(rows.map(row=>path.resolve(row.file))).size===rows.length,'PREPARATION_INDEPENDENT_OUTPUTS');
  const manifest=rows[0].manifest,coverage=[],unique=new Map();
  for(const slot of PRODUCT_LAND_COVERAGE){
   const pair=rows.filter(row=>row.district===slot.district&&row.preset===slot.graphics);
-  need(pair.length===2&&new Set(pair.map(row=>row.repeat)).size===2&&pair.every(row=>[1,2].includes(row.repeat)),'PREPARATION_SLOT_REPEATS');
-  need(canonical(pair[0].manifest)===canonical(pair[1].manifest)&&canonical(pair[0].identity)===canonical(pair[1].identity)&&pair[0].sha256===pair[1].sha256&&pair[0].bytes===pair[1].bytes,'ORDINARY_NOT_REPEATABLE');
-  need(readRaw(pair[0]).equals(readRaw(pair[1])),'ORDINARY_REPEAT_BYTES');
+  need(pair.length===repeats.length&&repeats.every(repeat=>pair.some(row=>row.repeat===repeat)),'PREPARATION_SLOT_REPEATS');
+  const [first,second]=pair;
+  if(second){
+   need(canonical(first.manifest)===canonical(second.manifest)&&canonical(first.identity)===canonical(second.identity)&&first.sha256===second.sha256&&first.bytes===second.bytes,'ORDINARY_NOT_REPEATABLE');
+   need(readRaw(first).equals(readRaw(second)),'ORDINARY_REPEAT_BYTES');
+  }
   for(const row of pair){
    need(canonical(row.manifest)===canonical(manifest),'PRESET_PARAMETERS_DIFFER');
    need(canonical(row.identity)===canonical(makeIdentity(manifest,row.identity.precleanHash)),'EXPORTED_INPUT_IDENTITY');
@@ -63,7 +66,7 @@ export function checkPreparationRepeats(rows){
    if(prior)need(prior.sha256===row.sha256&&prior.bytes===row.bytes&&readRaw(prior).equals(readRaw(row)),'SAME_INPUT_DIFFERENT_RESULT');
    else unique.set(key,row);
   }
-  coverage.push({...slot,precleanHash:pair[0].identity.precleanHash});
+  coverage.push({...slot,precleanHash:first.identity.precleanHash});
  }
  return{manifest,coverage,unique:[...unique.values()]};
 }
@@ -72,9 +75,11 @@ async function main(){
  const arg=key=>process.argv.slice(2).find(value=>value.startsWith('--'+key+'='))?.slice(key.length+3);
  const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
  const output=arg('out');need(output,'REQUIRED_OUT');const out=newExternalPath(repo,output);
+ const single=process.argv.includes('--single-export'),repeats=single?[1]:[1,2],workers=single?2:1;
+ const slots=PRODUCT_LAND_COVERAGE.flatMap(slot=>repeats.map(repeat=>({...slot,repeat})));
  fs.mkdirSync(out,{recursive:true});
  const journal={version:2,kind:'ordinary-land-preparation',startedAt:new Date().toISOString(),out,
-  protocol:{coverage:PRODUCT_LAND_COVERAGE,independentRepeats:2,exports:8,fresh:true,seed:null,externalInit:false},runs:[]};
+  protocol:{coverage:PRODUCT_LAND_COVERAGE,independentRepeats:repeats.length,exports:slots.length,workers,fresh:true,seed:null,externalInit:false},runs:[]};
  const harnessFiles=[...new Set([...PREPARATION_HELPERS,'tools/probe.cjs','tools/probe-page.cjs','tools/land-package-export-host.cjs'])];
  const harness=()=>harnessFiles.map(file=>{const bytes=fs.readFileSync(path.join(repo,file));return{file,bytes:bytes.length,sha256:sha256(bytes)};});
  journal.harness=harness();
@@ -105,9 +110,9 @@ async function main(){
   const receipt=writeExportReceipt({repo,dist,file:receiptFile,limits:LAND_PACKAGE_LIMITS});
   need(receipt.base.sourceHash===before.base.sourceHash,'SOURCE_CHANGED_BEFORE_RECEIPT');
   journal.receiptHash=receipt.receiptHash;save();
-  const electron=createRequire(path.join(repo,'package.json'))('electron'),exports=[];
-  for(const slot of PRODUCT_LAND_COVERAGE)for(const repeat of [1,2]){
-   const {district,graphics:preset}=slot,label=(district?'district'+district+'-':'')+preset+'-'+repeat,fixture=preparationFixture(slot);
+  const electron=createRequire(path.join(repo,'package.json'))('electron');journal.exports=[];
+  const exports=await runPreparationExports(slots,async slot=>{
+   const {district,graphics:preset,repeat}=slot,label=(district?'district'+district+'-':'')+preset+'-'+repeat,fixture=preparationFixture(slot);
    const fixtureFile=path.join(out,label+'-fixture.json'),report=path.join(out,label+'.json'),file=path.join(out,label+'.land'),session='lp17b-'+randomUUID();
    fs.writeFileSync(fixtureFile,JSON.stringify(fixture),{flag:'wx'});
    const args=[path.join(repo,'tools/probe.cjs'),...(process.platform==='linux'?['--no-sandbox','--disable-gpu-sandbox']:[]),
@@ -119,9 +124,9 @@ async function main(){
    const raw=fs.readFileSync(report),value=JSON.parse(raw),result=checkPreparationExport(value,slot,receipt);
    need(path.resolve(result.path)===path.resolve(file),'EXPORT_OUTPUT_PATH');
    readRaw({...result,file});
-   const row={label,district,preset,repeat,session,fixtureFile,fixtureSha256:sha256(fs.readFileSync(fixtureFile)),report,reportSha256:sha256(raw),file,...result};exports.push(row);journal.exports=exports;save();
-  }
-  const {manifest,coverage,unique}=checkPreparationRepeats(exports);
+   const row={label,district,preset,repeat,session,fixtureFile,fixtureSha256:sha256(fs.readFileSync(fixtureFile)),report,reportSha256:sha256(raw),file,...result};journal.exports.push(row);save();return row;
+  },workers);
+  const {manifest,coverage,unique}=checkPreparationRepeats(exports,repeats);
   readExportReceipt(receiptFile,{repo,dist});
   const pkg=path.join(out,'package'),staging=path.join(out,'package.part');
   fs.mkdirSync(path.join(staging,'city-data'),{recursive:true});const entries=[];
