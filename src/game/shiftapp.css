@@ -17,48 +17,6 @@
   font: 13px/1.4 "Helvetica Neue", Arial, sans-serif;
   text-shadow: none;
 }
-.rf-shift-header {
-  position: relative;
-  display: grid;
-  place-items: center;
-  height: 33px;
-  box-sizing: border-box;
-  border-top: 1px solid #fff;
-  border-bottom: 1px solid #4c251d;
-  background: linear-gradient(#f4eee7, #e9e1d9 49%, #d5cac2 50%, #bcb0a8);
-  color: #492f28;
-  font-weight: 700;
-  text-shadow: 0 1px 0 #fff9;
-}
-.rf-shift-lights {
-  position: absolute;
-  left: 10px;
-  top: 50%;
-  translate: 0 -50%;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.rf-shift-app .rf-shift-close, .rf-shift-lights i {
-  box-sizing: border-box;
-  width: 12px;
-  height: 12px;
-  padding: 0;
-  border: 1px solid #a99b91;
-  border-radius: 50%;
-  background: linear-gradient(#f7f0e9, #c9b9ac);
-  box-shadow: inset 0 1px 0 #fff9, 0 1px 0 #fff7;
-}
-.rf-shift-app .rf-shift-close {
-  border-color: #ab5143;
-  background: linear-gradient(#ffb6a3, #e75d49);
-  color: #732e2b;
-  font: 10px/9px Arial, sans-serif;
-  text-align: center;
-  cursor: pointer;
-}
-.rf-shift-app .rf-shift-close:hover { background: linear-gradient(#ffc3ad, #f45c45); }
-
 .rf-shift-main {
   position: relative;
   display: grid;
@@ -308,17 +266,4 @@
 .rf-shift-app .rf-shift-start:focus-visible, .rf-shift-app .rf-shift-start.padsel {
   outline: 2px solid #ffe4ac;
   outline-offset: 4px;
-}
-#cr-menu.rf-menu:has(.rf-shift-app) .crm-card.k-go::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 3px;
-  width: 7px;
-  height: 3px;
-  translate: -50% 0;
-  border-radius: 50%;
-  background: #c7e6f5;
-  box-shadow: 0 0 5px #b6dff0;
-  pointer-events: none;
 }

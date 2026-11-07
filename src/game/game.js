@@ -166,6 +166,7 @@ import * as HK from './hookah.js';               // кальянщики на л
 import * as CULL from './cull.js';
 import * as UPD from './update.js';              // обновление из меню: плашка «есть новая версия», настройки → версия (update.js)
 import * as RASK from './routeask.js';         // путь на дороге: всю первую смену горит, потом — вопрос «оставить?» и настройка (routeask.js)
+import { mountApp, clearApp } from './desktopapp.js';
 import * as SET from './settings.js';           // настройки — карусель карточек, одна и та же из меню и из паузы (settings.js)
 import * as PAUSE from './pausecz.js';             // пауза — карусель карточек: продолжить, чек, накладная, карта, настройки, управление, закончить смену
 import * as PIX from './pixfx.js';              // пиксельные частицы одним мешем: дымок из-под колёс, осколки стёкол (pixfx.js)
@@ -12625,7 +12626,15 @@ function unscrollUI () {
     if (e.scrollLeft && !hand(cs.overflowX)) e.scrollLeft = 0;
   }
 }
-new MutationObserver(() => { if (elPanel.hidden) unscrollUI(); }).observe(elPanel, { attributes: true, attributeFilter: ['hidden'] });
+new MutationObserver(changes => {
+  if (elPanel.hidden && changes.some(change => change.attributeName === 'hidden')) unscrollUI();
+  const kind = elPanel.dataset.kind;
+  const app = kind === 'collect' ? 'collect' : kind === 'settings' || elPanel.dataset.back === 'settings' ? 'settings' : '';
+  if (CAREER && !TOUCH && !elPanel.hidden && app) {
+    const name = app === 'collect' ? $t('мои находки') : $t('настройки');
+    mountApp(elPanel, app, name, app, panelBack, elPanel.querySelector('.pn-box'));
+  } else clearApp(elPanel);
+}).observe(elPanel, { attributes: true, attributeFilter: ['hidden', 'data-kind', 'data-back'] });
 /* B / Esc: язык и «стереть прогресс?», открытые из настроек, — назад в настройки */
 function panelBack () { if (RESET_LOCKED) return; if (elPanel.dataset.back === 'settings') renderSettings(elPanel.dataset.kind === 'reset' ? 'set-reset' : undefined); else closePanel(); }
 
@@ -13903,12 +13912,6 @@ function drawRadar () {
     L.length = 0;
   }
   if (RADAR_W.size > 64) RADAR_W.clear();
-  rctx.globalAlpha = 0.5;                           // пробки и бандиты — видны, но тише маршрута
-  RL.drawRadar(rctx, tr, s);                        // пробки — красным
-  WORLD.drawRadar(rctx, tr, s);                     // бандитские районы — красные круги (world.js)
-  THUGS.drawRadar(rctx, tr, s);                     // гопники прессуют прохожего — мигающая точка (thugs.js)
-  rctx.globalAlpha = 1;
-  // проложенный маршрут
   // проложенный маршрут — самое яркое после пина: толще, с тёмной каймой, чтобы читался на любом фоне
   if (routePts.length > 1) {
     rctx.lineJoin = 'round'; rctx.lineCap = 'round';
@@ -13936,57 +13939,18 @@ function drawRadar () {
     rctx.moveTo(ax, ay); rctx.lineTo(bx, by); rctx.lineTo(cx, cy); rctx.lineTo(dx, dy); rctx.closePath();
     rctx.fill('evenodd');
   }
-  // метки — тихие квадратики, яркое только адрес (пин, ниже). Пересчёт в точку
-  // радара — без массива: машин и баллонов много, а рисуем каждый кадр
-  const rA = (wx, wz) => ((wz - V.z) * sn - (wx - V.x) * cs) * s;
-  const rB = (wx, wz) => -((wx - V.x) * sn + (wz - V.z) * cs) * s;
-  const blip = (wx, wz, hex, size) => {
-    let a = rA(wx, wz), b = rB(wx, wz);
-    const len = Math.max(Math.abs(a), Math.abs(b));   // квадрат: у края — по большей из сторон (11бц)
-    if (len > R - 7) { a *= (R - 7) / len; b *= (R - 7) / len; }
-    rctx.fillStyle = hex; rctx.fillRect(a - size, b - size, size * 2, size * 2);
-  };
-  rctx.globalAlpha = 0.75;
-  if (PIZZA) {                                       // пиццерия — домиком (у края радара — прижат к краю)
-    let a = rA(PIZZA.x, PIZZA.z), b = rB(PIZZA.x, PIZZA.z);
-    const len = Math.max(Math.abs(a), Math.abs(b));
-    if (len > R - 8) { a *= (R - 8) / len; b *= (R - 8) / len; }
-    houseIcon(rctx, a, b, 4, '#ffffff', '#33210c', '#f0522a');
+  // На мини-карте только ближайший ориентир и текущая цель. Остальные отметки — на полной карте.
+  if (PIZZA && S.state !== 'back') {
+    const a = qx(PIZZA.x, PIZZA.z), b = qy(PIZZA.x, PIZZA.z);
+    if (Math.max(Math.abs(a), Math.abs(b)) < R - 8) houseIcon(rctx, a, b, 4, '#ffffff', '#33210c', '#f0522a');
   }
-  if (CAREER) AUTO.radar(rctx, tr, R);             // гараж Дяди Жени
-  rctx.globalAlpha = 1;
-  if (THIEF.p && Math.floor(tG * 4) % 2 === 0) blip(THIEF.p.x, THIEF.p.z, '#ff2d6e', 3.6);
-  if (CAREER) RAID.radar(rctx, rA, rB, R);         // налёт на точку — мигает (raid.js)
-  rctx.globalAlpha = 0.5;                           // находки, бонусы и машины — тихо, чтобы не спорили с адресом
-  // находки — просто фиолетовые точки
-  for (const o of COL_ON_MAP) {
-    const a = rA(o.x, o.z), b = rB(o.x, o.z);
-    if (Math.max(Math.abs(a), Math.abs(b)) < R - 4) colDot(rctx, a, b, o.hint ? 4 : 2.2);   // hint — клиент подсказал (hintFind)
-  }
-  // кофе и бонусы — только те, что в пределах радара
-  for (const n of NITRO_CANS) {
-    if (n.t > 0) continue;
-    const a = rA(n.x, n.z), b = rB(n.x, n.z);
-    if (Math.max(Math.abs(a), Math.abs(b)) < R - 4) { rctx.fillStyle = PICK_HEX[n.kind]; rctx.fillRect(a - 1.5, b - 1.5, 3, 3); }
-  }
-  rctx.beginPath();                                 // машины потока — одним путём (их ~300), со своим цветом — по одной
-  for (let i = 0; i < TACT.length; i++) {           // стоящие в склейке (trafficgrid.js) — не в TACT
-    const t = TACT[i];
-    if (t.dot || (t.parked && !t.knock)) continue;  // стоящие на парковке — не на радаре (их 150—240, не двигаются); толкнули — едет, видно
-    let a = rA(t.x, t.z), b = rB(t.x, t.z);
-    const len = Math.max(Math.abs(a), Math.abs(b));
-    if (len > R - 7) { a *= (R - 7) / len; b *= (R - 7) / len; }
-    rctx.rect(a - 1.6, b - 1.6, 3.2, 3.2);
-  }
-  rctx.fillStyle = '#5b6b80'; rctx.fill();
-  for (let i = 0; i < TACT.length; i++) { const t = TACT[i]; if (t.dot) blip(t.x, t.z, t.dot, 2.4); }
-  rctx.globalAlpha = 1;
   // стрелка игрока — картинкой поверх холста (.radar-me, выше у radarC)
   // куда везти — поверх всего: мигающий пин, а за краем радара — стрелка у края
   eachTarget((wx, wz, main, kind) => {
-    const a = rA(wx, wz), b = rB(wx, wz), len = Math.max(Math.abs(a), Math.abs(b));
+    if (!main) return;
+    const a = qx(wx, wz), b = qy(wx, wz), len = Math.max(Math.abs(a), Math.abs(b));
     const out = len > R - 6;
-    if (main && CAREER) {                            // срочный — ещё и красное кольцо (orders.js)
+    if (CAREER) {
       const k = out ? (R - 7) / len : 1;
       ORD.radarRing(rctx, a * k, b * k);
     }
@@ -14498,12 +14462,15 @@ function warStick (hex) {
   return new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 0.62), new THREE.MeshLambertMaterial({ color: 0xf4f1ea }));
 }
 
-function setFullMap (on) {
+function setFullMap (on, fromPause = false) {
   if (on) CREWR.hide();                            // после карты прежний рейтинг не возвращается
   const toPause = !on && FM.open && FM.fromPause;   // открыли из паузы — «закрыть» возвращает в паузу, а не в езду
-  FM.fromPause = false;
+  FM.fromPause = on && fromPause;
   FM.open = on;
   elFull.hidden = !on;
+  if (on && fromPause && CAREER && !TOUCH) {
+    mountApp(elFull, 'map', $t('карта района'), 'map', () => setFullMap(false), elFull.querySelector('.fm-box'));
+  } else clearApp(elFull);
   if (isPlaying() && !S.paused) { if (on) Platform.gameplayStop(); else Platform.gameplayStart(); }
   for (const k in FM.keys) FM.keys[k] = 0;
   FM.padX = FM.padY = FM.padZ = 0; FM.ptr.clear(); FM.moved = 0;
@@ -17151,6 +17118,22 @@ $('sfx').addEventListener('click', e => { Snd.set(!Snd.on); e.currentTarget.blur
    нитро. Всё остальное — куда едем, сколько сбито, звук, карта района и
    выход — здесь. */
 const elPause = $('pausem');
+const canCancelPausedOrder = () => !!S.order && ['brief', 'loading', 'drive'].includes(S.state)
+  && !HCAM.busy() && !FPD.busy() && !DOOR.on() && !DLG.isOpen();
+
+function cancelPausedOrder () {
+  if (!S.paused || !canCancelPausedOrder()) return;
+  STORY.onCancel(S.order);
+  hidePhone();
+  HUDFONE.clearOrder();
+  clearGate();
+  setTrunk(false);
+  backToBase();
+  renderPause();
+  padMenu.clear();
+  if (CAREER) CAREERM.kbClear();
+  elPause.querySelector('.pz-card.on [data-main]')?.focus({ preventScroll: true });
+}
 /* текущий заказ — накладной, как на карточке заказа: шапка с номером, таблица, фото на скрепке.
    Только кому, куда, что, оплата и пометка по делу (О4, 09.10.2026: убраны «до точки» и «сейчас» — время и сезон) */
 function orderInfo () {
@@ -17212,7 +17195,8 @@ function keysInfo () {
     '<div class="pm-keys-g">' + rows.map(([a, b]) => '<span>' + a + '</span><em>' + b + '</em>').join('') + '</div>';
 }
 function renderPause () {
-  $('pm-order').innerHTML = orderInfo();
+  $('pm-order').innerHTML = orderInfo() + (canCancelPausedOrder()
+    ? '<button id="pm-cancel-order" type="button">' + escHtml($t('Отменить заказ')) + '</button>' : '');
   $('pm-keys').innerHTML = keysInfo();
   // Чек паузы без внутреннего респекта и званий.
   const rows = [[$t('доставлено'), S.delivered], [$t('заработано'), money(S.money)]];
@@ -17274,7 +17258,8 @@ function endShift (why) {
 }
 if (elPause) {
   $('pm-go').addEventListener('click', () => setPause(false));
-  $('pm-map').addEventListener('click', () => { setPause(false); setFullMap(true); FM.fromPause = true; });
+  $('pm-map').addEventListener('click', () => { setPause(false); setFullMap(true, true); });
+  $('pm-order').addEventListener('click', event => { if (event.target.closest('#pm-cancel-order')) cancelPausedOrder(); });
   $('pm-sfx').addEventListener('click', () => { Snd.set(!Snd.on); renderPause(); });
   $('pm-menu').addEventListener('click', endShift);
   // пауза — карусель (pausecz.js); «настройки» — те же, что в главном меню, поверх паузы
@@ -18940,7 +18925,7 @@ function frameStep (now) {
   let dt = clamp(raw, 0, 1 / 20);       // назад время не идёт
   last = now;
   if (SHIFTIN.active()) {
-    if (!EXT.paused && !document.hidden) CL.step('shift-check-in', SHIFTIN.step, dt);
+    if (!EXT.paused && !document.hidden) CL.step('shift-check-in', SHIFTIN.step, Math.min(raw, .12));
     return;
   }
   CULL.govern(raw, isPlaying() && !S.paused && !EXT.paused && !FM.open && !document.hidden);

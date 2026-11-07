@@ -9,7 +9,7 @@ const H = { root: null, device: null, thread: null, modal: null,
   visible: false, app: 'courier', order: null, messages: [], rating: null,
   shrink: 0, messageTimer: 0, enterTimer: 0, resourcesKey: '', rankKey: '',
   moneyElement: null, moneyParent: null, payment: null, paymentModal: null, currentAvatar: '',
-  channel: 'crew', members: [], membersKey: '', replies: [], conversation: false, conversationHost: null };
+  channel: 'crew', members: [], membersKey: '', replies: [], managerMessages: 0, conversation: false, conversationHost: null };
 
 const icon = kind => '<span class="hp-icon hp-icon-' + kind + '" aria-hidden="true"><i></i></span>';
 const $ = s => H.root && H.root.querySelector(s);
@@ -23,7 +23,7 @@ function setApp (app) {
 function open (app = 'messages') {
   if (!H.root || !H.visible) return;
   clearTimeout(H.shrink); clearTimeout(H.messageTimer);
-  H.root.classList.remove('hp-focus-latest', 'hp-app-launching');
+  H.root.classList.remove('hp-focus-latest', 'hp-reveal-history', 'hp-app-launching');
   setApp(app);
   H.root.classList.add('hp-expanded');
   if (app === 'courier') $('.hp-courier-scroll').scrollTop = 0;
@@ -38,10 +38,10 @@ export function dock () {
   H.modal.hidden = true;
   document.body.classList.remove('hp-order-open');
   setApp('courier');
-  H.root.classList.remove('hp-expanded', 'hp-new-message', 'hp-focus-latest', 'hp-app-launching', 'hp-notifying');
+  H.root.classList.remove('hp-expanded', 'hp-new-message', 'hp-focus-latest', 'hp-reveal-history', 'hp-app-launching', 'hp-notifying');
 }
 
-function drawMessage ({ name, role = '', text, avatar = '', outgoing = false, system = false, earlier = false }) {
+function drawMessage ({ name, role = '', text, avatar = '', outgoing = false, system = false, earlier = false, typing = false }) {
   if (!H.root) return;
   H.thread.querySelector('.hp-chat-empty')?.remove();
   H.thread.querySelector('.hp-message.latest')?.classList.remove('latest');
@@ -52,7 +52,12 @@ function drawMessage ({ name, role = '', text, avatar = '', outgoing = false, sy
   const stamp = earlier ? t('до смены') : t('сейчас');
   const time = document.createElement('small'); time.textContent = role ? role + ' · ' + stamp : stamp;
   const labels = document.createElement('span'); labels.append(who, time); meta.appendChild(labels);
-  const bubble = document.createElement('p'); bubble.textContent = text;
+  const bubble = document.createElement('p');
+  if (typing) {
+    row.classList.add('hp-typing');
+    bubble.setAttribute('aria-label', t('печатает…'));
+    bubble.append(document.createElement('i'), document.createElement('i'), document.createElement('i'));
+  } else bubble.textContent = text;
   row.append(meta, bubble); H.thread.appendChild(row);
   while (H.thread.children.length > 40) H.thread.firstChild.remove();
   H.thread.scrollTop = H.thread.scrollHeight;
@@ -65,7 +70,7 @@ function addMessage (message) {
   return entry;
 }
 export function recordMessage (message) { if (H.root) return addMessage(message); }
-export function clearReplies () { H.replies = []; }
+export function clearReplies () { H.replies = []; H.managerMessages = 0; }
 function setChannel (channel) {
   H.channel = channel === 'direct' ? 'direct' : 'crew';
   for (const button of H.root.querySelectorAll('[data-hp-channel]')) {
@@ -154,7 +159,7 @@ export function init ({ visible = false } = {}) {
     if (H.conversation || root.classList.contains('hp-shift-chat')) return;
     if (!H.modal.hidden) return;
     const channel = e.target.closest('[data-hp-channel]');
-    if (channel) { clearTimeout(H.shrink); setChannel(channel.dataset.hpChannel); return; }
+    if (channel) { setChannel(channel.dataset.hpChannel); open('messages'); return; }
     if (e.target.closest('.hp-chat-members')) { clearTimeout(H.shrink); const list = $('.hp-chat-roster'); list.hidden = !list.hidden; return; }
     const b = e.target.closest('[data-open]');
     if (b) { H.modal.hidden = true; open(b.dataset.open); return; }
@@ -233,17 +238,22 @@ export function showOrder ({ number, html, name = '', avatar = '', many = false,
 }
 export function hasOrder () { return !!H.order; }
 export function clearOrder () { if (!H.root) return; H.order = null; H.modal.hidden = true; document.body.classList.remove('hp-order-open'); $('.hp-order-details').replaceChildren(); }
-export function beginShiftChat (history) {
+export function beginShiftChat () {
   if (!H.root) return;
+  reset();
   setVisible(true);
   H.root.classList.add('hp-shift-chat');
   $('.hp-messages .hp-nav b').textContent = t('Общий чат');
-  setChannel('crew');
-  history.forEach(addMessage);
+  H.thread.replaceChildren();
   open('messages');
+}
+export function shiftTyping (message) {
+  $('.hp-typing')?.remove();
+  if (message) drawMessage({ ...message, typing: true });
 }
 export function endShiftChat () {
   if (!H.root) return;
+  shiftTyping();
   H.root.classList.remove('hp-shift-chat');
   $('.hp-messages .hp-nav b').textContent = t('Сообщения');
   dock();
@@ -252,7 +262,10 @@ export function receive (o) {
   if (!active()) return false;
   clearTimeout(H.shrink); clearTimeout(H.messageTimer);
   const message = addMessage(o);
-  if (o.manager ?? (o.role === t('управляющая'))) H.replies.push({ message, t: 0 });
+  const manager = o.manager ?? (o.role === t('управляющая'));
+  if (manager && !o.urgent && ++H.managerMessages % 8 === 0 && !H.payment && !H.conversation && !H.replies.length) {
+    H.replies.push({ message, t: 0 });
+  }
   if (H.payment) { H.payment.message = o; return true; }
   if (H.conversation) return true;
   setChannel(message.channel);
@@ -265,12 +278,17 @@ function showLatestMessage () {
   clearTimeout(H.messageTimer);
   H.root.classList.remove('hp-notifying');
   setApp('messages');
-  H.root.classList.remove('hp-focus-latest');
-  H.root.classList.add('hp-expanded', 'hp-new-message', 'hp-app-launching');
+  H.root.classList.remove('hp-reveal-history');
+  H.root.classList.add('hp-expanded', 'hp-new-message', 'hp-app-launching', 'hp-focus-latest');
   requestAnimationFrame(() => { H.thread.scrollTop = H.thread.scrollHeight; });
-  H.messageTimer = setTimeout(() => H.root?.classList.remove('hp-app-launching'), 550);
+  H.messageTimer = setTimeout(() => {
+    H.root.classList.remove('hp-app-launching', 'hp-focus-latest');
+    H.root.classList.add('hp-reveal-history');
+    H.thread.scrollTop = H.thread.scrollHeight;
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) H.thread.scrollBy({ top: -28, behavior: 'smooth' });
+  }, 640);
   const latest = H.thread.querySelector('.hp-message.latest p')?.textContent || '';
-  H.shrink = setTimeout(dock, Math.max(9000, Math.min(16000, 7000 + latest.length * 65)));
+  H.shrink = setTimeout(dock, Math.min(6200, 2700 + latest.length * 28));
 }
 /* Один результат доставки вместо россыпи денег, перелёта и карточки слева.
    Время игровое: пауза и сцены не съедают время чтения; отмена не начисляет деньги. */
@@ -285,13 +303,19 @@ export function showPayment ({ name = '', avatar = '', mood = 'ok', amount = '',
   if (!H.paymentModal) {
     const modal = document.createElement('section'); modal.className = 'hp-paid-modal';
     modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-label', t('Заказ доставлен!'));
-    modal.innerHTML = '<div class="hp-paid-confetti" aria-hidden="true">' + '<i></i>'.repeat(14) + '</div>' +
+    const pieces = 24;
+    modal.innerHTML = '<div class="hp-paid-confetti" aria-hidden="true">' + '<i></i>'.repeat(pieces) + '</div>' +
       '<header class="hp-paid-head"><span aria-hidden="true">★</span><b>' + t('Заказ доставлен!') + '</b><strong class="hp-paid-praise"></strong></header>' +
       '<div class="hp-paid-scroll"><div class="hp-paid-guest"><span class="hp-paid-avatar"></span><div><b class="hp-paid-name"></b><span class="hp-paid-reaction"></span></div></div>' +
       '<div class="hp-paid-receipt"></div><div class="hp-paid-bottom"><span>' + t('Выплата') + '</span><strong class="hp-paid-gain"></strong></div>' +
       '<div class="hp-paid-shift"><span>' + t('За смену') + '</span><b class="hp-paid-total"></b></div></div>' +
       '<button type="button" class="hp-paid-close">' + t('Дальше') + '</button>';
-    modal.querySelectorAll('.hp-paid-confetti i').forEach((bit, i) => bit.style.setProperty('--i', i));
+    modal.querySelectorAll('.hp-paid-confetti i').forEach((bit, i) => {
+      const angle = i * 2 * Math.PI / pieces, distance = 70 + (i % 5) * 14;
+      bit.style.setProperty('--dx', Math.round(Math.cos(angle) * distance) + 'px');
+      bit.style.setProperty('--dy', Math.round(Math.sin(angle) * distance) + 'px');
+      bit.style.setProperty('--spin', (i % 2 ? 1 : -1) * (260 + (i % 4) * 90) + 'deg');
+    });
     $('.hp-glass').appendChild(modal); H.paymentModal = modal;
   }
   const modal = H.paymentModal;
@@ -331,11 +355,11 @@ function receiveAfterPayment (message) {
   setChannel(message.channel); showLatestMessage();
 }
 export const conversationActive = () => H.conversation;
-export function conversationHost () {
+export function conversationHost (channel = 'crew') {
   if (!active()) return null;
   clearTimeout(H.shrink); clearTimeout(H.messageTimer);
   H.root.classList.remove('hp-notifying', 'hp-focus-latest', 'hp-app-launching');
-  setChannel('crew'); open('messages');
+  setChannel(channel); open('messages');
   H.conversation = true;
   if (!H.conversationHost) { const host = document.createElement('div'); host.className = 'hp-dialog-host'; $('.hp-glass').appendChild(host); H.conversationHost = host; }
   H.conversationHost.hidden = false;
@@ -345,7 +369,7 @@ export function endConversation (show = true) {
   if (!H.conversation) return;
   H.conversation = false;
   if (H.conversationHost) H.conversationHost.hidden = true;
-  if (show) { setChannel('crew'); showLatestMessage(); } else dock();
+  if (show) showLatestMessage(); else dock();
 }
 export function hidePayment () {
   H.payment = null;
@@ -404,7 +428,7 @@ export function hideRating () { if (H.root && H.app === 'rating') dock(); }
 export function reset () {
   if (!H.root) return;
   hidePayment();
-  H.replies = []; H.conversation = false;
+  clearReplies(); H.conversation = false;
   if (H.conversationHost) H.conversationHost.hidden = true;
   clearTimeout(H.shrink);  clearTimeout(H.messageTimer);
   H.root.classList.remove('hp-notifying', 'hp-new-message');

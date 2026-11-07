@@ -270,7 +270,7 @@ export function say (text, onShow, angry, who, o) {
   NQ.push({
     kind: crew ? 'crew' : 'boss', text, ms: slot * 1000, fresh: SLOT.FRESH, key: o && o.key, urgent: !!o?.urgent,
     wait: crew ? SLOT.CREW_WAIT : SLOT.BOSS_WAIT, group: crew ? 'crew' : undefined, max: crew ? 1 : undefined,
-    show: () => { QN--; const f = rec.onShow; rec.onShow = null; rec.m = sayNow(text, f, angry, who, o?.channel || who?.channel || 'crew'); },
+    show: () => { QN--; const f = rec.onShow; rec.onShow = null; rec.m = sayNow(text, f, angry, who, o?.channel || who?.channel || 'crew', !!o?.urgent); },
     // перебило срочное или чек оплаты: только пришло — убираем из ленты, покажется заново целиком (вычет — один раз);
     // уже прочитали крупно — остаётся в ленте мелко
     hide: (it, again) => { if (!rec.m) return; if (again) { QN++; drop(rec.m); rec.m = null; } else { rec.m.calm = true; shrink(rec.m); } },
@@ -278,7 +278,7 @@ export function say (text, onShow, angry, who, o) {
   });
   return rec;
 }
-function sayNow (text, onShow, angry, who, channel = 'crew') {
+function sayNow (text, onShow, angry, who, channel = 'crew', urgent = false) {
   const el = box();
   place();
   // хад мог появиться или спрятаться, пока сообщения висят (написал в катсцене — хада нет, чат встал в самый верх;
@@ -313,7 +313,7 @@ function sayNow (text, onShow, angry, who, channel = 'crew') {
     place();                                              // текст пришёл — влезает ли по высоте (fit), до «крупно»
     m.said = true;
     shown(m);
-    if (C.hud && C.hud.active()) C.hud.receive({ name: nm0, role, text, avatar: img ? img.src : '', manager: !who?.name, channel });
+    if (C.hud && C.hud.active()) C.hud.receive({ name: nm0, role, text, avatar: img ? img.src : '', manager: !who?.name, channel, urgent });
     ding(angry);
     if (img) TF.talk(img, TF.talkTime(text));
     const big = !m.calm && !(C.hud && C.hud.active()) && grow(m) ? bigHold(text) : 0;

@@ -1,5 +1,6 @@
 /* Окно «На смену» в концепте дока №8-15. Район и настоящий запуск передаёт menu.js. */
 import './shiftapp.css';
+import { titlebar } from './desktopapp.js';
 import { t } from '../i18n/index.js';
 
 let active = null;
@@ -24,10 +25,6 @@ export function open (host, { district, preview, onStart, onClose }) {
   node.setAttribute('role', 'dialog');
   node.setAttribute('aria-labelledby', 'rf-shift-app-title');
   node.innerHTML = `
-    <header class="rf-shift-header">
-      <div class="rf-shift-lights"><button class="rf-shift-close" type="button" data-pad-skip>×</button><i aria-hidden="true"></i><i aria-hidden="true"></i></div>
-      <span id="rf-shift-app-title"></span>
-    </header>
     <div class="rf-shift-main">
       <div class="rf-shift-album">
         <div class="rf-shift-heading"><p class="rf-shift-label"></p><h2 class="rf-shift-district"></h2><p class="rf-shift-address"></p></div>
@@ -47,10 +44,10 @@ export function open (host, { district, preview, onStart, onClose }) {
         <button class="rf-shift-start" type="button" autofocus data-main><span></span><i aria-hidden="true">›</i></button>
       </div>
     </div>`;
-  const closeButton = node.querySelector('.rf-shift-close');
+  const header = titlebar(t('Птица Пицца'), 'pizza-game', () => close());
+  header.querySelector('b').id = 'rf-shift-app-title';
+  node.prepend(header);
   const startButton = node.querySelector('.rf-shift-start');
-  closeButton.setAttribute('aria-label', t('закрыть'));
-  node.querySelector('#rf-shift-app-title').textContent = t('Птица Пицца');
   node.querySelector('.rf-shift-label').textContent = t('Текущий район');
   node.querySelector('.rf-shift-district').textContent = district;
   node.querySelector('.rf-shift-address').textContent = preview.address;
@@ -69,7 +66,6 @@ export function open (host, { district, preview, onStart, onClose }) {
   counts[1].querySelector('small').textContent = t('Коллег в команде');
   counts[1].querySelector('b').textContent = preview.roster;
   startButton.querySelector('span').textContent = t('Начать смену');
-  closeButton.addEventListener('click', () => close());
   startButton.addEventListener('click', () => {
     if (active?.node !== node) return;
     close(false);

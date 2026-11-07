@@ -3727,3 +3727,27 @@ Gate: B1/B2 должны точно совпасть по каталогу, св
 </details>
 
 **Журнал 07.11.2026.** 0п127 · отданный адрес сразу снят с навигации, без ожидания отъезда. Беклог идей и статус багов обновлены; следующая доступная задача — №17г, после выпуска остановиться.
+
+## 05.11.2026 — №8-15, космический рабочий стол и управление
+
+<a id="ui-dock-space-controls"></a>
+<details><summary><b>8-15</b> · Космические обои, окна приложений, навигация и прыжок иконок дока · <b>S</b></summary>
+
+**Уточнение автора.** Вместо города поставить космические обои по референсу. Проверить стрелки и управление Steam Deck. Иконка подпрыгивает при активации. Окна дока и загрузку оформить как части одного рабочего стола.
+
+**Показ.** [Рабочий стол](reference/dock-aurora-desktop.png), [окно района](reference/dock-aurora-start.png), [гараж](reference/dock-app-garage.png), [доска почёта](reference/dock-app-honor.png), [находки](reference/dock-app-collection.png), [настройки](reference/dock-app-settings.png) и [пауза](reference/dock-aurora-pause.png). Снимки из взрослой игры 1280×800.
+
+**Управление.** Стрелки и крестовина листают док по кругу. Бамперы и левый стик тоже листают. Enter / A и клик активируют пункт через прыжок в 0,32 секунды. При уменьшенном движении действие сразу. В паузе стрелка вверх ведёт к отмене заказа. Проверка в эмуляции Steam Deck с высоким качеством графики, без звука.
+
+**Телефон и заказ.** Стартовая переписка укорочена до 2,45 секунды до начала игры, с постепенным показом реплик, тремя точками Ирины и затемнением. «Ок» курьера приходит на каждое восьмое обычное сообщение управляющей. Обед — личный чат. Новое уведомление сначала показывает свежую реплику, затем контекст. Имена переносятся в две строки. В паузе можно отменить заказ и вернуться в пиццерию; мини-карта показывает только ориентиры и текущую цель. Конфетти на выплате расходится из одной точки.
+
+<a id="ui-dock-aurora-prompt"></a>
+**Обои.** Встроенный imagegen, композиционный референс от автора. Готовый файл — `public/concepts/dock/aurora.webp`.
+
+> Use case: stylized-concept. Generate a NEW standalone full-bleed 16:10 landscape desktop wallpaper for a retro computer desktop inside a video game. The attached screenshot is only a color, atmosphere and composition reference. Show deep midnight indigo outer space, gently scattered tiny discrete pinprick stars, and a soft luminous lavender, pink and magenta aurora/nebula fanning diagonally from lower left of center toward the top and upper right, like late-2000s glossy desktop wallpaper. Flowing translucent silk-like ribbons with a bright warm pink crest in the upper third, hazy purple glow across the left and middle, and quiet deep violet edges. Give the outer sides and upper strip enough visible color to frame a large centered app window, keep the very bottom dark with soft purple glow for the foreground dock. Soft photographic bloom, smooth atmospheric falloff, tasteful restrained star density, atmospheric color contrast, authentic nostalgic look. Full image to all edges. Zero interface: no top bar, no dock, no icons, no text, no window, no planet, no horizon, no people, no logo or watermark. Not a screenshot mockup. Original artwork rather than a literal copy.
+
+</details>
+
+**Журнал 05.11.2026.** №8-15 · локальный показ космического рабочего стола, окон, навигации и обновлённого телефона. В опубликованной версии v0.34.8 — предыдущая одобренная итерация.
+
+**Решение автора, 07.11.2026.** «А ты не мерджил в мейн фон этот? Если нет то мерджи». Разрешён перенос показанной версии из отдельного ворктри в `main`, включая космические обои и загрузку, окна дока и сопутствующие правки интерфейса. Вопрос №77 закрыт.

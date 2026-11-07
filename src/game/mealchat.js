@@ -127,9 +127,10 @@ export function play (api) {
   };
   const manager = { name: api.name || t('Ирина Сергеевна'), person: api.person, courier: false };
   const player = { name: heroName(), courier: true }, history = [];
-  const common = { phone: true, compact: false, head: t('Курьерский чат') + (api.title ? ' · ' + api.title : ''), canonicalName: true,
+  const common = { phone: true, compact: false, head: t('Личные'), canonicalName: true,
     owner: run.owner, fillers: false, paused: api.paused, skip: () => !live(run),
-    host: () => { const host = HUDFONE.conversationHost(); if (host) run.embedded = true; return host; } };
+    host: () => { const host = HUDFONE.conversationHost('direct'); if (host) run.embedded = true; return host; } };
+  const record = message => { if (run.embedded) HUDFONE.recordMessage({ ...message, channel: 'direct' }); };
   run.promise = (async () => {
     let receipt = null;
     try {
@@ -137,7 +138,7 @@ export function play (api) {
       const picked = await DLG.say({ ...common, ...manager, text: question,
         choices: options.map(o => ({ id: o.id, text: o.text, sub: o.sub })), onShow: () => {
           takePause(); run.embedded = HUDFONE.conversationActive();
-          if (run.embedded) HUDFONE.recordMessage({ ...manager, text: question, role: t('управляющая') });
+          record({ ...manager, text: question, role: t('управляющая') });
         } });
       if (!live(run)) return null;
       const choice = options.find(o => o.id === picked);
@@ -148,20 +149,20 @@ export function play (api) {
       run.committed = true;
       receipt = { id: choice.id, before, after: capture(api.S, api.NOS), effects: effects.map(e => ({ kind: e.kind, text: e.text })) };
       run.receipt = receipt; run.stage = 'reply';
-      if (run.embedded) HUDFONE.recordMessage({ ...player, text: choice.reply, outgoing: true });
+      record({ ...player, text: choice.reply, outgoing: true });
       history.push({ ...manager, text: question });
       const replied = await DLG.say({ ...common, ...player, courierLine: true, text: choice.reply, auto: true, history: history.slice() });
       if (!live(run) || replied === null) return receipt;
       run.stage = 'ack'; history.push({ ...player, text: choice.reply });
       const acknowledged = await DLG.say({ ...common, ...manager, text: t('Ок'), auto: true, history: history.slice(),
-        onShow: () => { if (run.embedded) HUDFONE.recordMessage({ ...manager, text: t('Ок'), role: t('управляющая') }); } });
+        onShow: () => record({ ...manager, text: t('Ок'), role: t('управляющая') }) });
       if (!live(run) || acknowledged === null) return receipt;
       run.stage = 'effects';
       if (run.embedded) {
         const text = effects.map(effect => effect.text).join(' · ');
         effects.forEach(effect => refresh(run, effect.kind));
         history.push({ ...manager, text: t('Ок') });
-        HUDFONE.recordMessage({ ...manager, text, system: true });
+        record({ ...manager, text, system: true });
         await DLG.say({ ...common, ...manager, text, auto: true, history: history.slice() });
         return receipt;
       }

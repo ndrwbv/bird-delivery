@@ -31,6 +31,7 @@
         name(v) }, weather — weather.js (IDS, NAME, CHANCES, bucket, force), startRun(), toMenu(), afterQuick() — вернуть машину,
         пиццерию и сюжет к сохранённым. */
 import './quickrun.css';
+import { mountApp } from './desktopapp.js';
 import { t } from '../i18n/index.js';
 import { SHIFT, handlingK } from './econ.js';
 import * as DIST from './districts.js';
@@ -187,8 +188,8 @@ function render () {
       '<button type="button" class="pp-stamp qr-go" data-pad-main>' + keyHTML('ok') + esc(t('поехали')) + '</button>' +
     '</section>' +
     '<nav class="pp-margin"><button type="button" class="pp-note qr-back">' + keyHTML('back') + esc(Q.setupFrom === 'end' ? t('в меню') : t('назад')) + '</button></nav>';
+  if (!mountApp(box, 'quick', t('быстрый заезд'), 'quick', back)) fit(box);
   refreshKeys(box);
-  fit(box);
 }
 /* значение строки key — на d вперёд (по кругу); сезон сменился — погода не к сезону → «как выпадет» */
 function flip (key, d) {

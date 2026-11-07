@@ -1,5 +1,6 @@
 /* Карточка единственной карьеры: только чтение статистики, без смены и редактирования героя. */
 import './couriercard.css';
+import { mountApp } from './desktopapp.js';
 import { t, tn } from '../i18n/index.js';
 import { keyHTML } from '../input/glyphs.js';
 import { heroName } from './playername.js';
@@ -28,6 +29,7 @@ export function open ({ Store, money, face, onClose } = {}) {
       value(t('лучшая смена'), +get('dlv-msk-best') > 0 ? money(+get('dlv-msk-best')) : t('ещё не было')) +
       value(t('в копилке'), money(+get('dlv-msk-wallet') || 0)) + '</dl>' +
     '<button type="button" class="pp-note cc-back" autofocus>' + keyHTML('back') + esc(t('назад')) + '</button></section>';
+  mountApp(box, 'courier', t('карточка курьера'), '', close);
   after = onClose;
   (document.getElementById('game') || document.body).appendChild(box);
   box.querySelector('.cc-back').addEventListener('click', () => close());

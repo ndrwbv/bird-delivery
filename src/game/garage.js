@@ -31,6 +31,7 @@
    лист в фокусе листается внутри себя (курсор геймпада и обучение сами докручивают до нужного).
    Вверху справа — только копилка (свинья и сумма): про звёзды там больше не пишем (автор, 10.10.2026). */
 import './garage.css';
+import { mountApp } from './desktopapp.js';
 import * as ECON from './econ.js';
 import { t } from '../i18n/index.js';
 import * as TOUR from './garagetour.js';
@@ -76,6 +77,7 @@ const $ = id => document.getElementById(id);
 export function open (onClose) {
   if (!D) return;
   build();
+  mountApp(el, 'garage', t('гараж'), 'garage-game', close);
   onCloseCb = onClose || null;
   el.querySelector('.gr-back').innerHTML = keyHTML('back') + esc(t('назад'));
   el.querySelector('.gr-t').textContent = t('гараж');

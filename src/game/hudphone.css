@@ -184,6 +184,9 @@
 #hud-phone .hp-thread { background: linear-gradient(#ffffff66, #ffffff00), repeating-linear-gradient(0deg, #d7e6d2 0 1px, #e8f0e2 1px 4px); }
 #hud-phone .hp-messages .hp-nav button { border-color: #315b42; background: linear-gradient(#a5d4ac, #65a574 52%, #3e7856); box-shadow: inset 0 1px #e6ffe6a8, 0 1px 1px #284d39; text-shadow: 0 -1px #315b42; }
 #hud-phone.hp-focus-latest .hp-message:not(.latest) { display: none; }
+#hud-phone.hp-reveal-history .hp-message:not(.latest) { animation: hp-context-in .34s ease-out both; }
+@keyframes hp-context-in { from { opacity: 0; transform: translateY(-7px); } }
+@media (prefers-reduced-motion: reduce) { #hud-phone.hp-reveal-history .hp-message:not(.latest) { animation: none; } }
 #hud-phone.hp-app-launching .hp-messages { animation: hp-app-open .5s cubic-bezier(.17,.89,.32,1.15) both; transform-origin: 85% 8%; }
 @keyframes hp-app-open { from { opacity: .45; transform: scale(.38); filter: blur(3px); } to { opacity: 1; transform: scale(1); filter: none; } }
 body.hud-phone-active #hearts, body.hud-phone-active #cash, body.hud-phone-active #phone { visibility: hidden !important; }
@@ -216,11 +219,17 @@ body.hud-phone-active #payfx { z-index: 31; }
 #hud-phone .hp-paid-shift { display: flex; justify-content: space-between; gap: 8px; padding: 8px; border-radius: 5px; background: #e8d4af; font-size: 12px; }
 #hud-phone .hp-paid-close { flex: none; min-height: 38px; margin: 0 13px 13px; border: 1px solid #397140; border-radius: 7px; background: linear-gradient(#9bcb78, #639e53 48%, #4c8748 51%, #38713d); box-shadow: inset 0 1px #eaffd6, 0 2px 3px #69472144; color: #fffdf0; font-size: 15px; font-weight: 700; text-shadow: 0 -1px #37643b; }
 #hud-phone .hp-paid-confetti { position: absolute; z-index: 2; inset: 0; overflow: hidden; pointer-events: none; }
-#hud-phone .hp-paid-confetti i { position: absolute; left: calc(6% + var(--i) * 6.7%); top: -12px; width: 6px; height: 11px; border-radius: 1px; background: #e96554; animation: hp-paid-confetti 1.6s calc(var(--i) * .035s) ease-out both; }
+#hud-phone .hp-paid-confetti i { position: absolute; left: 50%; top: 29%; width: 7px; height: 11px; border-radius: 1px; background: #e96554; animation: hp-paid-confetti 1.2s .06s both; }
 #hud-phone .hp-paid-confetti i:nth-child(3n) { background: #f5c749; }
 #hud-phone .hp-paid-confetti i:nth-child(3n+1) { background: #7bc9ad; }
+#hud-phone .hp-paid-confetti i:nth-child(5n) { background: #79a6ed; }
 @keyframes hp-paid-arrive { from { opacity: .3; transform: translateY(35px) scale(.94); } to { opacity: 1; transform: none; } }
-@keyframes hp-paid-confetti { 0% { opacity: 0; transform: translateY(0) rotate(0); } 10%, 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(300px) rotate(330deg); } }
+@keyframes hp-paid-confetti {
+  0% { opacity: 0; transform: translate(0, 0) scale(.4); animation-timing-function: cubic-bezier(.12,.6,.32,1); }
+  27% { opacity: 1; transform: translate(var(--dx), var(--dy)) rotate(calc(var(--spin) * .48)); animation-timing-function: ease-in; }
+  68% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(var(--dx) * 1.3), calc(var(--dy) + 186px)) rotate(var(--spin)); }
+}
 @media (max-height: 690px) { #hud-phone.hp-expanded .hp-device { top: calc(100% - 306px); transform: translate(-50%, -50%) scale(.87) rotate(0deg); } }
 @media (prefers-reduced-motion: reduce) { #hud-phone .hp-device, #hud-phone .hp-backdrop, #hud-phone .hp-paid-modal, #hud-phone .hp-paid-confetti i { transition-duration: .01ms; animation-duration: .01ms; animation-delay: 0s; } }
 /* Два чата: курьеры текущей смены и личный диалог управляющей. */
@@ -275,3 +284,24 @@ body.shift-check-in #game > :is(.hud, .hios-fuel) { visibility: hidden; }
 #hud-phone.hp-shift-chat .hp-money-slot { visibility: hidden; }
 #hud-phone.hp-shift-chat :is(.hp-chat-tabs, .hp-chat-context) { display: none; }
 @media (max-height: 690px) { #hud-phone.hp-shift-chat.hp-expanded .hp-device { transform: translate(-50%, -50%) scale(.87); } }
+#hud-phone.hp-shift-chat .hp-message { animation: hp-shift-line-in .2s ease-out both; }
+#hud-phone .hp-typing p { display: flex; gap: 4px; width: max-content; padding: 9px 13px; }
+#hud-phone .hp-typing i { width: 5px; height: 5px; border-radius: 50%; background: #789269; animation: hp-shift-dot .65s ease-in-out infinite alternate; }
+#hud-phone .hp-typing i:nth-child(2) { animation-delay: .12s; }
+#hud-phone .hp-typing i:nth-child(3) { animation-delay: .24s; }
+.shift-check-in-fade { position: fixed; inset: 0; z-index: 11000; background: #080513; opacity: 0; pointer-events: none; }
+@keyframes hp-shift-line-in { from { opacity: 0; transform: translateY(5px); } }
+@keyframes hp-shift-dot { to { opacity: .35; transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { #hud-phone.hp-shift-chat .hp-message, #hud-phone .hp-typing i { animation: none; } }
+
+#hud-phone :is(.hp-current-title, .hp-order-name, .hp-paid-name, .hp-message-meta b, .hp-chat-member b, .hp-rank-line b, .hp-rating-row b) {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+#hud-phone .hp-message-meta img { flex: none; }
+#hud-phone .hp-message-meta span { min-width: 0; }

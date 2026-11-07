@@ -11,6 +11,7 @@
    Мост — Platform.steam.leaderboard и Platform.leaderboard (src/platform/steam.js).
    ────────────────────────────────────────────────────────────────────────── */
 import './board.css';
+import { mountApp } from './desktopapp.js';
 import Platform from '../platform/index.js';
 import { t } from '../i18n/index.js';
 import { heroName } from './playername.js';
@@ -64,6 +65,7 @@ function build () {
 export function open (cb) {
   if (!on()) return;
   build();
+  mountApp(box, 'board', t('таблица рекордов'), 'honor', close);
   onClose = cb || null;
   box.querySelector('.crm-dt').textContent = t('лучшая смена');
   box.querySelector('[data-tab="world"]').textContent = t('весь мир');

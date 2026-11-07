@@ -31,6 +31,7 @@
    районы — districts.js. Отметка «видел грамоту» — в dlv-ach (общем, как и сами достижения).
    ────────────────────────────────────────────────────────────────────────── */
 import './honor.css';
+import { mountApp } from './desktopapp.js';
 import Platform from '../platform/index.js';
 import { t, N_, lang } from '../i18n/index.js';
 import { keyHTML, matchKey, onInput, refreshKeys } from '../input/glyphs.js';
@@ -145,6 +146,7 @@ export function open (o = {}) {
   H = o;
   if (!A().Store) return;
   build();
+  mountApp(box, 'honor', t('доска почёта'), 'honor', close);
   S.timers.forEach(clearTimeout); S.timers = [];
   const list = achList();
   const vis = new Set(list.map(a => a.id));

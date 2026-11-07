@@ -70,7 +70,7 @@ function build () {
     '<div class="crm-meta"><button type="button" class="crm-debug" data-a="storytest"></button><div class="crm-ver"></div></div>';
   big.appendChild(el);
   el.querySelectorAll('[data-a]').forEach(b => b.addEventListener('click', () => act(b.dataset.a)));
-  CZ = carousel(el.querySelector('.crm-car'), { cls: 'crm-cz', grid: true, scales: [1, 0.86, 0.74], reach: 3, onChange: (i, c) => { curKey = c.dataset.key; navReset(); if (A.Snd && A.Snd.click) try { A.Snd.click(520); } catch (e) { /* — */ } } });
+  CZ = carousel(el.querySelector('.crm-car'), { cls: 'crm-cz', grid: true, wrap: true, scales: [1, 0.86, 0.74], reach: 3, onChange: (i, c) => { curKey = c.dataset.key; navReset(); if (A.Snd && A.Snd.click) try { A.Snd.click(520); } catch (e) { /* — */ } } });
   mountStart(el);
   return el;
 }
@@ -187,7 +187,14 @@ export function hot (k) {
   return true;
 }
 /** листать карточки меню: true — пролистнули */
-export function flip (d) { return !!(CZ && el && !modal() && CZ.flip(d)); }
+export const shiftWindow = SHIFTAPP.root;
+export function flip (d) {
+  const active = modal();
+  if (!CZ || (active && active !== shiftWindow()) || !CZ.flip(d)) return false;
+  SHIFTAPP.close(false);
+  focus();
+  return true;
+}
 export const shown = () => !!(el && el.isConnected && !el.closest('[hidden]'));
 /** фокус и подсветка — на карточку в центре (после окон поверх меню: праздник, выбор) */
 export function focus () {

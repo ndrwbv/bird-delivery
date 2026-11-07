@@ -6,6 +6,35 @@ import { t } from '../i18n/index.js';
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const tx = s => esc(t(s));
 
+function bounceOnActivation (track) {
+  let pending = null, replay = null;
+  track.addEventListener('click', event => {
+    const button = event.target.closest('button[data-main]');
+    if (!button || button === replay || button.disabled || button.closest('.off')) return;
+    const card = button.closest('.cz-card');
+    const icon = card?.querySelector('.rf-icon-image');
+    if (!icon?.animate || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    pending?.cancel();
+    const bounce = icon.animate([
+      { transform: 'translateY(0)', easing: 'ease-out' },
+      { transform: 'translateY(-20px)', offset: .34, easing: 'ease-in' },
+      { transform: 'translateY(0)', offset: .67, easing: 'ease-out' },
+      { transform: 'translateY(-5px)', offset: .81, easing: 'ease-in' },
+      { transform: 'translateY(0)' },
+    ], { duration: 320 });
+    pending = bounce;
+    bounce.finished.then(() => {
+      if (pending !== bounce) return;
+      pending = null;
+      if (!button.isConnected || button.closest('[hidden]') || !card.classList.contains('on')) return;
+      replay = button;
+      try { button.click(); } finally { replay = null; }
+    }, () => {});
+  }, true);
+}
+
 function dockFrame (paused) {
   const frame = document.createElement('section');
   frame.className = 'rf-window' + (paused ? ' rf-window-pause' : '');
@@ -25,7 +54,9 @@ export function mountStart (root) {
   frame.querySelector('.rf-bar-context').append(root.querySelector('.crm-upd'));
   root.append(frame);
   decorateCards(root, '.crm-card', '.crm-ico');
-  new MutationObserver(() => decorateCards(root, '.crm-card', '.crm-ico')).observe(root.querySelector('.crm-car .cz-track'), { childList: true });
+  const track = root.querySelector('.crm-car .cz-track');
+  bounceOnActivation(track);
+  new MutationObserver(() => decorateCards(root, '.crm-card', '.crm-ico')).observe(track, { childList: true });
 }
 
 function decorateCards (root, selector, target) {
@@ -61,4 +92,5 @@ export function mountPause (root) {
     card.append(icon);
   }
   decorateCards(root, '.pz-card', '.rf-pause-icon');
+  bounceOnActivation(root.querySelector('.pz-host .cz-track'));
 }

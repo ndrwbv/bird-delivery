@@ -74,7 +74,7 @@ export function init (el, api) {
     btnCard('keys', ctrl),
     btnCard('end', $('pm-menu')),
   ];
-  CZ = carousel(host, { cls: 'pz-cz', grid: true, scales: [1, 0.86, 0.74], reach: 3, onChange: () => { if (A.navReset) A.navReset(); } });
+  CZ = carousel(host, { cls: 'pz-cz', grid: true, wrap: true, scales: [1, 0.86, 0.74], reach: 3, onChange: () => { if (A.navReset) A.navReset(); } });
   CZ.set(cards, 0);
   if (desk) desk.hidden = true;
   mountPause(el);
@@ -124,5 +124,9 @@ function moreOne (w) {
 export function more () { if (root) for (const w of root.querySelectorAll('.pz-sheet')) { w.scrollTop = 0; moreOne(w); } }
 export function reset () { if (CZ) { CZ.go(0, true); label(); } }
 export const on = () => !!(CZ && root && !root.hidden);
-export function flip (d) { return on() && CZ.flip(d); }
+export function flip (d) {
+  if (!on() || !CZ.flip(d)) return false;
+  CZ.card()?.querySelector('[data-main]')?.focus({ preventScroll: true });
+  return true;
+}
 export const DEBUG = { flip, reset, get key () { return CZ && CZ.card() ? CZ.card().dataset.key : null; } };

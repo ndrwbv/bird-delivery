@@ -1,13 +1,14 @@
 /* №8-15: верхний бар macOS и компактный док у нижнего края экрана. */
 #cr-menu.rf-menu, #pausem.rf-pause {
   --di: clamp(68px, 6.2vw, 86px);
+  --rf-wallpaper: url('/concepts/dock/aurora.webp');
   font: 14px/1.4 "Helvetica Neue", Arial, sans-serif; color: #fff;
   letter-spacing: normal; text-shadow: none; text-transform: none;
   padding: 0; box-sizing: border-box; align-items: stretch; justify-content: flex-start;
 }
 body.career #big:has(.rf-menu) { background: transparent; }
-#cr-menu.rf-menu { background: linear-gradient(180deg, #1020350a, transparent 68%, #0c172c8c); }
-body #pausem.rf-pause { background: radial-gradient(ellipse at 50% 35%, #172b4366, #0c192cb8 90%); backdrop-filter: blur(6px); }
+#cr-menu.rf-menu { background: var(--rf-wallpaper) center / cover no-repeat #150b2b; }
+body #pausem.rf-pause { background: linear-gradient(#160b2c26, #160b2c3d), var(--rf-wallpaper) center / cover no-repeat #150b2b; backdrop-filter: none; }
 .rf-menu > .crm-top, .rf-menu > .crm-sky, .rf-pause > .pz-head { display: none; }
 .rf-window { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; width: 100%; height: 100%; text-align: left; isolation: isolate; }
 .rf-site-head { position: relative; z-index: 5; display: flex; flex: none; align-items: center; gap: 18px; height: 32px; padding: 0 14px; box-sizing: border-box;
@@ -52,12 +53,13 @@ body #pausem.rf-pause { background: radial-gradient(ellipse at 50% 35%, #172b436
 #cr-menu.rf-menu .crm-cb, #pausem.rf-pause .pz-card.pz-btn > button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; width: 100%; height: 124px; min-height: 0; padding: 4px 0 0; margin: 0; color: #fff; font: 500 11px/1.3 "Helvetica Neue", Arial, sans-serif; text-transform: none; letter-spacing: 0; text-shadow: 0 1px 2px #0a192e; background: none; border: 0; border-radius: 0; box-shadow: none; cursor: pointer; rotate: none; gap: 0; transition: none; }
 #cr-menu.rf-menu .crm-cb:hover, #pausem.rf-pause .pz-card.pz-btn > button:hover { background: none; }
 #cr-menu.rf-menu .crm-cb:active, #pausem.rf-pause .pz-card.pz-btn > button:active { translate: 0 1px; box-shadow: none; }
-#cr-menu.rf-menu .crm-cb b { position: absolute; top: 93px; left: 50%; translate: -50% 0; white-space: nowrap; margin: 0; padding: 0; font: 500 10px/1.2 "Helvetica Neue", Arial, sans-serif; color: #e1e3e6; letter-spacing: -.1px; text-transform: none; text-shadow: 0 1px 1px #0009; background: none; border: 0; border-radius: 0; box-shadow: none; z-index: 3; }
+#cr-menu.rf-menu .crm-cb b { position: absolute; top: 93px; left: 50%; translate: -50% 0; width: calc(100% - 6px); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; white-space: normal; text-align: center; margin: 0; padding: 0; font: 500 10px/1.2 "Helvetica Neue", Arial, sans-serif; color: #e1e3e6; letter-spacing: -.1px; text-transform: none; text-shadow: 0 1px 1px #0009; background: none; border: 0; border-radius: 0; box-shadow: none; z-index: 3; }
 #cr-menu.rf-menu .crm-cb > span { display: none; }
 /* У всех квадратных картинок видимое основание на 95% высоты. */
 #cr-menu.rf-menu .crm-ico, #pausem.rf-pause .rf-pause-icon { position: absolute; display: block; top: 92px; left: 50%; width: min(100%, var(--di)); height: auto; aspect-ratio: 1; translate: -50% -95%; padding: 0; margin: 0; background: none; border: 0; border-radius: 0; box-shadow: none; color: white; font-style: normal;
   -webkit-box-reflect: below calc(var(--di) * -.1) linear-gradient(#ffffff1c 0, #ffffff0a 16px, transparent 28px); transition: filter .18s ease-out; }
 .rf-dock .rf-icon-image { width: 100%; height: 100%; display: block; object-fit: contain; pointer-events: none; filter: drop-shadow(0 1px 1px #0006); }
+.rf-dock .cz-card.on::after { content: ''; position: absolute; left: 50%; bottom: 3px; width: 7px; height: 3px; translate: -50% 0; border-radius: 50%; background: #c7e6f5; box-shadow: 0 0 5px #b6dff0; pointer-events: none; }
 #cr-menu.rf-menu .crm-card.on .crm-ico, #cr-menu.rf-menu .crm-cb:hover .crm-ico, #pausem.rf-pause .pz-card.on .rf-pause-icon, #pausem.rf-pause .pz-card:hover .rf-pause-icon { transform: none; }
 #cr-menu.rf-menu .crm-card.on .crm-cb b { font-weight: 700; }
 #cr-menu.rf-menu .crm-card.off .crm-ico { filter: saturate(.2) brightness(.8); }
@@ -99,10 +101,13 @@ body #pausem.rf-pause { background: radial-gradient(ellipse at 50% 35%, #172b436
 #pausem.rf-pause #pm-order .oc-inv td b { color: #665742; font: 600 13px/1.4 Arial, sans-serif; }
 #pausem.rf-pause #pm-order .oc-inv td small { font: 10px Arial, sans-serif; }
 #pausem.rf-pause #pm-order .oc-photos { display: none; }
+#pm-cancel-order { display: inline-block; min-height: 32px; margin-top: 10px; padding: 5px 12px; border: 1px solid #af6e56; border-radius: 6px; background: linear-gradient(#fff2db, #f6cdb4); box-shadow: inset 0 1px #fff8, 0 1px 2px #8e4e3333; color: #762f24; font: 700 12px/1.2 "Helvetica Neue", Arial, sans-serif; cursor: pointer; }
+#pm-cancel-order:hover { background: linear-gradient(#fff6df, #ffc9aa); }
 #pausem.rf-pause .pz-more-b { bottom: 0; font: 10px Arial, sans-serif; background: linear-gradient(#fffaec00, #fffaec); }
 #pausem.rf-pause .pz-more-b span { color: #a38c66; background: #f8edcf; border: 1px solid #d8c8a6; box-shadow: none; transform: none; }
 #pausem.rf-pause .pz-card.pz-btn > button::before, #pausem.rf-pause .pz-card.pz-btn > button::after { display: none; }
-#pausem.rf-pause .pz-card.pz-btn > button, #pausem.rf-pause .pz-card.pz-btn > #pm-go, #pausem.rf-pause .pz-card.pz-btn > #pm-menu { position: absolute; top: 0; left: 0; width: 100%; height: 124px; padding: 93px 0 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; color: #e1e3e6; font: 500 10px/1.2 "Helvetica Neue", Arial, sans-serif; border: 0; border-radius: 0; background: none; box-shadow: none; text-shadow: 0 1px 1px #0009; rotate: none; letter-spacing: -.1px; white-space: nowrap; }
+#pausem.rf-pause .pz-card.pz-btn > button, #pausem.rf-pause .pz-card.pz-btn > #pm-go, #pausem.rf-pause .pz-card.pz-btn > #pm-menu { position: absolute; top: 0; left: 0; width: 100%; height: 124px; padding: 93px 3px 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; color: #e1e3e6; font: 500 10px/1.2 "Helvetica Neue", Arial, sans-serif; border: 0; border-radius: 0; background: none; box-shadow: none; text-shadow: 0 1px 1px #0009; rotate: none; letter-spacing: -.1px; white-space: normal; text-align: center; }
+#pausem.rf-pause .pz-card.on.pz-btn > button { font-weight: 700; }
 #pausem.rf-pause .rf-pause-icon, #pausem.rf-pause .rf-pause-icon * { pointer-events: none !important; }
 #pausem.rf-pause .pz-card > button.padsel:not(#pm-go) { background: none; }
 @media (max-height: 740px) { #cr-menu.rf-menu, #pausem.rf-pause { --di: 76px; } .rf-pause-sheets { top: 19%; height: 285px; } }

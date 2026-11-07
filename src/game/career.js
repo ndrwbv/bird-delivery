@@ -1150,7 +1150,7 @@ export function padPre (p) {
     if (!paint) p.menuLeft = p.menuRight = false;
     if (p.btnX) GARAGE.act('armor');                 // [X] броня, [Y] мотор — прямо, без курсора
     else if (p.btnY) GARAGE.act('engine');
-  } else if (!padRoot() && menuOn()) {                // главное меню: ←→, LB/RB — листать карточки (menu.js)
+  } else if (menuOn() && (!padRoot() || padRoot() === MENU.shiftWindow())) {   // из окна района ←→ и LB/RB тоже ведут в док
     const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
     if (d) MENU.flip(d);
     p.menuLeft = p.menuRight = false;
@@ -1254,14 +1254,14 @@ function onKey (e) {
   if (GARAGE.isOpen() && root === GARAGE.root() && (k === 'menuLeft' || k === 'menuRight') && GARAGE.mode() !== 'paint') { GARAGE.flip(k === 'menuLeft' ? -1 : 1); return; }
   if (DEP.root() && root === DEP.root() && (k === 'menuLeft' || k === 'menuRight')) { DEP.stake(k === 'menuLeft' ? -1 : 1); return; }   // ←→ — ставка
   if (k === 'menuBack') { back(); return; }
-  if (root.id === 'cr-menu' && (k === 'menuLeft' || k === 'menuRight')) { MENU.flip(k === 'menuLeft' ? -1 : 1); return; }   // меню-карусель
+  if ((root.id === 'cr-menu' || root === MENU.shiftWindow()) && (k === 'menuLeft' || k === 'menuRight')) { MENU.flip(k === 'menuLeft' ? -1 : 1); return; }
   if ((root.id === 'panel' || root.id === 'pausem') && (k === 'menuLeft' || k === 'menuRight') && A.cardFlip && A.cardFlip(root, k === 'menuLeft' ? -1 : 1)) return;   // настройки и пауза — карусели
   const p = { connected: true, active: true, menuUp: false, menuDown: false, menuLeft: false, menuRight: false, menuOk: false, menuBack: false };
   const sel = KB.selected();
   if (!sel || !sel.isConnected || !root.contains(sel) || !sel.classList.contains('padsel')) {
     KB.clear();
     KB(p, root);                                    // первое нажатие — только подсветить (на смену / autofocus)
-    if (k !== 'menuOk') return;
+    if (k !== 'menuOk' && !(root.id === 'pausem' && k === 'menuUp')) return;
   }
   p[k] = true;
   KB(p, root);

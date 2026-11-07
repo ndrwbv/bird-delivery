@@ -15,6 +15,7 @@
    сменой). Листать — свайп, ◀ ▶, ←→, стик, крестовина, LB/RB (career.js padPre / onKey зовут DP.flip),
    выбрать — A / Enter / тап по кнопке, назад — B / Esc / «назад». */
 import './distpick.css';
+import { mountApp } from './desktopapp.js';
 import { t, tn, N_ } from '../i18n/index.js';
 import * as DIST from './districts.js';
 import * as GROW from './growth.js';
@@ -133,6 +134,7 @@ export function open ({ title, cards, idx = 0, onPick, onBack, onFlip, back: bac
   build();
   ON = { onPick, onBack, onFlip };
   el.querySelector('.dp-t').textContent = title;
+  mountApp(el, 'district', title, 'map', back);
   el.querySelector('.dp-back').innerHTML = keyHTML('back') + esc(backTxt || t('назад'));
   el.hidden = false;
   CZ.set(cards, idx);
