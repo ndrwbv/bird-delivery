@@ -1,0 +1,11 @@
+Model Information:
+* title:	Old Car - VAZ 2107
+* source:	https://sketchfab.com/3d-models/old-car-vaz-2107-91270dab9d1a47c7ba7ffaaf8c8b0beb
+* author:	Arkady Gribachev (https://sketchfab.com/prephonat)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Old Car - VAZ 2107" (https://sketchfab.com/3d-models/old-car-vaz-2107-91270dab9d1a47c7ba7ffaaf8c8b0beb) by Arkady Gribachev (https://sketchfab.com/prephonat) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
