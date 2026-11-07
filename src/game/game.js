@@ -16317,8 +16317,10 @@ function checkArrival (dt) {
     HANDOFF.payment(handoff, showPay);
 
     o.idx++;
+    // Отданный адрес больше не цель, даже пока экран оплаты держит handover.
+    syncTarget();
+    rebuildRoutePath();
     if (o.idx < o.stops.length) {
-      syncTarget();
       if (o.ord && o.ord.bundle) {
         // сборный (orders.js): срок один на весь развоз — не добавляем; куда дальше — решает игрок
         toast($tn(o.stops.length - o.idx, 'остался {n} адрес — выбирай, куда дальше|осталось {n} адреса — выбирай, куда дальше|осталось {n} адресов — выбирай, куда дальше'));
