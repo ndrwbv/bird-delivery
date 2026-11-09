@@ -449,6 +449,7 @@ float mdLawn (vec2 p) { vec2 uv = (p - uMdWin.xy) * uMdWin.z + 0.5; vec2 e = abs
     try { FSH.shadeInject(sh); } catch (e) { /* без теней домов */ }
   };
   m.customProgramCacheKey = () => 'meadow';
+  A.cutMaterial?.(m);
   return m;
 }
 function makeLayer (cfg, near, seed) {

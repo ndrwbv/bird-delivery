@@ -39,7 +39,7 @@ import { keyHTML, refreshKeys, matchKey } from '../input/glyphs.js';
 import * as PFX from './paperfx.js';
 
 const KEY = 'dlv-quick';
-const PASS = new Set(['dlv-sound', 'dlv-vol-music', 'dlv-vol-sfx', 'dlv-vol-eng', 'dlv-lang', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-ach', 'dlv-heroes', 'dlv-heroq', 'dlv-crashlog', KEY]);
+const PASS = new Set(['dlv-sound', 'dlv-vol-music', 'dlv-vol-sfx', 'dlv-vol-eng', 'dlv-lang', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-ach', 'dlv-heroes', 'dlv-heroq', 'dlv-crashlog', 'dlv-hell-history', KEY]);
 const FREEZE = new Set(['dlv-msk-xp']);
 /* сезоны на выбор: «как сейчас в карьере» и середина каждого (seasons.js: 0 — начало лета, год — 4) */
 const SEASONS = [{ id: 'now' }, { id: 'summer', v: 0.5 }, { id: 'autumn', v: 1.5 }, { id: 'winter', v: 2.5 }, { id: 'spring', v: 3.5 }];
@@ -61,8 +61,9 @@ export function init (api) {
 export const on = () => Q.on;
 export const opts = () => Q.opt;
 export const len = () => SHIFT.LENGTHS.find(l => l.id === (Q.opt && Q.opt.len)) || SHIFT.LENGTHS[1];
-/* быстрый заезд — после первой смены карьеры (учебный заказ и вступление уже позади) */
-export const available = () => !!A && (+A.Store.get('dlv-shifts', 0) || 0) >= 1;
+/* Обычный заезд открывается после первой смены, пробный «Ад на земле» доступен сразу. */
+export const normalAvailable = () => !!A && (+A.Store.get('dlv-shifts', 0) || 0) >= 1;
+export const available = () => !!A?.hellAvailable || normalAvailable();
 
 /* ── песочница сохранения ── */
 function sandbox (onOff) {
@@ -115,6 +116,7 @@ function choices () {
   const curCar = (cars.find(c => c.current) || cars[0] || {}).id;
   const season = SEASONS.some(x => x.id === s.season) ? s.season : 'now';
   return {
+    mode: A.hellAvailable && ['hell', 'afterhell'].includes(s.mode) ? s.mode : !normalAvailable() && A.hellAvailable ? 'hell' : 'normal',
     season,
     weather: weathers(season).includes(s.weather) ? s.weather : 'auto',
     len: SHIFT.LENGTHS.some(l => l.id === s.len) ? s.len : 'medium',
@@ -128,26 +130,33 @@ let SEL = null;
 /* строки листа: { key, label, opts: [{ v, name, sub }] }; строка с одним вариантом не показывается */
 function fields () {
   const S = A.seasons, mins = l => Math.round(SHIFT.BASE_S * l.slow / 60);
-  const f = [
-    { key: 'season', label: t('сезон'), opts: SEASONS.map(s => s.id === 'now'
-      ? { v: 'now', name: t('как в карьере'), sub: S.name(S.value()) }
-      : { v: s.id, name: SEASON_NAME[s.id](), sub: '' }) },
-  ];
-  if (A.weather) {
-    f.push({ key: 'weather', label: t('погода'), opts: weathers(SEL.season).map(id => id === 'auto'
-      ? { v: 'auto', name: t('как выпадет'), sub: t('по шансам сезона') }
-      : { v: id, name: A.weather.NAME[id](), sub: id === 'hurricane' ? t('уносит дома') : '' }) });
+  const hell = SEL.mode !== 'normal', f = [];
+  if (A.hellAvailable) {
+    const opts = normalAvailable() ? [{ v: 'normal', name: t('обычный заезд') }] : [];
+    opts.push({ v: 'hell', name: t('Ад на земле'), sub: t('Юг') + ' · ' + t('~{n} мин', { n: mins(SHIFT.LENGTHS[0]) }) });
+    opts.push({ v: 'afterhell', name: t('День после катастрофы'), sub: t('Юг') + ' · ' + t('~{n} мин', { n: mins(SHIFT.LENGTHS[0]) }) });
+    f.push({ key: 'mode', label: t('режим заезда'), opts });
   }
-  f.push({ key: 'len', label: t('длина'), opts: SHIFT.LENGTHS.map(l => ({ v: l.id, name: LEN_NAME[l.id] ? LEN_NAME[l.id]() : l.id, sub: t('~{n} мин', { n: mins(l) }) })) });
+  if (!hell) {
+    f.push({ key: 'season', label: t('сезон'), opts: SEASONS.map(s => s.id === 'now'
+      ? { v: 'now', name: t('как в карьере'), sub: S.name(S.value()) }
+      : { v: s.id, name: SEASON_NAME[s.id](), sub: '' }) });
+    if (A.weather) {
+      f.push({ key: 'weather', label: t('погода'), opts: weathers(SEL.season).map(id => id === 'auto'
+        ? { v: 'auto', name: t('как выпадет'), sub: t('по шансам сезона') }
+        : { v: id, name: A.weather.NAME[id](), sub: id === 'hurricane' ? t('уносит дома') : '' }) });
+    }
+    f.push({ key: 'len', label: t('длина'), opts: SHIFT.LENGTHS.map(l => ({ v: l.id, name: LEN_NAME[l.id] ? LEN_NAME[l.id]() : l.id, sub: t('~{n} мин', { n: mins(l) }) })) });
+  }
   f.push({ key: 'car', label: t('машина'), opts: ownedCars().map(c => ({ v: c.id, name: c.name,
     sub: t('{kmh} км/ч · руль {h}/10', { kmh: Math.round((c.vmax || 0) * 3.6), h: handlingK(c.handling).h }) })) });
-  if (DIST.has()) {
+  if (!hell && DIST.has()) {
     f.push({ key: 'dist', label: t('район'), opts: [
       ...(DIST.allOpen() ? [{ v: 'city', name: t('весь город'), sub: t('заказы во всех районах') }] : []),
       ...DIST.list().slice(0, DIST.opened()).map((d, i) => ({ v: i, name: t(d.name), sub: '' })),
     ] });
   }
-  return f.filter(x => x.opts.length > 1);
+  return f.filter(x => x.key === 'mode' || x.opts.length > 1);
 }
 const fieldOf = key => fields().find(f => f.key === key);
 const optOf = f => f.opts.find(o => String(o.v) === String(SEL[f.key])) || f.opts[0];
@@ -169,12 +178,14 @@ function setupBox () {
   return box;
 }
 function rowHTML (f) {
-  const o = optOf(f);
+  const o = optOf(f), arrow = (d, label) => f.opts.length > 1
+    ? '<button type="button" class="qr-ar" data-pad-skip data-d="' + d + '" aria-label="' + label + '">' + label + '</button>'
+    : '<span aria-hidden="true"></span>';
   return '<div class="qr-f" data-pad tabindex="-1" data-f="' + f.key + '">' +
     '<span class="qr-fl">' + esc(f.label) + '</span>' +
-    '<button type="button" class="qr-ar" data-pad-skip data-d="-1" aria-label="◀">◀</button>' +
+    arrow(-1, '◀') +
     '<span class="qr-fv"><b>' + esc(o.name) + '</b><small>' + esc(o.sub || '') + '</small></span>' +
-    '<button type="button" class="qr-ar" data-pad-skip data-d="1" aria-label="▶">▶</button></div>';
+    arrow(1, '▶') + '</div>';
 }
 function render () {
   const runs = +saved().runs || 0;
@@ -194,12 +205,20 @@ function render () {
 /* значение строки key — на d вперёд (по кругу); сезон сменился — погода не к сезону → «как выпадет» */
 function flip (key, d) {
   const f = fieldOf(key);
-  if (!f || !d) return;
+  if (!f || f.opts.length < 2 || !d) return;
   const i = Math.max(0, f.opts.findIndex(o => String(o.v) === String(SEL[key])));
   const o = f.opts[(i + d + f.opts.length) % f.opts.length];
   SEL[key] = key === 'dist' && o.v !== 'city' ? +o.v : o.v;
   if (key === 'season' && !weathers(SEL.season).includes(SEL.weather)) SEL.weather = 'auto';
   blip(d > 0 ? 880 : 740);
+  if (key === 'mode') {
+    const rows = box.querySelector('.qr-fields');
+    // Строка выбора остаётся на месте, чтобы не сбрасывать фокус мыши и геймпада.
+    while (rows.children.length > 1) rows.lastElementChild.remove();
+    rows.insertAdjacentHTML('beforeend', fields().slice(1).map(rowHTML).join(''));
+    refreshKeys(box);
+    if (!box.dataset.rfApp) fit(box);
+  }
   // строки на месте (курсор геймпада не теряется) — меняются только значения
   for (const g of fields()) {
     const row = box.querySelector('.qr-f[data-f="' + g.key + '"]');
@@ -292,14 +311,22 @@ function fit (desk) {
 /* ── заезд ── */
 function go () {
   if (Q.on || !SEL) return;
-  const o = { ...SEL };
+  const o = SEL.mode !== 'normal' ? hellOptions(SEL) : { ...SEL };
   if (!ownedCars().some(c => c.id === o.car)) return;
   const s = saved();
-  try { A.Store.set(KEY, { ...s, season: o.season, weather: o.weather, len: o.len, car: o.car, dist: o.dist, runs: (+s.runs || 0) + 1 }); } catch (e) { /* — */ }
+  try { A.Store.set(KEY, { ...s, ...SEL, runs: (+s.runs || 0) + 1 }); } catch (e) { /* — */ }
   closeSetup();
   hideEnd();
   start(o);
 }
+const hellOptions = o => ({ ...o, mode: o.mode === 'afterhell' ? 'afterhell' : 'hell', dist: 0, season: 'summer', weather: 'clear', len: 'short', hell: true, aftermath: o.mode === 'afterhell' });
+
+export function startHellPreview (aftermath = false) {
+  if (!A?.hellAvailable || Q.on) return;
+  const o = choices();
+  if (o.car) start(hellOptions({ ...o, mode: aftermath ? 'afterhell' : 'hell', preview: true }));
+}
+
 function start (o) {
   Q.opt = o;
   Q.sea = A.seasons.value(); Q.seaForced = A.seasons.forced();
@@ -348,7 +375,9 @@ function endUI () {
 function hideEnd () { if (endBox) endBox.hidden = true; endTok++; }
 /* «ещё заезд» — сразу, с теми же условиями (последний выбор лежит в dlv-quick) */
 function again () {
-  if (Q.on || !available()) return;
+  if (Q.on) return;
+  if (Q.opt?.preview) { hideEnd(); start({ ...Q.opt }); return; }
+  if (!available()) return;
   SEL = choices();
   PFX.press(endBox && endBox.querySelector('.qr-again'));
   go();
@@ -364,7 +393,7 @@ export function finish (r = {}) {
   const distName = o.dist === 'city' ? t('весь город') : DIST.has() ? t((DIST.list()[+o.dist] || {}).name || '') : '';
   stop();
   // рекорд быстрого заезда — свой, мимо карьеры (dlv-quick.best). Печать «РЕКОРД» — только если был прошлый рекорд
-  const s = saved(), money = Math.max(0, Math.round(r.money || 0)), prev = +s.best || 0, rec = money > prev;
+  const s = saved(), money = Math.max(0, Math.round(r.money || 0)), prev = o.hell ? 0 : +s.best || 0, rec = !o.hell && money > prev;
   if (rec) { try { A.Store.set(KEY, { ...s, best: money }); } catch (e) { /* — */ } }
   const showRec = rec && prev > 0;
   // сняли с заезда / сорвался — печать красная, кончился сам или по времени — зелёная
@@ -379,7 +408,7 @@ export function finish (r = {}) {
     r.fine ? row(t('штраф за клиента'), '−' + A.money(r.fine), 'pp-minus') : '',
     r.back ? row(t('опоздал обратно'), '−' + A.money(r.back), 'pp-minus') : '',
   ].join('');
-  const cond = [seaName, carName, distName, clock(r.t0h ?? 9) + '—' + clock(r.endH ?? 9)].filter(Boolean).map(x => '<span>' + esc(x) + '</span>').join(' · ');
+  const cond = [o.aftermath ? t('День после катастрофы') : o.hell ? t('Ад на земле') : seaName, carName, distName, clock(r.t0h ?? 9) + '—' + clock(r.endH ?? 9)].filter(Boolean).map(x => '<span>' + esc(x) + '</span>').join(' · ');
   endBox.innerHTML =
     '<section class="pp-receipt pp-in qr-check">' +
       '<header class="pp-head"><span>' + esc(t('чек заезда')) + '</span><b>' + num(+saved().runs || 1) + '</b></header>' +

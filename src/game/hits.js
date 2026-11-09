@@ -332,12 +332,13 @@ const BODIES = [], LIMBS = [], PUDDLES = [], WRECKS = [], CHUNKS = [], SPLATS = 
 export const STATS = { BODIES, LIMBS, PUDDLES, WRECKS, CHUNKS, SPLATS, LAST: null };   // LAST — последний «через руль» (отладка)
 
 /* ── упал и встал: живой человек из PEOPLE, его же модель ── */
-export function fall (p, vx, vz) {
+export function fall (p, vx, vz, shock = 0) {
   const l = Math.hypot(vx, vz) || 1;
   const was = p.fall;
   if (was && was.decor) for (const o of was.decor) { o.visible = true; o.userData.fallHid = 0; }   // упал заново, не поднявшись
   if (p.pk) { if (p.pk.L) p.pk.L.claim = 0; p.pk = null; }             // наклонился за вещью — и снова сбили
-  p.fall = { t: 0, yaw: Math.atan2(-vx, -vz), vx: vx / l * 2.6, vz: vz / l * 2.6, mad: 0 };
+  const speed = Math.max(2.6, Math.min(17, shock));
+  p.fall = { t: 0, yaw: Math.atan2(-vx, -vz), vx: vx / l * speed, vz: vz / l * speed, launch: shock ? speed * 0.32 : 0, mad: 0 };
   CARRYM.drop(p, vx, vz, true);                    // из рук — на землю; встанет — подберёт (carried.js)
   A.Snd.fx('fall', s => s.noise(0.12, 0.2), { x: p.x, z: p.z });
   A.puff(p.x, 0.3, p.z, false, 0.5);
@@ -369,6 +370,7 @@ export function fallStep (p, dt) {
   const F = p.fall, g = p.grp, u = g.userData;
   if (F.pick) return CARRYM.pickStep(p, dt) || fallEnd(p);   // встал — идёт за своими вещами (carried.js)
   const t = (F.t += dt);
+  const hop = Math.max(0, F.launch * t - 8.9 * t * t);
   const T1 = 0.35, T2 = T1 + TIME.FALL_LIE, T3 = T2 + 0.6, T4 = T3 + 1.1;
   if (!F.snowMarked && t >= T1) {
     F.snowMarked = true;
@@ -391,7 +393,7 @@ export function fallStep (p, dt) {
       BX.makeEmpty(); BX.expandByObject(u.skin, true);
       F.qLift = BX.isEmpty() ? 0 : Math.max(-0.3, Math.min(0.3, F.top + 0.01 - BX.min.y));
     }
-    g.position.set(p.x, F.top + (F.qLift || 0) * lie, p.z);
+    g.position.set(p.x, F.top + (F.qLift || 0) * lie + hop, p.z);
     if (t >= T3 && !F.mad) { F.mad = 1; A.emote(p.x, 2.1, p.z, 'angry', 3); }
     if (t < T4) return true;
     return pickOrEnd(p, dt);
@@ -408,7 +410,7 @@ export function fallStep (p, dt) {
   const base = A.groundH(p.x, p.z) + A.curbAt(p.x, p.z);
   if (t < T1 + 0.3 || F.top === undefined) F.top = topAt(p.x, p.z);
   if (F.lift === undefined) F.lift = fallLift(g);
-  g.position.set(p.x, base + (F.top - base + F.lift) * a, p.z);
+  g.position.set(p.x, base + (F.top - base + F.lift) * a + hop, p.z);
   u.legL.rotation.x = 0.25 * a; u.legR.rotation.x = -0.15 * a;
   u.armL.rotation.x = -2.6 * a; u.armR.rotation.x = -2.2 * a;
   if (t >= T3) {                                   // встал — грозит кулаком
@@ -461,7 +463,7 @@ export function hit (p, vx, vz, kmh, o = {}) {
     return !o.up;
   }
   // на куски и с оторванной рукой — только на нитро (A.shred, game.js shredHit); без нитро — отлетает целым
-  const nitro = !!(A.adult && !o.up && A.shred && A.shred(p));
+  const nitro = !!(A.adult && !o.up && (o.burst || A.shred?.(p)));
   if (nitro && kmh >= TIER.HIGH) { A.burst(p, vx, vz); return true; }
   const up = o.up || !A.adult;
   const lie = o.up ? TIME.FALL_LIE : !A.adult ? (kmh >= TIER.BURST ? TIME.KID_LIE_HIGH : TIME.KID_LIE) : TIME.BODY;
@@ -714,6 +716,25 @@ export function burst (p, vx, vz, low) {
   }
   let over = CHUNKS.length - CAP.CHUNKS;
   for (const q of CHUNKS) { if (over <= 0) break; if (q.life > TIME.SINK) { q.life = TIME.SINK; over--; } }
+}
+// В пробном заезде мелкие фрагменты снова отлетают при наезде колеса.
+export function kickChunks (car, fx, fz, length, width) {
+  const speed = Math.hypot(car.vx, car.vz);
+  if (speed < 1.2) return;
+  const now = performance.now();
+  for (const q of CHUNKS) {
+    if (q.life <= TIME.SINK || q.kickAt > now) continue;
+    const p = q.m.position, dx = p.x - car.x, dz = p.z - car.z;
+    if (p.y < car.y - 0.38 || p.y > car.y + 1 || Math.abs(dx * fx + dz * fz) > length + 0.25) continue;
+    const side = dx * fz - dz * fx;
+    if (Math.abs(side) > width + 0.18) continue;
+    const force = clamp(speed * 0.34, 2, 9), across = Math.sign(side || 1) * force * 0.58;
+    q.vx = car.vx / speed * force + fz * across;
+    q.vz = car.vz / speed * force - fx * across;
+    q.vy = 1.2 + force * 0.34;
+    q.spin = rand(-12, 12); q.rest = 0; q.kickAt = now + 480;
+    if (q.splat) { q.splat.fade = 1; q.splat = null; }
+  }
 }
 /* лужица под куском: общий круг, свой материал (тает своим темпом) */
 /* пятно крови на земле (game.js spray — куда долетели брызги) */

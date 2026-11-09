@@ -60,6 +60,9 @@ function h01 (n, k = 0) {
 const HOLE_N = { value: 0 };
 const HOLE_A = { value: Array.from({ length: HOLE_MAX }, () => new THREE.Vector4()) };   // центр x, z; ось x, z
 const HOLE_B = { value: Array.from({ length: HOLE_MAX }, () => new THREE.Vector4()) };   // полуразмеры; выше y0 — в y1
+const HELL_ON = { value: 0 };
+let hellCut = false;
+export function enableHellCollapse (enabled) { hellCut = enabled; }
 const HOLE_GLSL = `uniform int uHoleN;
 uniform vec4 uHoleA[${HOLE_MAX}], uHoleB[${HOLE_MAX}];
 vec3 hurHole (vec3 p) {
@@ -69,9 +72,26 @@ vec3 hurHole (vec3 p) {
     if (i >= uHoleN) break;
     vec4 a = uHoleA[i], b = uHoleB[i];
     vec2 d = w.xz - a.xy;
-    if (w.y > b.z && abs(d.x * a.z + d.y * a.w) < b.x && abs(d.y * a.z - d.x * a.w) < b.y) { p.y -= w.y - b.w; return p; }
+    if (b.x > 0.0 && w.y > b.z && abs(d.x * a.z + d.y * a.w) < b.x && abs(d.y * a.z - d.x * a.w) < b.y) {
+      p.y -= w.y - b.w;
+      return p;
+    }
   }
   return p;
+}
+`;
+const COLLAPSE_FRAGMENT = `varying vec3 vHurCollapse;
+uniform int uHellOn, uHoleN;
+uniform vec4 uHoleA[${HOLE_MAX}], uHoleB[${HOLE_MAX}];
+void hurCollapse () {
+  if (uHellOn == 0) return;
+  for (int i = 0; i < ${HOLE_MAX}; i++) {
+    if (i >= uHoleN) break;
+    vec4 a = uHoleA[i], b = uHoleB[i];
+    if (b.x >= 0.0 || vHurCollapse.y < b.z || vHurCollapse.y > b.w) continue;
+    vec2 d = vHurCollapse.xz - a.xy;
+    if (abs(d.x * a.z + d.y * a.w) < -b.x && abs(d.y * a.z - d.x * a.w) < b.y) discard;
+  }
 }
 `;
 const WRAPPED = new WeakSet();
@@ -81,12 +101,25 @@ export function holeMat (m) {
   WRAPPED.add(m);
   const prev = m.onBeforeCompile, own = m.customProgramCacheKey !== THREE.Material.prototype.customProgramCacheKey;
   const prevKey = own ? m.customProgramCacheKey : null, base = own ? '' : (prev ? prev.toString() : '');
+  const cut = hellCut;
   m.onBeforeCompile = (sh, r) => {
     if (prev) prev.call(m, sh, r);
     sh.uniforms.uHoleN = HOLE_N; sh.uniforms.uHoleA = HOLE_A; sh.uniforms.uHoleB = HOLE_B;
-    sh.vertexShader = HOLE_GLSL + sh.vertexShader.replace('#include <project_vertex>', 'transformed = hurHole(transformed);\n#include <project_vertex>');
+    const collapseVertex = cut ? `vec4 collapsePos = vec4(transformed, 1.0);
+#ifdef USE_INSTANCING
+collapsePos = instanceMatrix * collapsePos;
+#endif
+vHurCollapse = (modelMatrix * collapsePos).xyz;
+` : '';
+    sh.vertexShader = (cut ? 'varying vec3 vHurCollapse;\n' : '') + HOLE_GLSL + sh.vertexShader.replace('#include <project_vertex>',
+      collapseVertex + 'transformed = hurHole(transformed);\n#include <project_vertex>');
+    if (cut) {
+      sh.uniforms.uHellOn = HELL_ON;
+      sh.fragmentShader = COLLAPSE_FRAGMENT + sh.fragmentShader.replace('#include <clipping_planes_fragment>',
+        '#include <clipping_planes_fragment>\nhurCollapse();');
+    }
   };
-  m.customProgramCacheKey = () => (prevKey ? prevKey.call(m) : base) + '|hole';
+  m.customProgramCacheKey = () => (prevKey ? prevKey.call(m) : base) + (cut ? '|hole-collapse' : '|hole');
   m.needsUpdate = true;
   return m;
 }
@@ -97,6 +130,7 @@ function holesRoom () {
     restore(old, false);
   }
 }
+let collapses = [];
 function holesApply () {
   let n = 0;
   for (const s of SITES) {
@@ -106,7 +140,20 @@ function holesApply () {
     HOLE_B.value[n].set(I.hx + HUR.M, I.hz + HUR.M, I.gmax + 0.22, I.gmin - 1.4);
     n++;
   }
+  // В пробном заезде оседают только верхние этажи. Адреса и коллизии остаются обычными.
+  for (const { house: I, progress } of collapses) {
+    if (n >= HOLE_MAX) break;
+    HOLE_A.value[n].set(I.ox, I.oz, I.ux, I.uz);
+    HOLE_B.value[n].set(-(I.hx + 2.5), I.hz + 2.5, collapseTop(I, progress), I.top + 9);
+    n++;
+  }
   HOLE_N.value = n;
+}
+
+export function setCollapses (sites) {
+  collapses = sites;
+  HELL_ON.value = sites.length ? 1 : 0;
+  holesApply();
 }
 
 /* ═════════════ дома: что можно унести ═════════════ */
@@ -154,6 +201,76 @@ function shape (b) {
   }
   return { area, cx, cz, ccw: s2 > 0, ...best };
 }
+export function collapseTargets (x, z, radius) {
+  if (!C) return [];
+  const targets = [];
+  for (const i of near(x - radius, z - radius, x + radius, z + radius)) {
+    const b = C.CITY.buildings[i];
+    if ((b.lv || 0) < 3 || SITES.some(s => s.I.i === i)) continue;
+    const I = info(i);
+    if (I && Math.hypot(I.cx - x, I.cz - z) < radius) targets.push(impactHouse(i));
+  }
+  return targets.filter(Boolean);
+}
+
+export const collapseTop = (house, progress) => house.top + 5 - (house.top + 5 - house.cut) * progress;
+const IMPACT_HOUSES = new Map();
+
+function impactHouse (i) {
+  const b = C.CITY.buildings[i];
+  if (b.k === 'waste' || b.k === 'site' || !Number.isFinite(b._top)) return null;
+  if (IMPACT_HOUSES.has(i)) return IMPACT_HOUSES.get(i);
+  const s = shape(b);
+  if (!s.hx || !s.hz) return null;
+  const hHi = Math.max(...b.p.map(([x, z]) => C.groundH(x, z)));
+  const top = b._top + (b.roof === 'g' || b.roof === 'h' ? Math.min(2, s.hz * 0.2) : 0);
+  const h = { ...s, i, id: b.id, p: b.p, hHi, top, cut: hHi + Math.min(3.4, (top - hHi) * 0.48), hex: b._hex };
+  IMPACT_HOUSES.set(i, h);
+  return h;
+}
+
+export function restoreImpactHouse (saved) {
+  if (!C) return null;
+  const buildings = C.CITY.buildings;
+  const i = saved.id == null ? saved.i : buildings.findIndex(b => b.id === saved.id);
+  return i >= 0 && i < buildings.length ? impactHouse(i) : null;
+}
+
+function footprintDistance (h, x, z) {
+  if (C.inPoly(x, z, h.p)) return 0;
+  let best = Infinity;
+  for (let i = 0; i < h.p.length; i++) {
+    const [ax, az] = h.p[i], [bx, bz] = h.p[(i + 1) % h.p.length];
+    const dx = bx - ax, dz = bz - az, ex = x - ax, ez = z - az;
+    const t = clamp((ex * dx + ez * dz) / (dx * dx + dz * dz || 1), 0, 1);
+    best = Math.min(best, (ex - dx * t) ** 2 + (ez - dz * t) ** 2);
+  }
+  return best;
+}
+
+export function strikeBuilding (from, to, radius) {
+  const m = radius + 3, dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
+  const candidates = [...near(Math.min(from.x, to.x) - m, Math.min(from.z, to.z) - m,
+    Math.max(from.x, to.x) + m, Math.max(from.z, to.z) + m)].map(impactHouse).filter(Boolean);
+  const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy, dz) / 0.7));
+  for (let j = 1; j <= steps; j++) {
+    const t = j / steps, x = from.x + dx * t, y = from.y + dy * t, z = from.z + dz * t;
+    for (const h of candidates) {
+      const site = collapses.find(s => s.house.i === h.i);
+      const top = site ? Math.min(h.top, collapseTop(h, site.progress)) : h.top;
+      const above = Math.max(0, y - top), below = Math.max(0, h.hHi - 2 - y);
+      if (above + below >= radius) continue;
+      if (footprintDistance(h, x, z) + above * above + below * below <= radius * radius) return { house: h, t, x, y, z };
+    }
+  }
+  return null;
+}
+
+export function missingBalcony (x, y, z) {
+  return collapses.some(({ house, progress }) =>
+    y + 1 > collapseTop(house, progress) && y < house.top + 8 && nearBox(house, x, z, 2.5));
+}
+
 const toW = (I, a, c) => [I.ox + I.ux * a - I.uz * c, I.oz + I.uz * a + I.ux * c];
 const toL = (I, x, z) => { const dx = x - I.ox, dz = z - I.oz; return [dx * I.ux + dz * I.uz, -dx * I.uz + dz * I.ux]; };
 /* можно ли этот дом вообще уносить (без машины и заказа): кэш по индексу */

@@ -142,7 +142,7 @@ export function show ({ openShift = false } = {}) {
     go.appendChild(b);
   }
   const cards = [go];
-  const qr = card('quick', '»', t('быстрый заезд'), QR.available() ? t('сезон, машина, длина смены · без копилки и сюжета') : t('откроется после первой смены'));
+  const qr = card('quick', '»', t('быстрый заезд'), QR.normalAvailable() ? t('сезон, машина, длина смены · без копилки и сюжета') : QR.available() ? t('Ад на земле') : t('откроется после первой смены'));
   if (!QR.available()) qr.classList.add('off');
   cards.push(qr,
     card('garage', '⌂', t('гараж'), t('машины, броня, мотор, покраска')),

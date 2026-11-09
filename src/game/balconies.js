@@ -332,6 +332,7 @@ const CT = new THREE.Color();
 function kitBuild (cx, cz) {
   if (!KIT) {
     KG = kitGeo(); KM = kitMat();
+    A.holeMat?.(KM);
     const max = MOB.on ? BALC.KIT_MAX_MOB : BALC.KIT_MAX;
     KIT = new THREE.InstancedMesh(KG, KM, max);
     KIT.userData.iB = new Float32Array(max * 2); KIT.userData.iC = new Float32Array(max * 3);
@@ -472,7 +473,7 @@ export function step (dt) {
     const t0 = performance.now();
     for (let i = MEN.length - 1; i >= 0; i--) {
       const m = MEN[i];
-      if (dist(m.x, m.z) > BALC.DROP || m.st === 'gone') { drop(m); MEN.splice(i, 1); }
+      if (dist(m.x, m.z) > BALC.DROP || m.st === 'gone' || A.missing?.(m.x, m.sp.y, m.z)) { drop(m); MEN.splice(i, 1); }
     }
     const night = (A.ENV.night || 0) > 0.55, rain = (A.ENV.rain || 0) > 0.5;
     const want = Math.max(0, cap - (rain ? 1 : 0) - (night ? 1 : 0)) + (FORCE ? 1 : 0);
@@ -481,7 +482,7 @@ export function step (dt) {
       let best = null, bd = 1e9;
       for (const k of nearIdx(V.x, V.z, BALC.NEAR)) {
         const b = k * PER;
-        if (BUSY.has(k) || (!FORCE && (OB[b + 8] * 7.3) % 1 > BALC.OCC)) continue;
+        if (BUSY.has(k) || A.missing?.(OB[b], OB[b + 1], OB[b + 2]) || (!FORCE && (OB[b + 8] * 7.3) % 1 > BALC.OCC)) continue;
         const d = dist(OB[b], OB[b + 2]);
         if (d > BALC.NEAR || d < BALC.MIN || !inView(OB[b], OB[b + 1] + 1, OB[b + 2], 1.5)) continue;
         const sc = d + Math.random() * 25;
