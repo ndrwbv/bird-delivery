@@ -113,7 +113,7 @@ export function bankDepth (x, z, floor, bridge, mask) {
 /** Начальный снег на видимом дорожном полотне. surfaceY — выбранная твёрдая
  * опора (земля/мост), чтобы дорога сверху не меняла снег под мостом.
  * Никаких аллокаций; out переиспользуется вызывающим кодом. */
-export function sampleSurface (x, z, surfaceY, out = {}, bridge) {
+export function sampleSurface (x, z, surfaceY, out = {}, bridge, terrainBase) {
   out.onRoad = false; out.baseY = surfaceY; out.thickness = 0; out.compaction = 0;
   out.roadThickness = 0; out.sand = 0; out.dirt = 0; out.wetness = 0; out.rut = 0; out.heading = 0; out.coverage = 0; out.bridge = false; out.moundMask = 0; out.edgeDistance = Infinity;
   const k = key(Math.floor(x / WINTER_ROAD.CELL), Math.floor(z / WINTER_ROAD.CELL));
@@ -124,7 +124,7 @@ export function sampleSurface (x, z, surfaceY, out = {}, bridge) {
     if (bridge !== undefined && !!p.road.b !== bridge) continue;
     const dx = x - p.a[0], dz = z - p.a[1], along = dx * p.ux + dz * p.uz, off = -dx * p.uz + dz * p.ux;
     if (along < -0.1 || along > p.len + 0.1 || Math.abs(off) > p.w / 2 + 0.03) continue;
-    const y = p.surfaceY(x, z);
+    const y = terrainBase && p.surfaceLift !== undefined ? terrainBase(x, z) + p.surfaceLift : p.surfaceY(x, z);
     // Road material lift is ~0.14 m above the old vehicle support.
     if (Number.isFinite(surfaceY) && Math.abs(y - surfaceY) > 0.55) continue;
     const score = (8 - p.road.c) * 10000 + (p.clear ? 1000 : p.sand ? 500 : 0) + p.w;
@@ -136,9 +136,10 @@ export function sampleSurface (x, z, surfaceY, out = {}, bridge) {
   for (const q of list) {
     if (!q.clear || q.road.c > winner.road.c || !!q.road.b !== !!winner.road.b) continue;
     const dx = x - q.a[0], dz = z - q.a[1], along = dx * q.ux + dz * q.uz;
-    if (along < -0.1 || along > q.len + 0.1) continue;
     const off = -dx * q.uz + dz * q.ux;
-    if (Math.abs(off) > q.w / 2 + 8 || Math.abs(q.surfaceY(x, z) - base) > 0.3) continue;
+    if (along < -0.1 || along > q.len + 0.1 || Math.abs(off) > q.w / 2 + 8) continue;
+    const y = terrainBase && q.surfaceLift !== undefined ? terrainBase(x, z) + q.surfaceLift : q.surfaceY(x, z);
+    if (Math.abs(y - base) > 0.3) continue;
     clearance = Math.min(clearance, smooth(clamp((Math.abs(off) - q.w / 2) / 8, 0, 1)));
   }
   const p = winner, edgeDistance = p.w / 2 - Math.abs(bestOff);
@@ -417,23 +418,21 @@ function roadSheet (M, p) {
 
 /* Плавная маска песка — один байт на вершину. В материале она даёт
    мелкую зернистую примесь, не геометрические треугольники на дороге. */
-export function addSandAttribute (group, THREE) {
+export function addSandAttribute (mesh, THREE, terrainBase) {
   const sampled = {};
-  for (const mesh of group.children) {
-    const pos = mesh.geometry.attributes.position, mask = new Uint8Array(pos.count), cover = new Uint8Array(pos.count);
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), z = pos.getZ(i);
-      sampleSurface(x, z, pos.getY(i) - 0.09, sampled);
-      mask[i] = Math.round(sampled.sand * 255);
-      cover[i] = Math.round(Math.max(sampled.coverage, sampled.roadThickness < 0.003 ? sampled.rut * 0.72 : 0) * 255);
-    }
-    const a = new THREE.BufferAttribute(mask, 1, true);
-    a.onUpload(function () { this.array = null; });
-    mesh.geometry.setAttribute('roadSand', a);
-    const b = new THREE.BufferAttribute(cover, 1, true);
-    b.onUpload(function () { this.array = null; });
-    mesh.geometry.setAttribute('roadBlend', b);
+  const pos = mesh.geometry.attributes.position, mask = new Uint8Array(pos.count), cover = new Uint8Array(pos.count);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    sampleSurface(x, z, pos.getY(i) - 0.09, sampled, undefined, terrainBase);
+    mask[i] = Math.round(sampled.sand * 255);
+    cover[i] = Math.round(Math.max(sampled.coverage, sampled.roadThickness < 0.003 ? sampled.rut * 0.72 : 0) * 255);
   }
+  const a = new THREE.BufferAttribute(mask, 1, true);
+  a.onUpload(function () { this.array = null; });
+  mesh.geometry.setAttribute('roadSand', a);
+  const b = new THREE.BufferAttribute(cover, 1, true);
+  b.onUpload(function () { this.array = null; });
+  mesh.geometry.setAttribute('roadBlend', b);
 }
 
 /* Округлый вал у обочины. Сечения сужаются и опускаются к обоим концам. */
@@ -619,7 +618,7 @@ export function build ({ M, rutM, softM, roads, roadWidth, yOf, groundH, junctio
     const bankGaps = breaks.map(({ at, core }) => [at - core - 2.4, at + core + 2.4]).sort((a, b) => a[0] - b[0]);
     // На большой карте миллиметры разницы глубины исчезают. Снег выше полотна,
     // а каждый видимый слой выше предыдущего на сантиметры.
-    const y = yOf(road) + 0.06;
+    const surfaceLift = yOf(road), y = surfaceLift + 0.06;
     const surfaceY = (x, z) => groundH(x, z) + yOf(road);
     let along = 0;
     for (let i = 1; i < pts.length; i++) {
@@ -643,7 +642,7 @@ export function build ({ M, rutM, softM, roads, roadWidth, yOf, groundH, junctio
         return true;
       };
       coverJunction(a); coverJunction(b);
-      const segment = { a, b, ux, uz, len, w, surfaceY, sand, clear, road, rutRoad, count, depth, fade, breaks, bankGaps, total, along,
+      const segment = { a, b, ux, uz, len, w, surfaceY, surfaceLift, sand, clear, road, rutRoad, count, depth, fade, breaks, bankGaps, total, along,
         corridor: modes.get(road)?.corridor || String(road.c), heading: Math.atan2(ux, uz) };
       segments.push(segment); registerRoad(segment);
       along += len;

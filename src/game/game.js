@@ -41,6 +41,7 @@ import {createLandPackageReader} from './landdata/land-package-reader.js';
 import {createLandPackageExporter} from './landdata/land-package-export.js';
 import {LAND_PACKAGE_LIMITS} from './landdata/land-package-config.js';
 import {createLandStream,streamedGroundMaterial} from './landstream.js';
+import { createCitySurface } from './citysurface.js';
 import {createTileGpu} from './tilegpu.js';
 import {clippedMesher} from './landclip.js';
 let LAND_STREAM = null, LAND_ENTERING = false;
@@ -1361,7 +1362,7 @@ function Mesher (opt) {
     if (k === lastK && !lastB.done) return lastB;
     let b = ids.get(k);
     // done — клетка уже склеена заранее (prep), её массивы отпущены: дописанное — в новую клетку с тем же ключом
-    if (b === undefined || b.done) { b = LAND_PAGES ? {cap:0,n:0,pos:null,col:null,cs:CSI,pages:createLandMeshPages(CSI),landRow:k===-1?Infinity:Math.floor((z0+z1+z2)/3/CHUNK)} : { cap: 1 << 10, n: 0, pos: new Float32Array(3 << 10), col: new Uint8Array(CSI << 10), cs: CSI }; ids.set(k, b); BK.push(b); }
+    if (b === undefined || b.done) { b = LAND_PAGES ? {cap:0,n:0,pos:null,col:null,cs:CSI,pages:createLandMeshPages(CSI),landRow:k===-1?Infinity:Math.floor((z0+z1+z2)/3/CHUNK)} : { cap: 1 << 10, n: 0, pos: new Float32Array(3 << 10), col: new Uint8Array(CSI << 10), cs: CSI }; b.key = k; ids.set(k, b); BK.push(b); }
     lastK = k; lastB = b;
     return b;
   }
@@ -1675,11 +1676,16 @@ function Mesher (opt) {
     /* keep — поздняя сборка (latebuild.js): меши того, что есть сейчас, а клетки не сбрасываем. Следующий
        mesh() допишет в те же клетки: у клетки с прибавкой меш получает новую склейку (старая — из видеокарты
        вон), новые клетки — новые меши. Так кусков и вызовов отрисовки столько же, как при сборке разом */
-    mesh (mat, keep) {
+    mesh (mat, keep, near = null) {
       const grp = new THREE.Group();
       const IX = opt && opt.index && !NO_LIX && !keep;   // общие вершины (ixCell) — при последней склейке; клетки меню (keep) — без них, их склеят заново
       for (const B of BK) {
         if (B.done) { tracks(B, B.me); continue; }    // склеена заранее (prep) — меш готов и уже в видеокарте
+        if (near && B.key !== -1 && !B.f && !B.mb) {
+          const x = (Math.floor(B.key / 100000) - 50000) * CHUNK, z = (B.key % 100000 - 50000) * CHUNK;
+          // До точной рамки оставляем запас для треугольников соседних клеток.
+          if (!near([x - CHUNK, z - CHUNK, x + 2 * CHUNK, z + 2 * CHUNK])) continue;
+        }
         // поздняя сборка держит клетки до конца (keep): запас «на вырост» (до ×2) — обрезать, в Северске это десятки МБ на всё меню (порог 128 вершин, было 1024 — 23.10.2026)
         if (keep && B.cap > B.n + 128) { const c = Math.max(B.n, 16); B.pos = B.pos.slice(0, c * 3); B.col = B.col.slice(0, c * B.cs); B.cap = c; }
         if (B.me) {                                   // клетка уже с мешем (keep): дописалось — склейка заново
@@ -1709,6 +1715,40 @@ function Mesher (opt) {
       n = 0; ids = new Map(); BK = []; lastK = NaN; lastB = null;
       ixFree();
       return grp;
+    },
+    /* Передать неподвижные данные очереди, пока для них ещё нет мешей.
+       Живой префикс, уже показанные клетки и большие общие полотна идут старым путём. */
+    *defer (mat, enqueue, { landRGB = false, decorate = null } = {}) {
+      const keep = [];
+      let i = 0;
+      for (const B of BK) {
+        let deferred = false;
+        if (B.n && B.key !== -1 && !B.me && !B.f && !B.mb && !B.pages) {
+          let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+          for (let j = 0; j < B.n * 3; j += 3) {
+            const x = B.pos[j], z = B.pos[j + 2];
+            if (x < x0) x0 = x; if (x > x1) x1 = x;
+            if (z < z0) z0 = z; if (z > z1) z1 = z;
+          }
+          deferred = enqueue([x0, z0, x1, z1], () => {
+            const mesh = new THREE.Mesh(geoOf(B, !!opt.index && !NO_LIX, false, landRGB), mat);
+            mesh.matrixAutoUpdate = false;
+            decorate?.(mesh);
+            return mesh;
+          });
+        }
+        if (deferred) {
+          if (B.cap > 1.25 * B.n) {
+            B.pos = B.pos.slice(0, B.n * 3);
+            B.col = B.col.slice(0, B.n * B.cs);
+            B.cap = B.n;
+          }
+          if (ids.get(B.key) === B) ids.delete(B.key);
+          n -= B.n; BUILT_TRIS += B.n / 3;
+        } else keep.push(B);
+        if (++i % 24 === 0) yield 'город: участки';
+      }
+      BK = keep; lastK = NaN; lastB = null;
     },
     /* Временная земля меню заменяется окончательным контуром, со сцены — сразу. */
     discard () {
@@ -6106,6 +6146,9 @@ function* timedSteps (k, it) {                    // шаги куска (latebu
   }
 }
 function buildCity () {
+  const streamLand = RLAND.ON && LATE.busy() && !new URLSearchParams(location.search).has('fullterrain');
+  const citySurface = streamLand && ADULT && MAP.id === 'seversk' && !EDL.ED.on && !MOBM.ON
+    ? createCitySurface(TER) : null;
   const house = dodoHouse();
   const spot = house ? null : pizzaSpot();
   const tm0 = (k, f) => { const t0 = performance.now(); STARTUP.work('city.' + k, f); BUILD_T[k] = Math.round(performance.now() - t0); };
@@ -6139,6 +6182,11 @@ function buildCity () {
   }
   // бордюры — после пиццерий: перед стоянкой курьеров бордюр опущен (заезд, pizzeria.js DRIVEWAYS); растр асфальта нужен только им (mapworks.js) — сразу отпускаем
   tm0('curbs', () => { osmCurbs(); MAPW.freeAsphalt(); });
+  const preview = PIZZA;
+  const nearPreview = ([x0, z0, x1, z1]) => Math.hypot(
+    Math.max(x0 - preview.bx, 0, preview.bx - x1), Math.max(z0 - preview.bz, 0, preview.bz - z1)) <= 640;
+  const deferOutsidePreview = citySurface && ((bounds, make, onPublish) =>
+    !nearPreview(bounds) && citySurface.defer(bounds, make, onPublish));
   // во вступлении место под кружок знаем заранее — его держим пустым
 
   // дальше — то, что в меню не главное: с поздней сборкой (latebuild.js) — очередью после первого кадра меню, в том же порядке
@@ -6198,6 +6246,7 @@ function buildCity () {
       descriptor:()=>EDL.rngDescriptor(),expose:api=>{window.__landPackage17bExport=api;},work:STARTUP.work,mark:STARTUP.mark,flag:STARTUP.flag}):null;
     const inspect17a=it=>export17a?export17a.watch(it):exportPackage?exportPackage.watch(it):it;
     CURB_M.discard();
+    if (citySurface) yield* LITM.defer(litMat, citySurface.defer, { landRGB: true });
     yield* flushLandStage();
     yield* flushLandStage(GROUND_M);
     LITM.landPages(LATE.busy());
@@ -6279,23 +6328,30 @@ function buildCity () {
   if (HELL_ENABLED) HELL.cutMaterial(flatMat);
   FSH.mat(litMat); FSH.mat(flatMat);            // тени домов: маска в шейдере земли и разметки (fakeshadows.js)
   const groups = [];
-  const winterGroup = WINM.mesh(FSH.mat(SEAS.winterRoadMat(true)));
-  const winterRutGroup = WINRUTM.mesh(FSH.mat(SEAS.winterRoadMat(true)));
   const winterSoftGroup = new THREE.Group();
   const winterSoftMat = FSH.mat(SEAS.winterRoadMat());
   scene.add(winterSoftGroup); groups.push(winterSoftGroup);
-  for (const mesh of winterRutGroup.children) mesh.renderOrder = 1;
-  for (const group of [winterGroup, winterRutGroup]) {
-    WINROAD.addSandAttribute(group, THREE);
+  const winterGroups = [winterSoftGroup];
+  for (const [M, order] of [[WINM, 0], [WINRUTM, 1]]) {
+    const mat = FSH.mat(SEAS.winterRoadMat(true));
+    // Цвет снега берётся по исходной высоте полотна и после активации бордюров.
+    const decorate = mesh => { mesh.renderOrder = order; WINROAD.addSandAttribute(mesh, THREE, citySurface ? terrainH : undefined); };
+    if (deferOutsidePreview) {
+      const enqueue = (bounds, make) => deferOutsidePreview(bounds, make, SEAS.addWinterRoadMesh);
+      for (const _ of M.defer(mat, enqueue, { decorate })) { /* без ожидания для рисунка меню */ }
+    }
+    const group = M.mesh(mat);
+    for (const mesh of group.children) decorate(mesh);
     if (group.children.length) { groups.push(group); scene.add(group); }
+    winterGroups.push(group);
   }
-  SEAS.bindWinterRoadGroup([winterGroup, winterRutGroup, winterSoftGroup]);
+  SEAS.bindWinterRoadGroup(winterGroups);
   let landPackedMat=null,landPaletteMat=null,landPaletteTex=null,landPaletteRevision=-1;
   let groundMat=litMat,groundStreamMask=null;
-  if (RLAND.ON && LATE.busy() && !new URLSearchParams(location.search).has('fullterrain')) {
+  if (streamLand) {
     const disposeLand=g=>{if(g){g.removeFromParent();g.traverse(m=>m.geometry?.dispose());}};
     const landGpu=createTileGpu({renderer,scene,cam,keep:()=>WARM.keep()});
-    LAND_STREAM=createLandStream({terrain:TER,build:function* (bounds) {
+    LAND_STREAM=createLandStream({terrain:TER,retries:citySurface ? 1 : 0,build:function* (bounds, id) {
       LAND_READ17?.assertReady();
       landPackageUsable();
       const M=Mesher({alpha:true,index:true,keepFront:true,mainRGB:true,noLandRecord:true});
@@ -6313,21 +6369,27 @@ function buildCity () {
           triangulate:(p,holes=[])=>THREE.ShapeUtils.triangulateShape(p.map(q=>new THREE.Vector2(...q)),holes.map(h=>h.map(q=>new THREE.Vector2(...q))))});
         yield* M.prep(litMat,g,()=>{});
         const tail=M.mesh(litMat);for(const m of tail.children.slice())g.add(m);
+        if (citySurface) yield* citySurface.append(id, g);
         transferred=true;
         return g;
       } finally {
         // return() on cancellation unwinds the nested raisedland builder
         // first, then releases unpublished buffers and geometries here.
         if(!transferred){M.discard();disposeLand(g);}
+        if (citySurface) ixFree();
       }
     },upload:function* (g){yield* landGpu.upload(g);g.userData.landGpuUploaded=true;},warm:landGpu.warm,dispose:disposeLand,visible:b=>{
       const x=(b[0]+b[2])/2,z=(b[1]+b[3])/2;
       return CULL.inView(x,terrainH(x,z),z,Math.hypot(b[2]-b[0],b[3]-b[1])/2);
     },publish(id,g) {
       STARTUP.geometry('land.surfacePublished', g);
-      scene.add(g);CULL.register(g);groundStreamMask.update();groups.push(g);
+      scene.add(g);CULL.register(g);
+      citySurface?.publish(g);
+      groundStreamMask.update();groups.push(g);
+      if (citySurface) MEADOW.groundChanged();
     }});
     LAND_STREAM.stats.gpu=landGpu.stats;
+    if (citySurface) LAND_STREAM.stats.city=citySurface.stats;
     groundStreamMask=streamedGroundMaterial(THREE,litMat,LAND_STREAM);
     groundMat=groundStreamMask.material;
   }
@@ -6357,7 +6419,12 @@ function buildCity () {
     if (g.children.length) groups.push(g); else scene.remove(g);
   }
   let warm4 = null;                               // прогрев шейдера склейки с признаком (см. ниже)
-  const meshNow = keep => { for (const g of [...(RLAND.ON&&keep ? [GROUND_M.mesh(groundMat, keep)] : []), LITM.mesh(litMat, keep), FLATM.mesh(flatMat, keep)]) { if (g.children.length) { groups.push(g); scene.add(g); } } };
+  const meshNow = keep => {
+    const near = keep && citySurface ? nearPreview : null;
+    for (const g of [...(RLAND.ON&&keep ? [GROUND_M.mesh(groundMat, keep)] : []), LITM.mesh(litMat, keep, near), FLATM.mesh(flatMat, keep, near)]) {
+      if (g.children.length) { groups.push(g); scene.add(g); }
+    }
+  };
   if (LATE.busy()) {                              // поздняя сборка: видимое — в сцену сразу, в видеокарту — при первом кадре
     meshNow(true);
     /* клетки меню — цвет тремя байтами (как лежит), последняя склейка — четырьмя (признак: реквизит, мелочь, плафоны) — это
@@ -6380,6 +6447,10 @@ function buildCity () {
     const banks = WINSOFTM.mesh(winterSoftMat);
     for (const mesh of banks.children.slice()) winterSoftGroup.add(mesh);
     yield 'snow banks';
+    if (citySurface) {
+      yield* LITM.defer(litMat, citySurface.defer);
+      yield* FLATM.defer(flatMat, citySurface.defer);
+    }
     let t0 = performance.now(), ms = 0;
     // перенос в клетки — по шагу на список (на Деке все четыре с первой пачкой клеток были одним шагом 0,2—0,25 с; кусок без
     // зерна и случайных чисел — шаги можно двигать)
@@ -6418,7 +6489,7 @@ function buildCity () {
     BUILD_T.meshLate = Math.round(ms + performance.now() - t0);
   });
   if(RLAND.ON)LATE.add('raisedlandSurface', () => STARTUP.steps('raisedland.nearSurface', buildRaisedLandSurface()));
-  WINS.build(scene);                              // окна — по клеткам, один материал (windows.js)
+  WINS.build(scene, deferOutsidePreview);           // окна — по клеткам, один материал (windows.js)
   PAINT.build(scene);                             // муралы — один меш (citypaint.js)
   /* Всю статику — сразу в видеокарту, одним кадром в крохотную цель:
      иначе куски, которых ещё не было в кадре, держат свои вершины и в

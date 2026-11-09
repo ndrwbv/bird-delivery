@@ -505,6 +505,7 @@ export function init (api) {
   } catch (e) { /* — */ }
 }
 export function groundMat (m) { GROUND = m; }
+export function groundChanged () { LIST_T = -Infinity; }
 /* середина маски и плиток травы — впереди камеры */
 function ahead (cam, k) {
   const P = DEBUG.pose;                              // проверки (кадры с камерой «руками»): [x, y, z, куда x, y, z]

@@ -615,15 +615,17 @@ export function lodScale (k) { if (k === LOD_K) return; LOD_K = k; U.uLod.value 
 function dropArr () { this.array = null; }
 
 /* все окна — по клеткам города: в клетке один вызов отрисовки (экземпляры одного четырёхугольника) */
-export function build (scene) {
+export function build (scene, defer = null) {
   const t0 = performance.now();
   const mat = material();
   const quad = new THREE.BufferAttribute(new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]), 3);
   const idx = new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 0, 2, 3]), 1);
-  for (const b of BUCKETS.values()) {
+  function makeMesh (b, isolated) {
     const g = new THREE.InstancedBufferGeometry();
-    g.setAttribute('position', quad);
-    g.setIndex(idx);
+    // A queued cell can be cancelled and disposed while other cells use
+    // the original quad. Its copy has an independent GPU lifetime.
+    g.setAttribute('position', isolated ? quad.clone() : quad);
+    g.setIndex(isolated ? idx.clone() : idx);
     const buf = new THREE.InstancedInterleavedBuffer(b.a.subarray(0, b.n * PER), PER, 1);
     buf.onUpload(dropArr);
     g.setAttribute('iP', new THREE.InterleavedBufferAttribute(buf, 3, 0));
@@ -636,7 +638,10 @@ export function build (scene) {
     const m = new THREE.Mesh(g, mat);
     m.matrixAutoUpdate = false;
     m.name = 'windows';
-    scene.add(m);
+    return m;
+  }
+  for (const b of BUCKETS.values()) {
+    if (!defer?.([b.x0, b.z0, b.x1, b.z1], () => makeMesh(b, true))) scene.add(makeMesh(b, false));
     STATS.meshes++; STATS.verts += b.n * 4;
   }
   BUCKETS.clear();

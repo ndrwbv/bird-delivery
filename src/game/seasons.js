@@ -334,6 +334,10 @@ export function bindWinterRoadGroup (groups) {
   WINTER_ROAD_GROUPS = Array.isArray(groups) ? groups : [groups];
   for (const group of WINTER_ROAD_GROUPS) group.visible = (A.snow || 0) > 0.42;
 }
+export function addWinterRoadMesh (mesh) {
+  mesh.visible = (A.snow || 0) > 0.42;
+  WINTER_ROAD_GROUPS.push(mesh);
+}
 
 /* Мелочь дворов (SMASH): как статика, но у кустов (aux.x = 1) листва
    своя: осенью желтеет и краснеет, к зиме — голые бурые прутья под

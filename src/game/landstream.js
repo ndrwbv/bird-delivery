@@ -3,10 +3,10 @@ import { createTileQueue } from './tilequeue.js';
 /* Подробная поверхность нужна вокруг камеры, а не сразу во всём городе.
    Опора и правила движения уже готовы; до замены остаётся исходная земля.
    Готовый участок публикуется целиком, затем скрывается его старый слой. */
-export function createLandStream({terrain,build,upload=null,warm=null,publish=()=>{},dispose=()=>{},visible=()=>false,radius=832,now=()=>performance.now()}) {
+export function createLandStream({terrain,build,upload=null,warm=null,publish=()=>{},dispose=()=>{},visible=()=>false,radius=832,retries=0,now=()=>performance.now()}) {
   const size=terrain.g*16,x0=terrain.x0,z0=terrain.z0;
   const nx=Math.ceil((terrain.nx-1)/16),nz=Math.ceil((terrain.nz-1)/16);
-  const ready=new Uint8Array(nx*nz),uploaded=new Uint8Array(nx*nz),warmed=new Uint8Array(nx*nz),failed=new Set(),cells=new Map();
+  const ready=new Uint8Array(nx*nz),uploaded=new Uint8Array(nx*nz),warmed=new Uint8Array(nx*nz),failed=new Set(),attempts=new Map(),cells=new Map();
   const stats={ready:0,uploaded:0,warmed:0,total:nx*nz,steps:0,maxStep:0,ms:0,failed:0};
   let visualSeed=0x5a17,focus=null,lastPlan=null;
   // UUID мешей three.js используют Math.random. Догрузка рисунка не
@@ -26,16 +26,20 @@ export function createLandStream({terrain,build,upload=null,warm=null,publish=()
   function* buildTile(id) {
     let value,owned=false;
     try {
-      value=yield* build(bounds(id));owned=true;
+      value=yield* build(bounds(id),id);owned=true;
       if(upload)yield* upload(value);
       if(warm)yield* warm(value);
       owned=false;return value;
     } finally {if(owned)dispose(value);}
   }
   const queue=createTileQueue({build:buildTile,dispose,
-    onError:id=>failed.add(id),
+    onError(id){
+      const count=(attempts.get(id)||0)+1;
+      if(count>retries){failed.add(id);attempts.delete(id);}
+      else{attempts.set(id,count);lastPlan=null;}
+    },
     onRequest:()=>STARTUP.count('land.cellsRequested'),publish(id,value){
-      publish(id,value);cells.set(id,value);ready[id]=255;stats.ready++;
+      publish(id,value);attempts.delete(id);cells.set(id,value);ready[id]=255;stats.ready++;
       if(upload){uploaded[id]=255;stats.uploaded++;STARTUP.count('land.cellsUploaded');}
       if(warm){warmed[id]=255;stats.warmed++;STARTUP.count('land.cellsWarmed');}
     }});
