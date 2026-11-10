@@ -22,6 +22,8 @@
    __dlv.weather.hur — ручки (force(), sites, wind, restore()).
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import { createTileGpu } from './tilegpu.js';
+import { quiet as cosmetic } from './propvar.js';
 import * as SEAS from './seasons.js';
 import * as CONSTR from './construction.js';
 import { roadGap } from './pave.js';
@@ -443,7 +445,7 @@ function flyMat () {
 }
 const GLASS = ['#4d6578', '#5b7590', '#6f8aa3'];
 /* копия дома из кусков: стены — плиты по 6—8 м на 1—3 этажа с окнами, крыша — треугольники до 10 м */
-function flyHouse (I) {
+function* flyHouseSteps (I) {
   const g = Geo(true), p = I.p, n = p.length, base = I.hLo - 0.3, top = I.top, H = top - base;
   const fb = I.lv <= 3 ? Math.max(1, I.lv) : I.lv <= 6 ? 2 : 3, bands = Math.ceil(I.lv / fb), FH = 3.15;
   const roofHex = ['#c3b6bc', '#bcafb8', '#b4b0bd', '#c7bdb0'][(n + I.lv) % 4];
@@ -474,6 +476,7 @@ function flyHouse (I) {
           }
         }
       }
+      yield;
     }
   }
   // крыша: треугольники контура, длинные — пополам, пока не меньше 10 м
@@ -493,13 +496,22 @@ function flyHouse (I) {
     g.tri([A[0], top, A[1]], [B[0], top, B[1]], [Cq[0], top, Cq[1]], roofHex);
     g.tri([A[0], top - 0.35, A[1]], [Cq[0], top - 0.35, Cq[1]], [B[0], top - 0.35, B[1]], '#8e8a84');
   };
-  for (const f of faces) roof(p[f[0]], p[f[1]], p[f[2]], 0);
+  for (const f of faces) {
+    roof(p[f[0]], p[f[1]], p[f[2]], 0);
+    yield;
+  }
   const geo = g.build(), mat = flyMat();
   const m = new THREE.Mesh(geo, mat);
   m.frustumCulled = false;
   m.matrixAutoUpdate = false; m.updateMatrix();
   mat.userData.U.uO.value.set(I.cx, base, I.cz);
   return m;
+}
+function flyHouse (I) {
+  const build = flyHouseSteps(I);
+  let step;
+  do { step = build.next(); } while (!step.done);
+  return step.value;
 }
 
 /* ═════════════ забор, фундамент, кран ═════════════ */
@@ -517,9 +529,14 @@ function buildSite (s) {
   // земля: укатанный грунт по всей коробке (под ней статика провалилась)
   {
     const A = I.hx + M, B = I.hz + M, nu = Math.max(2, Math.ceil(2 * A / 2.5)), nv = Math.max(2, Math.ceil(2 * B / 2.5));
+    const stride = nv + 1, points = new Array((nu + 1) * stride);
+    for (let a = 0; a <= nu; a++) for (let c = 0; c <= nv; c++) {
+      const [x, z] = toW(I, -A + 2 * A * a / nu, -B + 2 * B * c / nv);
+      points[a * stride + c] = [x, C.groundH(x, z) + 0.09, z];
+    }
     for (let a = 0; a < nu; a++) for (let c = 0; c < nv; c++) {
-      const pt = (ia, ic) => { const [x, z] = toW(I, -A + 2 * A * ia / nu, -B + 2 * B * ic / nv); return [x, C.groundH(x, z) + 0.09, z]; };
-      const q00 = pt(a, c), q10 = pt(a + 1, c), q11 = pt(a + 1, c + 1), q01 = pt(a, c + 1);
+      const k = a * stride + c;
+      const q00 = points[k], q10 = points[k + stride], q11 = points[k + stride + 1], q01 = points[k + 1];
       const hex = r(a * 131 + c * 17) < 0.5 ? '#7d6b55' : r(a * 7 + c * 311) < 0.5 ? '#86745c' : '#74644f';
       g.tri(q00, q01, q11, hex); g.tri(q00, q11, q10, hex);
     }
@@ -738,12 +755,51 @@ function stepHowl () {
 
 /* ═════════════ смена урагана: когда и какой дом ═════════════ */
 const PLAN = { on: false, left: 0, wait: 0, scan: null, temp: false, took: 0 };
+let flightGpu = null;
+function* prepareFlight (pending) {
+  pending.fly = yield* flyHouseSteps(pending.I);
+  yield;
+  flightGpu ??= createTileGpu({ renderer: C.renderer, scene: C.scene, cam: C.cam });
+  yield* flightGpu.upload(pending.fly);
+  yield* flightGpu.warm(pending.fly);
+}
+function finishFlight (pending, keep = false) {
+  pending?.work?.return();
+  if (pending?.fly && !keep) {
+    pending.fly.geometry.dispose();
+    pending.fly.material.dispose();
+  }
+  return keep ? pending?.fly : null;
+}
+function queueFlight (I, dbg = false) {
+  finishFlight(PLAN.pend);
+  const pending = { I, t: TWIST.come(I.cx, I.cz, WIND), dbg, fly: null, work: null };
+  if (C.prepareFlight?.() && C.renderer) pending.work = prepareFlight(pending);
+  PLAN.pend = pending;
+  return pending;
+}
+function stepFlight (pending) {
+  const work = pending.work;
+  if (!work) return;
+  const t0 = performance.now(), deadline = t0 + 1;
+  try {
+    do {
+      if (cosmetic(() => work.next()).done) { pending.work = null; return; }
+    } while (performance.now() < deadline);
+  } catch {
+    // A failed upload leaves the ordinary drawing path available.
+    pending.work = null;
+  } finally {
+    MS.flyPrep = Math.max(MS.flyPrep, +(performance.now() - t0).toFixed(1));
+  }
+}
 export function shiftStart (id, ride, n) {
   if (!C) return;
   sync(true);
   PLAN.on = id === 'hurricane';
   WIND.base = h01(n | 0, 11) * Math.PI * 2;
   WIND.T = h01(n | 0, 12) * 100;
+  finishFlight(PLAN.pend);
   PLAN.pend = null;
   if (!PLAN.on) { PLAN.left = 0; PLAN.scan = null; return; }
   const x = h01(n | 0, 13) * 100;
@@ -784,10 +840,11 @@ function scanStep (force) {
   return sc.best;
 }
 /* унести дом сейчас */
-function takeHouse (I) {
+function takeHouse (I, prepared = null) {
   const s = { I, back: shiftsDone() + HUR.BACK, temp: PLAN.temp, hole: true, mesh: null, cranes: [], fly: null, t: 0, puffT: 0 };
   const t0 = performance.now();
-  s.fly = flyHouse(I);
+  s.fly = prepared || flyHouse(I);
+  if (prepared) MS.prepared++;
   MS.fly = Math.max(MS.fly, +(performance.now() - t0).toFixed(1));
   s.fly.material.userData.U.uW.value.set(WIND.x, WIND.z);
   C.scene.add(s.fly);
@@ -829,7 +886,7 @@ function stepSites (dt) {
   }
 }
 /* каждый кадр (из weather.update): on — сейчас ураган */
-const PERF = { ms: 0, n: 0 }, MS = { fly: 0, site: 0, scan: 0 };
+const PERF = { ms: 0, n: 0 }, MS = { fly: 0, flyPrep: 0, prepared: 0, site: 0, scan: 0 };
 export function step (dt, on) {
   if (!C) return;
   const t0 = performance.now();
@@ -850,17 +907,24 @@ export function step (dt, on) {
       MS.scan = Math.max(MS.scan, +(performance.now() - t1).toFixed(1));
       if (I !== undefined) {
         // дом выбран: смерч касается земли и идёт к нему (twister.js), дом взлетает, когда дошёл
-        if (I) { PLAN.pend = { I, t: TWIST.come(I.cx, I.cz, WIND) }; PLAN.left--; PLAN.wait = rnd(...HUR.GAP); PLAN.miss = 0; }
+        if (I) { queueFlight(I); PLAN.left--; PLAN.wait = rnd(...HUR.GAP); PLAN.miss = 0; }
         else { PLAN.wait = 3; PLAN.miss = (PLAN.miss || 0) + 1; }
       }
     }
   }
-  if (PLAN.pend && (PLAN.pend.t -= dt) <= 0) {
-    const I = PLAN.pend.I, dbg = PLAN.pend.dbg;
-    PLAN.pend = null;
-    // пока шёл смерч, рядом мог появиться адрес заказа — тогда дом стоит, а смерч уходит
-    if (on && !SITES.some(s => s.I.i === I.i) && !clientPts().some(([x, z]) => nearBox(I, x, z, HUR.CLIENT))) takeHouse(I);
-    else if (!dbg) PLAN.left++;
+  if (PLAN.pend) {
+    const pending = PLAN.pend;
+    if ((pending.t -= dt) > 0) {
+      if (on) stepFlight(pending);
+    } else {
+      PLAN.pend = null;
+      const { I, dbg } = pending;
+      // пока шёл смерч, рядом мог появиться адрес заказа — тогда дом стоит, а смерч уходит
+      const allowed = on && !SITES.some(s => s.I.i === I.i) && !clientPts().some(([x, z]) => nearBox(I, x, z, HUR.CLIENT));
+      const prepared = finishFlight(pending, allowed);
+      if (allowed) takeHouse(I, prepared);
+      else if (!dbg) PLAN.left++;
+    }
   }
   TWIST.step(dt, on && WIND.on, WIND);
   PERF.ms += performance.now() - t0; PERF.n++;
@@ -901,7 +965,7 @@ export const DEBUG = {
   /* унести дом рядом сейчас (поиск целиком, без «перед камерой»); null — нечего */
   force () { PLAN.scan = null; const I = scanStep(true); PLAN.scan = null; if (I) TWIST.at(I.cx, I.cz); return I ? takeHouse(I) && DEBUG.sites.slice(-1)[0] : null; },
   /* как в смене: смерч идёт к дому рядом, дом взлетает через TW.COME с */
-  come () { PLAN.scan = null; const I = scanStep(true); PLAN.scan = null; if (!I) return null; PLAN.pend = { I, t: TWIST.come(I.cx, I.cz, WIND), dbg: 1 }; return { i: I.i, x: Math.round(I.cx), z: Math.round(I.cz), t: PLAN.pend.t }; },
+  come () { PLAN.scan = null; const I = scanStep(true); PLAN.scan = null; if (!I) return null; const pending = queueFlight(I, true); return { i: I.i, x: Math.round(I.cx), z: Math.round(I.cz), t: pending.t }; },
   twister: TWIST.DEBUG,
   /* сколько домов в кольце вокруг машины вообще можно унести */
   candidates () { const V = C.V, R = HUR.NEAR[1], out = []; for (const i of near(V.x - R, V.z - R, V.x + R, V.z + R)) { const I = info(i); if (I) out.push({ i, x: Math.round(I.cx), z: Math.round(I.cz), d: Math.round(Math.hypot(I.cx - V.x, I.cz - V.z)), lv: I.lv, area: Math.round(I.area) }); } return out; },

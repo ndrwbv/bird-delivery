@@ -32,9 +32,11 @@ export function createCitySurface (terrain) {
     const entries = [];
     staged.set(group, entries);
     for (const entry of cell) {
-      const mesh = entry.build();
-      group.add(mesh);
-      entries.push([entry, mesh]);
+      const work = entry.build();
+      const result = work?.next ? yield* work : work;
+      const meshes = result.isGroup ? result.children.slice() : [result];
+      for (const mesh of meshes) group.add(mesh);
+      entries.push([entry, meshes]);
       yield 'город: геометрия';
     }
   }
@@ -42,8 +44,8 @@ export function createCitySurface (terrain) {
   function publish (group) {
     const entries = staged.get(group);
     if (!entries) return;
-    for (const [entry, mesh] of entries) {
-      entry.onPublish?.(mesh);
+    for (const [entry, meshes] of entries) {
+      for (const mesh of meshes) entry.onPublish?.(mesh);
       for (const id of entry.tiles) {
         const cell = cells.get(id);
         cell.delete(entry);

@@ -107,7 +107,10 @@ export function createStartupTrace ({ enabled = false, now = () => performance.n
       resources: capturedResources.slice(0, 64).map(r => ({ name: r.name, start: r.startTime, duration: r.duration, responseEnd: r.responseEnd, transferBytes: r.transferSize, encodedBytes: r.encodedBodySize, decodedBytes: r.decodedBodySize })),
       notes: { work: 'Synchronous elapsed JS slices; exclusive/union avoid nested double counting, not OS CPU.', imports: 'Async import includes I/O, parse/evaluate and scheduling; ResourceTiming is separate evidence, never pure parse time.', worker: 'Worker-reported work overlaps main thread; wait unions overlap other categories and cannot be added to wall.' } };
   }
-  return { enabled, mark, work, startWork, windowStart, awaited, steps, flag, worker, request, control, count, geometry, report, get firstControl () { return marks['first.control'] || null; }, get firstReport () { return firstSnapshot; } };
+  return { enabled, mark, work, startWork, windowStart, awaited, steps, flag, worker, request, control, count, geometry, report,
+    get awaitingControl () { return latestRun?.controlAt === null; },
+    get firstSteerable () { return marks['first.steerable'] || null; },
+    get firstControl () { return marks['first.control'] || null; }, get firstReport () { return firstSnapshot; } };
 }
 const enabled = typeof location !== 'undefined' && new URLSearchParams(location.search).has('startuptrace');
 export const STARTUP = createStartupTrace({ enabled });

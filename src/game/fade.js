@@ -24,13 +24,10 @@ float fadeK (float d, vec2 ab) { return 1.0 - smoothstep(ab.x, ab.y, d); }`;
 /* узор Байера 4 × 4: порог точки экрана 0…1 */
 export const BAYER_FN = `
 float bayer4 (vec2 p) {
-  vec2 q = mod(floor(p), 4.0);
-  float i = q.x + q.y * 4.0;
-  float v = i < 1.0 ? 0.0 : i < 2.0 ? 8.0 : i < 3.0 ? 2.0 : i < 4.0 ? 10.0 :
-            i < 5.0 ? 12.0 : i < 6.0 ? 4.0 : i < 7.0 ? 14.0 : i < 8.0 ? 6.0 :
-            i < 9.0 ? 3.0 : i < 10.0 ? 11.0 : i < 11.0 ? 1.0 : i < 12.0 ? 9.0 :
-            i < 13.0 ? 15.0 : i < 14.0 ? 7.0 : i < 15.0 ? 13.0 : 5.0;
-  return (v + 0.5) / 16.0;
+  ivec2 q = ivec2(floor(p)) & 3;
+  int xy = q.x ^ q.y;
+  int value = ((xy & 1) << 3) | ((q.y & 1) << 2) | (xy & 2) | ((q.y & 2) >> 1);
+  return (float(value) + 0.5) / 16.0;
 }`;
 
 /* основание экземпляра в мире (InstancedMesh) и расстояние до камеры по земле */

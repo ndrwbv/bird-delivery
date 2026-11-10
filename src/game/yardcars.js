@@ -498,6 +498,7 @@ function ensureIM (M, cap) {
   im.userData.yard = true;
   A.scene.add(im);
   M.im = im; M.cap = c;
+  M.slots = []; M.scale = new Float64Array(c);
 }
 
 /* пустая модель машины: та же форма userData, что у makeCarLite (game.js), детей нет — рисует InstancedMesh */
@@ -580,17 +581,20 @@ export function out (t, bare) {
   return true;
 }
 
-const VW = { x: 1e9, z: 1e9, t: 0, R: 0, dirty: true };
+const VW = { x: 1e9, z: 1e9, t: 0, R: 0, dirty: true, clipped: false };
 let READY = false;
 /** каждый кадр (game.js cullFar): стоящие дворов ближе R — в InstancedMesh; в последние band м — уменьшаются */
-export function view (x, z, R, band) {
+export function view (x, z, R, band, inView) {
   if (!MAT) return;
   MAT.color.copy(A.LITE_MAT.color); MAT.emissive.copy(A.LITE_MAT.emissive);
   U.uBasic.value.copy(A.LITE_BASIC.color); U.uLed.value.copy(A.LED_MAT.color);
   const now = performance.now();
-  if (!VW.dirty && (x - VW.x) ** 2 + (z - VW.z) ** 2 < 4 && now - VW.t < 250 && R === VW.R) return;
+  // A frame-specific frustum cannot reuse the last camera's instance list.
+  // Replays and cutscenes still use the distance-only view.
+  if (!inView && !VW.clipped && !VW.dirty && (x - VW.x) ** 2 + (z - VW.z) ** 2 < 4 && now - VW.t < 250 && R === VW.R) return;
+  VW.clipped = !!inView;
   VW.dirty = false; VW.x = x; VW.z = z; VW.t = now; VW.R = R;
-  for (const M of MODELS) { M.k = 0; M.rad = 0; }
+  for (const M of MODELS) { M.k = 0; M.rad = 0; M.from = Infinity; M.to = -1; }
   const i0 = Math.floor((x - R) / CGC), i1 = Math.floor((x + R) / CGC), j0 = Math.floor((z - R) / CGC), j1 = Math.floor((z + R) / CGC);
   const R2 = R * R;
   let drawn = 0;
@@ -602,18 +606,24 @@ export function view (x, z, R, band) {
         const t = a[q], P = t.pk;
         if (!P || !P.yc || !t.still || t.gone) continue;
         const dx = t.x - x, dz = t.z - z, d2 = dx * dx + dz * dz;
-        if (d2 > R2) continue;
+        if (d2 > R2 || (inView && !inView(t.x, P.m[13] + 1, t.z, 7))) continue;
         const M = MODELS[P.mi];
         if (!M.im || M.k >= M.cap) continue;
         const d = Math.sqrt(d2);
         let s = clamp((R - d) / band, 0, 1);
         s = Math.max(0.02, s * s * (3 - 2 * s));
-        const e = M.im.instanceMatrix.array, o = M.k * 16, m = P.m;
-        for (let c = 0; c < 12; c++) e[o + c] = (c & 3) === 3 ? m[c] : m[c] * s;
-        e[o + 12] = m[12]; e[o + 13] = m[13]; e[o + 14] = m[14]; e[o + 15] = 1;
-        const ca = M.im.instanceColor.array, co = M.k * 3;
-        ca[co] = P.r; ca[co + 1] = P.gg; ca[co + 2] = P.b;
-        M.cov.array[M.k] = P.cov; M.sn.array[M.k] = P.sn;
+        const slot = M.k;
+        // A parked instance gets a fresh pose record when it changes.
+        if (M.slots[slot] !== P || M.scale[slot] !== s) {
+          M.slots[slot] = P; M.scale[slot] = s;
+          const e = M.im.instanceMatrix.array, o = slot * 16, m = P.m;
+          for (let c = 0; c < 12; c++) e[o + c] = (c & 3) === 3 ? m[c] : m[c] * s;
+          e[o + 12] = m[12]; e[o + 13] = m[13]; e[o + 14] = m[14]; e[o + 15] = 1;
+          const ca = M.im.instanceColor.array, co = slot * 3;
+          ca[co] = P.r; ca[co + 1] = P.gg; ca[co + 2] = P.b;
+          M.cov.array[slot] = P.cov; M.sn.array[slot] = P.sn;
+          M.from = Math.min(M.from, slot); M.to = slot;
+        }
         if (d + 4 > M.rad) M.rad = d + 4;
         M.k++; drawn++;
       }
@@ -623,14 +633,27 @@ export function view (x, z, R, band) {
     if (!im) continue;
     im.count = M.k;
     im.visible = M.k > 0;
+    M.slots.length = M.k;
     if (!M.k) continue;
-    im.instanceMatrix.needsUpdate = true; im.instanceMatrix.clearUpdateRanges(); im.instanceMatrix.addUpdateRange(0, M.k * 16);
-    im.instanceColor.needsUpdate = true; im.instanceColor.clearUpdateRanges(); im.instanceColor.addUpdateRange(0, M.k * 3);
-    M.cov.needsUpdate = true; M.cov.clearUpdateRanges(); M.cov.addUpdateRange(0, M.k);
-    M.sn.needsUpdate = true; M.sn.clearUpdateRanges(); M.sn.addUpdateRange(0, M.k);
+    if (M.from <= M.to) {
+      updateInstances(im.instanceMatrix, M.from, M.to);
+      updateInstances(im.instanceColor, M.from, M.to);
+      updateInstances(M.cov, M.from, M.to);
+      updateInstances(M.sn, M.from, M.to);
+    }
     im.boundingSphere.center.set(x, 0, z); im.boundingSphere.radius = M.rad + 3;
   }
   ST.drawn = drawn;
+}
+
+function updateInstances (attribute, first, last) {
+  let start = first * attribute.itemSize, end = (last + 1) * attribute.itemSize;
+  const queued = attribute.updateRanges[0];
+  // A second view can be prepared before the renderer uploads the first.
+  if (queued) { start = Math.min(start, queued.start); end = Math.max(end, queued.start + queued.count); }
+  attribute.clearUpdateRanges();
+  attribute.addUpdateRange(start, end - start);
+  attribute.needsUpdate = true;
 }
 
 /** взрыв (game.js boom): стоящие дворов ближе r — будим (своя модель, в TRAFFIC), чтобы их помяло и отбросило */

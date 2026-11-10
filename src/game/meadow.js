@@ -238,7 +238,27 @@ function ground () {
   LIST = L; ST.meshes = L.length;
   return L;
 }
-const ORIG = { mat: null, mask: 0 }, SPH = new THREE.Sphere();
+const MASK_SCENE = new THREE.Scene(), SPH = new THREE.Sphere();
+MASK_SCENE.matrixWorldAutoUpdate = false;
+function drawMaskBatch (renderer, meshes, camera) {
+  if (!meshes.length) return;
+  // The meshes keep their actual parent and world matrix. Passes still
+  // draw in list order so overlapping paint follows the same rules.
+  try {
+    MASK_SCENE.children = meshes.map(({ mesh, material, cull }) => {
+      if (mesh.matrixWorldAutoUpdate) mesh.updateMatrixWorld();
+      mesh.material = material; mesh.layers.mask = 1; mesh.frustumCulled = cull;
+      return mesh;
+    });
+    renderer.render(MASK_SCENE, camera);
+  } finally {
+    MASK_SCENE.children = [];
+    for (const { mesh, original, mask, frustum } of meshes) {
+      mesh.material = original; mesh.layers.mask = mask; mesh.frustumCulled = frustum;
+    }
+    meshes.length = 0;
+  }
+}
 function drawMask (cx, cz) {
   const R = A.renderer, H = MEADOW.MASK.HALF, t0 = performance.now();
   // середина — по сетке точек маски (2г17, автор 26.10: «трава перемещается раз в несколько секунд»): иначе при каждой
@@ -252,42 +272,41 @@ function drawMask (cx, cz) {
   MCAM.up.set(0, 0, -1); MCAM.position.set(cx, MU.uMdRef.value + 600, cz); MCAM.lookAt(cx, MU.uMdRef.value - 100, cz);
   MCAM.updateProjectionMatrix(); MCAM.updateMatrixWorld(true);
   const prevRT = R.getRenderTarget(), prevAC = R.autoClear, prevCol = R.getClearColor(new THREE.Color()), prevA = R.getClearAlpha();
+  const prevSort = R.sortObjects;
   R.setRenderTarget(RT);
   R.setClearColor(0x000000, 0);
   R.clear(true, true, false);
-  R.autoClear = false;
+  R.autoClear = false; R.sortObjects = false;
   let n = 0;
+  const meshes = [];
+  const push = (mesh, material, cull = mesh.frustumCulled) => {
+    meshes.push({ mesh, material, cull, original: mesh.material, mask: mesh.layers.mask, frustum: mesh.frustumCulled });
+    n++;
+  };
   try {
     for (const m of ground()) {
       if (!m.geometry.boundingSphere) continue;
       SPH.copy(m.geometry.boundingSphere).applyMatrix4(m.matrixWorld);
       if (Math.abs(SPH.center.x - cx) > H + SPH.radius || Math.abs(SPH.center.z - cz) > H + SPH.radius) continue;
-      ORIG.mat = m.material; ORIG.mask = m.layers.mask;
-      m.material = landPositionMaskMaterial(MMAT,ORIG.mat); m.layers.mask = 1;
-      try { R.render(m, MCAM); } finally { m.material = ORIG.mat; m.layers.mask = ORIG.mask; }
-      n++;
+      push(m, landPositionMaskMaterial(MMAT, m.material));
     }
+    drawMaskBatch(R, meshes, MCAM);
     // реквизит гасит газон: та же склейка вторым проходом, потом мелочь газона
     KMAT.uniforms.uC.value.set(cx, cz, 1 / (2 * H));
     for (const m of LIST) {
       if (!m.geometry.boundingSphere || !m.geometry.attributes.color || m.geometry.attributes.color.itemSize < 4) continue;
       SPH.copy(m.geometry.boundingSphere).applyMatrix4(m.matrixWorld);
       if (Math.abs(SPH.center.x - cx) > H + SPH.radius || Math.abs(SPH.center.z - cz) > H + SPH.radius) continue;
-      ORIG.mat = m.material; ORIG.mask = m.layers.mask;
-      m.material = KMAT; m.layers.mask = 1;
-      try { R.render(m, MCAM); } finally { m.material = ORIG.mat; m.layers.mask = ORIG.mask; }
-      n++;
+      push(m, KMAT);
     }
     for (const m of PROPS) {
       if (!m.visible || !m.count) continue;
-      ORIG.mat = m.material; ORIG.mask = m.layers.mask; const fc = m.frustumCulled;
-      m.material = KMAT; m.layers.mask = 1; m.frustumCulled = false;
-      try { R.render(m, MCAM); } finally { m.material = ORIG.mat; m.layers.mask = ORIG.mask; m.frustumCulled = fc; }
-      n++;
+      push(m, KMAT, false);
     }
+    drawMaskBatch(R, meshes, MCAM);
     if (PMESH) { R.render(PMESH, MCAM); n++; }
   } finally {
-    R.setRenderTarget(prevRT); R.autoClear = prevAC; R.setClearColor(prevCol, prevA);
+    R.setRenderTarget(prevRT); R.autoClear = prevAC; R.sortObjects = prevSort; R.setClearColor(prevCol, prevA);
   }
   MU.uMdWin.value.set(cx, cz, 1 / (2 * H));
   MU.uMdOn.value = 1;
@@ -506,6 +525,14 @@ export function init (api) {
 }
 export function groundMat (m) { GROUND = m; }
 export function groundChanged () { LIST_T = -Infinity; }
+// Build paths and use the real mask shaders at the pizzeria while loading.
+export function prepare () {
+  if (!A?.car || !GROUND) return;
+  PN = A.CITY?.paths?.length || 0;
+  buildPaths();
+  PSTABLE = -1;
+  drawMask(A.car.x, A.car.z);
+}
 /* середина маски и плиток травы — впереди камеры */
 function ahead (cam, k) {
   const P = DEBUG.pose;                              // проверки (кадры с камерой «руками»): [x, y, z, куда x, y, z]

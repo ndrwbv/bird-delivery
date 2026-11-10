@@ -1,5 +1,27 @@
 import * as THREE from '../vendor/three.module.min.js';
 
+// Three r169 uploads vertex attributes during scene traversal and binds the
+// index buffer before issuing a draw. An empty range keeps both operations
+// and shader setup, without processing the triangles in the scratch target.
+export function renderUploadBatch (renderer, scene, camera, meshes) {
+  const ranges = new Map();
+  for (const mesh of meshes) {
+    const geometry = mesh.geometry;
+    if (!geometry?.drawRange || ranges.has(geometry)) continue;
+    ranges.set(geometry, [geometry.drawRange.start, geometry.drawRange.count]);
+  }
+  // Multi-material groups and BatchedMesh use their own draw ranges.
+  for (const mesh of meshes) {
+    if (Array.isArray(mesh.material) || mesh.isBatchedMesh) ranges.delete(mesh.geometry);
+  }
+  for (const geometry of ranges.keys()) geometry.setDrawRange(0, 0);
+  try {
+    renderer.render(scene, camera);
+  } finally {
+    for (const [geometry, [start, count]] of ranges) geometry.setDrawRange(start, count);
+  }
+}
+
 /* Upload a cell before publishing it. The scratch render forces every buffer
    through WebGL, including meshes outside the camera. Compile/warm separately
    for the screen: a render target can use a different shader program. */
@@ -57,7 +79,7 @@ export function createTileGpu({renderer,scene,cam,keep=()=>{},maxVertices=50000,
       scratch.children=[...lighting(),...batch];
       target??=new THREE.WebGLRenderTarget(4,4);
       renderer.xr.enabled=false;renderer.shadowMap.autoUpdate=false;
-      renderer.setRenderTarget(target);renderer.render(scratch,cam);
+      renderer.setRenderTarget(target);renderUploadBatch(renderer,scratch,cam,batch);
       alive();
       if(pending.size)throw Error('land.gpu.buffersMissing:'+pending.size);
       stats.batches++;stats.meshes+=batch.length;
@@ -93,7 +115,10 @@ export function createTileGpu({renderer,scene,cam,keep=()=>{},maxVertices=50000,
         for(const p of programs){
           if(heated.has(p))continue;
           alive();if(!p.program)throw Error('land.gpu.programMissing');
-          if(p.isReady&&!p.isReady())yield 'land.gpu.wait';
+          while(p.isReady&&!p.isReady()){
+            yield 'land.gpu.wait';
+            alive();
+          }
           // These calls finish the real first-use work even without the
           // parallel-compile extension. A single program may exceed a slice.
           p.getUniforms();p.getAttributes();alive();

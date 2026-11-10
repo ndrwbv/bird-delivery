@@ -861,9 +861,13 @@ let PR = null;
 export function qPortrait (Lk, spec, size, id) {
   const q = pickQ(Lk);
   if (!q || typeof document === 'undefined') return null;
-  const key = id + ':' + size;
-  let url = PCACHE.get(key);
-  if (url) return url;
+  const key = id + ':' + size, cached = PCACHE.get(key);
+  if (cached) return cached;
+  drawQPortrait(q, Lk, spec);
+  return saveQPortrait(PR.r.domElement, size, key);
+}
+
+function drawQPortrait (q, Lk, spec) {
   if (!PR) {
     const r = new THREE.WebGLRenderer({ antialias: false, alpha: false, preserveDrawingBuffer: true });
     r.setPixelRatio(1); r.setSize(48, 48, false);
@@ -886,16 +890,64 @@ export function qPortrait (Lk, spec, size, id) {
   PR.r.render(PR.sc, PR.cam);
   PR.sc.remove(g);
   g.traverse(o => { if (o.geometry) o.geometry.dispose(); });   // свои цвета, кости, очки — вон (общее у людей остаётся)
+}
+
+function saveQPortrait (source, size, key) {
   const c = document.createElement('canvas'); c.width = c.height = size;
-  const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
-  x.drawImage(PR.r.domElement, 0, 0, size, size);
-  // снимок не вышел (контекст рендера портретов потерян — память видеокарты, телефон; холст пустой): угол — не пастельный
-  // фон, а чёрный / прозрачный. Тогда — обычный портрет игры (people.js), не чёрный квадрат; не в кэш — в другой раз снимет
+  const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingEnabled = false;
+  x.drawImage(source, 0, 0, size, size);
+  // A failed render stays out of the cache so the synchronous caller can retry.
   const k0 = x.getImageData(0, 0, 1, 1).data;
   if (PR.r.getContext().isContextLost() || k0[3] < 200 || k0[0] + k0[1] + k0[2] < 300) { QP.fails = (QP.fails || 0) + 1; return null; }
-  url = c.toDataURL();
+  const url = c.toDataURL();
   PCACHE.set(key, url);
   return url;
+}
+
+let portraitInFlight = null;
+// true: already cached or submitted, null: try on the next idle callback.
+export function qPortraitSoon (Lk, spec, size, id) {
+  const q = pickQ(Lk);
+  if (!q || typeof document === 'undefined') return false;
+  const key = id + ':' + size;
+  if (PCACHE.has(key) || portraitInFlight === key) return true;
+  if (portraitInFlight !== null) return null;
+  drawQPortrait(q, Lk, spec);
+  const gl = PR.r.getContext(), width = gl.drawingBufferWidth, height = gl.drawingBufferHeight;
+  const row = width * 4, pixels = new Uint8Array(row * height);
+  const buffer = gl.createBuffer();
+  if (!buffer) return false;
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, buffer);
+  gl.bufferData(gl.PIXEL_PACK_BUFFER, pixels.byteLength, gl.STREAM_READ);
+  gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+  const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  if (!fence) { gl.deleteBuffer(buffer); return false; }
+  gl.flush();
+  portraitInFlight = key;
+  const deadline = performance.now() + 1000;
+  const finish = () => {
+    const status = gl.clientWaitSync(fence, 0, 0);
+    if (status === gl.TIMEOUT_EXPIRED && performance.now() < deadline) { setTimeout(finish, 8); return; }
+    try {
+      if (PCACHE.has(key) || (status !== gl.ALREADY_SIGNALED && status !== gl.CONDITION_SATISFIED)) return;
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, buffer);
+      gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, pixels);
+      const c = document.createElement('canvas'); c.width = width; c.height = height;
+      const ctx = c.getContext('2d', { willReadFrequently: true }), image = ctx.createImageData(width, height);
+      for (let y = 0; y < height; y++) image.data.set(pixels.subarray(y * row, (y + 1) * row), (height - 1 - y) * row);
+      ctx.putImageData(image, 0, 0);
+      saveQPortrait(c, size, key);
+    } catch {
+      QP.fails = (QP.fails || 0) + 1;
+    } finally {
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      gl.deleteSync(fence); gl.deleteBuffer(buffer);
+      portraitInFlight = null;
+    }
+  };
+  setTimeout(finish, 8);
+  return true;
 }
 
 /* отладка (tools/probe-checks/qcatalog.js): человек из заданных частей в цветах художника — лист всей одежды */

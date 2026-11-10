@@ -462,6 +462,12 @@ function act (m, dt, near) {
   }
 }
 
+export function prepare () {
+  if (!A || OLD || !ON || OFFR || NOKIT || A.intro()) return;
+  const { x, z } = A.cam.position;
+  kitBuild(x, z);
+}
+
 export function step (dt) {
   if (!A || OLD || !ON || OFFR || A.intro()) return;
   const V = A.V, cam = A.cam;

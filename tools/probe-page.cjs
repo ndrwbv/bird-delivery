@@ -234,10 +234,15 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
   const segHitsSolid = (D, x0, z0, x1, z1, rr) => {
     const L = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.ceil(L / 0.7));
     if (D.YFILL && D.YFILL.segGarage && D.YFILL.segGarage(x0, z0, x1, z1, rr * 0.6)) return true;   // ракушки газона (yardfill.js)
+    let cellI, cellJ, cell;
     for (let k = 1; k <= n; k++) {
       const x = x0 + (x1 - x0) * k / n, z = z0 + (z1 - z0) * k / n;
       if (D.inWall(x, z, rr * 0.6)) return true;      // угол дома (дома — не в SOLID_GRID)
-      const cell = D.SOLID_GRID.get(Math.floor(x / 30) + ',' + Math.floor(z / 30));
+      const i = Math.floor(x / 30), j = Math.floor(z / 30);
+      if (i !== cellI || j !== cellJ) {
+        cell = D.SOLID_GRID.get(i + ',' + j);
+        cellI = i; cellJ = j;
+      }
       if (cell) for (const q of cell) {
         if (q.deckY !== undefined || q.ramp !== undefined) continue;
         const dx = x - q.cx, dz = z - q.cz, lx = dx * q.cs + dz * q.sn, lz = -dx * q.sn + dz * q.cs;
@@ -268,6 +273,7 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
   };
   const step = () => { raf0(step);
     const D = window.__dlv, A = P.ap; if (!A.on || !D) return; const IN = D.IN, V = D.V, S = D.S;
+    const timing = A.timing, started = timing ? performance.now() : 0;
     try {
       if (S.state === 'brief') { D.acceptOrder(); return; }
       /* окна, что ждут ответа игрока (мир стоит на паузе): ~0,8 с «читает» и жмёт кнопку, как игрок мышью —
@@ -303,14 +309,15 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
       if (D.DOOR && D.DOOR.on && D.DOOR.on()) { IN.joy = 0; IN.gas = 0; IN.brake = 0; const n = performance.now(); if (!A.doorT) A.doorT = n; else if (n - A.doorT > 600) { A.doorT = 0; D.DOOR.solve(); } return; }
       A.doorT = 0;
       if (!['drive', 'back', 'side'].includes(S.state)) { IN.joy = 0; IN.gas = 0; IN.brake = 0; return; }
-      let GR = D.route;
+      const fixed = A.fixedRoute, target = fixed ? null : S.target;
+      let GR = fixed || D.route;
       // 0п123: показанная полоса заканчивается на дороге. Для поездки проверки к прежнему
       // пину во дворе используем полный вспомогательный путь, который игроку не рисуется.
-      if (D.drivingPath && D.roadPath && S.target) {
-        const key = S.target.x + ',' + S.target.z;
+      if (D.drivingPath && D.roadPath && target) {
+        const key = target.x + ',' + target.z;
         if (A.deliverySrc !== GR || A.deliveryKey !== key) {
           A.deliverySrc = GR; A.deliveryKey = key;
-          A.delivery = D.roadPath(V.x, V.z, S.target.x, S.target.z, V.h, V.y - D.groundH(V.x, V.z) > 2.5);
+          A.delivery = D.roadPath(V.x, V.z, target.x, target.z, V.h, V.y - D.groundH(V.x, V.z) > 2.5);
         }
         if (A.delivery && A.delivery.length > 1) GR = A.delivery;
       }
@@ -322,31 +329,31 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
       const rdC = D.nearestRoad(V.x, V.z), onRoad = !!rdC && rdC.d < rdC.seg.w / 2 + 1;
       if (onRoad || !A.trail) A.trail = [[V.x, V.z]];
       else { const l = A.trail[A.trail.length - 1]; if (Math.hypot(V.x - l[0], V.z - l[1]) > 2) { A.trail.push([V.x, V.z]); if (A.trail.length > 150) A.trail.shift(); } }
-      const tkey = S.target ? Math.round(S.target.x) + ',' + Math.round(S.target.z) : '';
-      if (tkey !== A.tkey) { A.tkey = tkey; A.own = null; A.detT = 0; A.lm = S.target ? lastMile(D, S.target.x, S.target.z) : null; A.lmOn = false; A.lmNav = 0;
+      const tkey = target ? Math.round(target.x) + ',' + Math.round(target.z) : '';
+      if (tkey !== A.tkey) { A.tkey = tkey; A.own = null; A.detT = 0; A.lm = target ? lastMile(D, target.x, target.z) : null; A.lmOn = false; A.lmNav = 0;
         if (!onRoad && A.trail.length > 2) A.own = { kind: 'trail', pts: [[V.x, V.z], ...A.trail.slice().reverse()] }; }
       if (A.own && A.own.kind === 'trail' && (onRoad || Math.hypot(V.x - A.own.pts[A.own.pts.length - 1][0], V.z - A.own.pts[A.own.pts.length - 1][1]) < 3)) A.own = null;
-      if (A.lm && !A.lmOn && !A.lmNav && S.target && GR.length > 1 && Math.hypot(GR[GR.length - 1][0] - S.target.x, GR[GR.length - 1][1] - S.target.z) < 6) {
+      if (A.lm && !A.lmOn && !A.lmNav && target && GR.length > 1 && Math.hypot(GR[GR.length - 1][0] - target.x, GR[GR.length - 1][1] - target.z) < 6) {
         A.lmNav = 1;                                    // маршрут игры уже к этому пину — решаем раз
-        if (navOk(D, GR, S.target.x, S.target.z)) { A.lm = null; if (A.own && A.own.kind === 'detour') A.own = null; A.detT = 0; }
+        if (navOk(D, GR, target.x, target.z)) { A.lm = null; if (A.own && A.own.kind === 'detour') A.own = null; A.detT = 0; }
       }
       // доехали до въезда к пину вдали от улиц — дальше по клеткам, маршрут больше не пересчитываем
       if (A.lm && !A.lmOn && !(A.own && A.own.kind === 'trail') && Math.hypot(V.x - A.lm.entry[0], V.z - A.lm.entry[1]) < 8) {
         A.lmOn = true; A.own = { kind: 'last', pts: [[V.x, V.z], ...A.lm.pts] };
       }
       // объезд ремонта и путь к въезду: раз в секунду, свой путь по улицам
-      if ((!A.own || A.own.kind === 'detour') && !A.lmOn && (A.detT = (A.detT || 0) - dts) <= 0) {
+      if (!fixed && (!A.own || A.own.kind === 'detour') && !A.lmOn && (A.detT = (A.detT || 0) - dts) <= 0) {
         A.detT = 1;
         const dt = A.lm ? detour(D, GR, V, A.lm.pts) : needDetour(D, GR) ? detour(D, GR, V) : null;
         A.own = dt ? { kind: 'detour', pts: dt } : null;
       }
-      const R = A.own ? A.own.pts : GR;
+      const R = !fixed && A.own ? A.own.pts : GR;
       /* не застревать: упёрлась — газ есть, а едет медленнее 0,6 м/с 1,5 с — назад с рулём в другую
          сторону (каждый следующий раз подряд — дольше); 2,5 с стоит за машиной, что не едет
          (светофор, пробка, припаркованная), — объезжает по встречной, если она свободна, не быстрее 8 м/с */
       if (A.rev > 0) { A.rev -= dts; IN.joy = 1; IN.jx = A.rjx; IN.gas = 0; IN.brake = V.vx * Math.sin(V.h) + V.vz * Math.cos(V.h) > -5 ? 1 : 0; return; }   // назад не быстрее 5 м/с
       if (A.pass > 0) A.pass -= dts;
-      const sp = Math.hypot(V.vx, V.vz), left = S.target ? Math.hypot(S.target.x - V.x, S.target.z - V.z) : 99;
+      const sp = Math.hypot(V.vx, V.vz), left = target ? Math.hypot(target.x - V.x, target.z - V.z) : 99;
       const pr = proj(R, V.x, V.z), L = 9 + sp * 0.35;
       let [tx, tz, ux, uz] = along(R, pr.i, pr.k, L);
       /* не срезать угол сквозь твёрдое: прямая до точки цели задевает забор, столб, гараж, угол дома (запас — полкорпуса) — точку ближе
@@ -380,9 +387,14 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
         }
       }
       /* стены, деревья, столбы впереди: удар о стену бьёт сердца только быстрее 13 м/с — рядом с ними не быстрее 10 */
-      let wall = false;
+      let wall = false, wallI, wallJ, cell;
       for (let f = 2; f < reach && !wall; f += 1.5) for (const o of [-1.1, 0, 1.1]) {
-        const px = V.x + fx * f + fz * o, pz = V.z + fz * f - fx * o, cell = D.SOLID_GRID.get(Math.floor(px / 30) + ',' + Math.floor(pz / 30));
+        const px = V.x + fx * f + fz * o, pz = V.z + fz * f - fx * o;
+        const i = Math.floor(px / 30), j = Math.floor(pz / 30);
+        if (i !== wallI || j !== wallJ) {
+          cell = D.SOLID_GRID.get(i + ',' + j);
+          wallI = i; wallJ = j;
+        }
         if (cell) for (const q of cell) {
           if (q.deckY !== undefined && V.y < q.deckY - 1.2) continue;
           if (q.ramp !== undefined) continue;
@@ -421,6 +433,7 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
         A.rev = Math.min(3, 1.2 + A.nrev * 0.6); A.rjx = (Math.abs(diff) > 1.2 || A.nrev % 2 === 0 ? 1 : -1) * (IN.jx > 0 ? -0.8 : 0.8);
         if (onRoad && Math.abs(diff) < 0.6 && !oncoming) A.pass = 3; }   // впереди перегорожена своя полоса (ремонт полосы) — потом по встречной
     } catch (e) { console.error('[probe autopilot]', e && e.message); A.on = false; }
+    finally { if (timing) timing.push(performance.now() - started); }
   };
   raf0(step);
 })()`;

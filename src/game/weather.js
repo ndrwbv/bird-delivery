@@ -485,7 +485,7 @@ function thunderSynth (c, out, dist) {
    заказа или двери подъезда; у пиццерии (45 м), зебр и остановок — нет. Одна склейка по клеткам
    200 м с тем же материалом, что сугробы сезона (новых программ нет), видна только в снежную зиму. */
 let DEEP_MESH = [];
-const DEEP = new Map(), DEEP_LIST = [], SLED_SPOTS = [];
+const DEEP = new Map(), DEEP_TOP = new Map(), DEEP_LIST = [], SLED_SPOTS = [];
 const DSTAT = { house: 0, road: 0, ms: 0, tris: 0 };
 const gk = (i, j) => i * 100003 + j;
 const DEEP_STEP = 1500;                     // проверок места на шаг (по счёту — город с ?nolate и без одинаковый)
@@ -536,6 +536,15 @@ function* buildDeep () {
     const k = gk(Math.floor(x / 20), Math.floor(z / 20));
     let a = DEEP.get(k); if (!a) DEEP.set(k, a = []);
     a.push(d); DEEP_LIST.push(d);
+    // A height sample only needs drifts whose bounds touch its cell.
+    // Keep the same neighbouring cells as the original height query.
+    const i = Math.floor(x / 20), j = Math.floor(z / 20), r = Wd + L;
+    for (let u = Math.max(i - 1, Math.floor((x - r) / 20)); u <= Math.min(i + 1, Math.floor((x + r) / 20)); u++) {
+      for (let v = Math.max(j - 1, Math.floor((z - r) / 20)); v <= Math.min(j + 1, Math.floor((z + r) / 20)); v++) {
+        const key = gk(u, v), list = DEEP_TOP.get(key);
+        if (list) list.push(d); else DEEP_TOP.set(key, [d]);
+      }
+    }
     if (house && H > 2.5) SLED_SPOTS.push(d);
   };
   // у домов
@@ -604,14 +613,14 @@ const prof = bankProfile;
 function deepTop (x, z) {
   if (ID !== 'snowy') return -Infinity;
   let top = -Infinity;
-  const ci = Math.floor(x / 20), cj = Math.floor(z / 20);
-  for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
-    for (const d of DEEP.get(gk(i, j)) || []) {
-      const dx = x - d.x, dz = z - d.z;
-      if (Math.abs(dx) > d.W + d.L || Math.abs(dz) > d.W + d.L) continue;
-      const e = Math.hypot((dx * d.cs - dz * d.sn) / d.W, (dx * d.sn + dz * d.cs) / d.L);
-      if (e < 1) top = Math.max(top, d.y + d.H * prof(e));
-    }
+  const list = DEEP_TOP.get(gk(Math.floor(x / 20), Math.floor(z / 20)));
+  if (!list) return top;
+  for (let k = 0; k < list.length; k++) {
+    const d = list[k];
+    const dx = x - d.x, dz = z - d.z;
+    if (Math.abs(dx) > d.W + d.L || Math.abs(dz) > d.W + d.L) continue;
+    const e = Math.hypot((dx * d.cs - dz * d.sn) / d.W, (dx * d.sn + dz * d.cs) / d.L);
+    if (e < 1) top = Math.max(top, d.y + d.H * prof(e));
   }
   return top;
 }

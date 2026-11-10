@@ -34,6 +34,11 @@ export function unionLandRegions(input,core){
   const simplified=grouped.map(p=>({outer:simplifyRing(p.outer,core),holes:p.holes.map(h=>simplifyRing(h,core)).filter(h=>h.length>=3)})).filter(p=>p.outer.length>=3);
   return regions(clip(simplified.flatMap(p=>[path(p.outer),...p.holes.map(path)]),[],Clipper.ClipType.ctUnion,true));
 }
+export function normalizeLandRegions ({ regions, core }, removeSpikes) {
+  const cleaned = unionLandRegions(regions, core);
+  return { regions: cleaned, removed: removeSpikes ? subtractLandRegions(regions, cleaned) : [] };
+}
+
 export function subtractLandRegions(subject,other){
   const paths=items=>items.flatMap(p=>[path(p.outer),...p.holes.map(path)]);
   return regions(clip(paths(subject),paths(other),Clipper.ClipType.ctDifference,true));

@@ -320,6 +320,7 @@ objectNormal = normalize(vec3(-capDX, 1.0, -capDZ));`);
       chosen[at].mesh = root; chosen[at].player = false; chosen[at].d = d; count = Math.min(MAX_CARS, count + 1);
     }
     let used = 0, built = false, cars = 0;
+    const seasonal = clamp((snowAmount - 0.08) / 0.5, 0, 1);
     for (let ci = 0; ci < count; ci++) {
       const item = chosen[ci];
       const root = item.mesh;
@@ -342,19 +343,34 @@ objectNormal = normalize(vec3(-capDX, 1.0, -capDZ));`);
         }
       }
       if (!tpl?.pos.length || used + tpl.pos.length / 3 > MAX_VERTS) continue;
-      root.updateWorldMatrix(true, false); NORMAL.getNormalMatrix(root.matrixWorld);
+      root.updateWorldMatrix(true, false);
+      const matrix = root.matrixWorld.elements, normal = NORMAL.getNormalMatrix(root.matrixWorld).elements;
       const lost = damage.get(root) || 0, fade = clamp((DISTANCE - Math.sqrt(item.d)) / 8, 0, 1);
-      const seasonal = clamp((snowAmount - 0.08) / 0.5, 0, 1);
-      for (let i = 0; i < tpl.pos.length / 3; i++) {
-        const j = used + i, k = i * 3;
-        A.fromArray(tpl.pos, k).applyMatrix4(root.matrixWorld); N.fromArray(tpl.normal, k).applyMatrix3(NORMAL).normalize();
-        A.toArray(pos, j * 3); N.toArray(nor, j * 3);
-        local[j * 3] = tpl.pos[k]; local[j * 3 + 1] = tpl.pos[k + 1]; local[j * 3 + 2] = tpl.pos[k + 2];
+      const offset = used * 3, vertexCount = tpl.pos.length / 3;
+      local.set(tpl.pos, offset);
+      for (let i = 0, k = 0; i < vertexCount; i++, k += 3) {
+        const j = offset + k;
+        const px = tpl.pos[k], py = tpl.pos[k + 1], pz = tpl.pos[k + 2];
+        // Same homogeneous transform and normalization as Three.js, without
+        // writing through two Vector3 objects for every snow vertex.
+        const w = 1 / (matrix[3] * px + matrix[7] * py + matrix[11] * pz + matrix[15]);
+        pos[j] = (matrix[0] * px + matrix[4] * py + matrix[8] * pz + matrix[12]) * w;
+        pos[j + 1] = (matrix[1] * px + matrix[5] * py + matrix[9] * pz + matrix[13]) * w;
+        pos[j + 2] = (matrix[2] * px + matrix[6] * py + matrix[10] * pz + matrix[14]) * w;
+        const nx = tpl.normal[k], ny = tpl.normal[k + 1], nz = tpl.normal[k + 2];
+        const tx = normal[0] * nx + normal[3] * ny + normal[6] * nz;
+        const ty = normal[1] * nx + normal[4] * ny + normal[7] * nz;
+        const tz = normal[2] * nx + normal[5] * ny + normal[8] * nz;
+        const inverseLength = 1 / (Math.sqrt(tx * tx + ty * ty + tz * tz) || 1);
+        nor[j] = tx * inverseLength;
+        nor[j + 1] = ty * inverseLength;
+        nor[j + 2] = tz * inverseLength;
         const amount = item.player ? playerSnow : (tpl.amount[i] < 0 ? 0.45 : Math.min(1, (tpl.amount[i] % 128) / 120)) * seasonal;
-        props[j * 3] = Math.max(0, amount - lost) * fade; props[j * 3 + 1] = item.player ? 1 : 0;
-        props[j * 3 + 2] = tpl.amount[i] < 0 ? 54 : tpl.amount[i];
+        props[j] = Math.max(0, amount - lost) * fade;
+        props[j + 1] = item.player ? 1 : 0;
+        props[j + 2] = tpl.amount[i] < 0 ? 54 : tpl.amount[i];
       }
-      used += tpl.pos.length / 3; cars++;
+      used += vertexCount; cars++;
       if (lost > 0 && snowAmount > 0.45) damage.set(root, Math.max(0, lost - dt / 180));
     }
     for (const attr of Object.values(geo.attributes)) { attr.clearUpdateRanges(); attr.addUpdateRange(0, used * attr.itemSize); attr.needsUpdate = true; }

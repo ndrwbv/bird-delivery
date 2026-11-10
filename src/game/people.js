@@ -38,7 +38,7 @@
 
 import { t, lang } from '../i18n/index.js';
 import { MOB } from './mobile.js';
-import { pickQ, buildQ, qPortrait, qForce } from './qpeople.js';
+import { pickQ, buildQ, qPortrait, qPortraitSoon, qForce } from './qpeople.js';
 
 /* ─────────────── случайность от зерна ─────────────── */
 function rng (seed) {
@@ -1197,14 +1197,19 @@ const idle = fn => (typeof requestIdleCallback === 'function' ? requestIdleCallb
 function soonStep (dl) {
   let n = 0;
   while (SOON.length && (dl ? dl.timeRemaining() > 3 || (dl.didTimeout && !n) : !n)) {
-    const [person, size, mood, talk] = SOON.shift();
-    /* человек-модель (qpeople.js): его лицо — снимок головы (faceDataURL берёт его, а не рисованное) — снимаем заранее его
-       (кэш по человеку и размеру, рот и выражение не важны); снимок на Деке — 3—8 мс: в кадре, где лицо впервые нужно
-       (таблица мест после вручения, чат коллеги), это был рывок шага до 9 мс */
-    if (person.look && pickQ(person.look)) {
+    const [person, size, mood, talk] = SOON[0];
+    if (person.look) {
       const t0 = performance.now();
-      if (qPortrait(person.look, () => buildSpec(person.look, { summer: !!person.story }), size, person.id || person.look.seed)) { FACE_STATS.soonQ = (FACE_STATS.soonQ || 0) + 1; n++; FACE_STATS.soonMs += performance.now() - t0; continue; }
+      const pending = qPortraitSoon(person.look, () => buildSpec(person.look, { summer: !!person.story }), size, person.id || person.look.seed);
+      if (pending === null) break;
+      if (pending) {
+        SOON.shift();
+        FACE_STATS.soonQ = (FACE_STATS.soonQ || 0) + 1; n++;
+        FACE_STATS.soonMs += performance.now() - t0;
+        continue;
+      }
     }
+    SOON.shift();
     const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk);
     if (PORTRAITS.has(key)) continue;
     const t0 = performance.now(), url = drawPortrait(Lk, size, talk, !!person.story), e = performance.now() - t0;

@@ -131,13 +131,18 @@ function objDist (o, x, z) {
   return Math.sqrt(dx * dx + dz * dz) - o.r;
 }
 export function blocks (x, z, r = 0) {
-  const a = G.get(gk(Math.floor(x / GC), Math.floor(z / GC)));
-  if (a) for (let i = 0; i < a.length; i++) if (objDist(a[i], x, z) < r) return true;
-  // край клетки: вещь из соседней (радиус до ~10 м) — проверяем и соседей, если r или вещь большая
-  for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
-    if (!di && !dj) continue;
-    const b = G.get(gk(Math.floor(x / GC) + di, Math.floor(z / GC) + dj));
-    if (b) for (let i = 0; i < b.length; i++) if (objDist(b[i], x, z) < r) return true;
+  const ix = Math.floor(x / GC), iz = Math.floor(z / GC);
+  const own = G.get(gk(ix, iz));
+  if (own) for (let i = 0; i < own.length; i++) if (objDist(own[i], x, z) < r) return true;
+  if (!(r > 0)) return false;
+  // Каждая вещь лежит во всех клетках своей рамки. Соседи нужны,
+  // только если радиус запроса пересекает границу клетки.
+  const i0 = Math.max(ix - 1, Math.floor((x - r) / GC)), i1 = Math.min(ix + 1, Math.floor((x + r) / GC));
+  const j0 = Math.max(iz - 1, Math.floor((z - r) / GC)), j1 = Math.min(iz + 1, Math.floor((z + r) / GC));
+  for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+    if (i === ix && j === iz) continue;
+    const list = G.get(gk(i, j));
+    if (list) for (let k = 0; k < list.length; k++) if (objDist(list[k], x, z) < r) return true;
   }
   return false;
 }
@@ -261,14 +266,10 @@ function scaled (t, sx, sy, sz) {
   if (t.index) o.setIndex(new THREE.BufferAttribute(t.index.array.slice(), 1));
   return o;
 }
-const TMP = { m: null, r: null };
-/* коробка от (ax, ya, az) до (bx, yb, bz) толщиной w × h — наклонная по рельефу; середина — в нуле (put сдвигает) */
-function railGeo (ax, ay, az, bx, by, bz, w, h) {
-  const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz) || 0.01;
-  const g = new THREE.BoxGeometry(L, h, w);
-  TMP.m.makeRotationZ(Math.atan2(by - ay, L)); g.applyMatrix4(TMP.m);
-  TMP.m.makeRotationY(Math.atan2(-dz, dx)); g.applyMatrix4(TMP.m);
-  return g;
+/* Наклонная коробка вдоль секции забора, с заданной серединой. */
+function rail (ax, ay, az, bx, by, bz, w, h, hex, x, y, z) {
+  const dx = bx - ax, dz = bz - az, length = Math.hypot(dx, dz) || 0.01;
+  A.tiltedBox(LIT, length, h, w, hex, x, y, z, Math.atan2(by - ay, length), Math.atan2(-dz, dx));
 }
 
 /* ═════════════ 1. заборы вдоль тротуаров ═════════════ */
@@ -362,7 +363,7 @@ function fenceOk (cx, cz, ux, uz) {
 function wall (run, t0, t1, top, w, hex) {
   const { ax, az, ux, uz } = run, x0 = ax + ux * t0, z0 = az + uz * t0, x1 = ax + ux * t1, z1 = az + uz * t1;
   const y0 = A.groundH(x0, z0), y1 = A.groundH(x1, z1), h = top + 0.25;
-  A.put(LIT, railGeo(x0, y0, z0, x1, y1, z1, w, h), hex, (x0 + x1) / 2, (y0 + y1) / 2 + top - h / 2, (z0 + z1) / 2);
+  rail(x0, y0, z0, x1, y1, z1, w, h, hex, (x0 + x1) / 2, (y0 + y1) / 2 + top - h / 2, (z0 + z1) / 2);
 }
 /* столб s × s высотой top над землёй (и 0,2 м в землю) в точке t; ry — вдоль забора */
 function pillar (run, t, s, top, hex, ry) {
@@ -413,11 +414,11 @@ function solidRun (run, len, sty, hex) {
     for (const t of [0, len]) cap(pillar(run, t, 0.44, 1.15, conc, ry), t, 0.44, 1.15);
     const pipe = wear === 2 ? '#6e3b22' : hex;
     const sag = wear === 2 && n >= 4 && wh(ax, az, 83) < 0.5;
-    if (!sag) A.put(LIT, railGeo(ax, ay + 0.8, az, bx, by + 0.8, bz, 0.2, 0.2), pipe, cx, (ay + by) / 2 + 0.8, cz);
+    if (!sag) rail(ax, ay + 0.8, az, bx, by + 0.8, bz, 0.2, 0.2, pipe, cx, (ay + by) / 2 + 0.8, cz);
     else {                                         // провисла: две половины к точке на 0,16 м ниже
       const tm = Math.round(n / 2) * sl, [mx, mz, my] = at(tm), ym = my + 0.8 - 0.16;
-      A.put(LIT, railGeo(ax, ay + 0.8, az, mx, ym, mz, 0.2, 0.2), pipe, (ax + mx) / 2, (ay + 0.8 + ym) / 2, (az + mz) / 2);
-      extra(() => A.put(LIT, railGeo(mx, ym, mz, bx, by + 0.8, bz, 0.2, 0.2), pipe, (mx + bx) / 2, (ym + by + 0.8) / 2, (mz + bz) / 2));
+      rail(ax, ay + 0.8, az, mx, ym, mz, 0.2, 0.2, pipe, (ax + mx) / 2, (ay + 0.8 + ym) / 2, (az + mz) / 2);
+      extra(() => rail(mx, ym, mz, bx, by + 0.8, bz, 0.2, 0.2, pipe, (mx + bx) / 2, (ym + by + 0.8) / 2, (mz + bz) / 2));
     }
     if (wear === 2) extra(() => {                  // обрывки старой краски на ржавой трубе
       for (let k = 0; k < n; k++) {
@@ -442,7 +443,7 @@ function solidRun (run, len, sty, hex) {
         else if (wear === 0) extra(() => A.box(LIT, 0.085, 0.1, 0.085, tip, x, gy + top + 0.08, z, ry + 0.785));   // пика
       }
     }
-    A.put(LIT, railGeo(ax, ay + top, az, bx, by + top, bz, 0.07, 0.07), bar, cx, (ay + by) / 2 + top, cz);
+    rail(ax, ay + top, az, bx, by + top, bz, 0.07, 0.07, bar, cx, (ay + by) / 2 + top, cz);
     for (let k = 0; k <= n; k++) {
       if (k % 2 && k !== n) continue;
       const gy = pillar(run, k * sl, 0.5, 1.22, hex, ry), x = ax + ux * k * sl, z = az + uz * k * sl;
@@ -670,7 +671,6 @@ export function* build (api) {
   OFF = new Set(((QS && QS.get('mazeoff')) || '').split(','));   // ?mazeoff=fence,bed,hedge,grove — без этих частей (замеры)
   const t0 = performance.now();
   A = api; THREE = api.THREE; LIT = api.LIT;
-  TMP.m = new THREE.Matrix4();
   if (!TPL) TPL = tpl();
   MOBK = A.mobile && A.mobile() ? MAZE.MOB : 1;   // телефон: дворов с вещами меньше, лесочки меньше (память)
   SG = new Map(); for (const s of A.SOLIDS) idx(SG, SGC, s.cx - s.ex, s.cz - s.ez, s.cx + s.ex, s.cz + s.ez, s);
@@ -679,9 +679,16 @@ export function* build (api) {
   ENTG = new Map(); ALLG = new Map(); RES.length = 0;
   for (const e of A.CITY.entrances) { idx(ALLG, 20, e[0], e[1], e[0], e[1], e); if (resDoor(e)) { RES.push(e); idx(ENTG, 20, e[0], e[1], e[0], e[1], e); } }
   RESC = new Set();
-  for (const e of RES) {
-    const RR = MAZE.FEN.ENT_NEAR, k = Math.ceil(RR / RC) + 1, ci = Math.floor(e[0] / RC), cj = Math.floor(e[1] / RC);
-    for (let i = ci - k; i <= ci + k; i++) for (let j = cj - k; j <= cj + k; j++) if (Math.hypot((i + 0.5) * RC - e[0], (j + 0.5) * RC - e[1]) < RR) RESC.add(gk(i, j));
+  const radius = MAZE.FEN.ENT_NEAR, reach = Math.ceil(radius / RC) + 1;
+  for (const [x, z] of RES) {
+    const ci = Math.floor(x / RC), cj = Math.floor(z / RC);
+    for (let i = ci - reach; i <= ci + reach; i++) {
+      const dx = (i + 0.5) * RC - x;
+      for (let j = cj - reach; j <= cj + reach; j++) {
+        const key = gk(i, j);
+        if (!RESC.has(key) && Math.hypot(dx, (j + 0.5) * RC - z) < radius) RESC.add(key);
+      }
+    }
   }
   RAILG = new Map();
   for (const r of A.CITY.rails || []) for (let i = 1; i < r.p.length; i++) {

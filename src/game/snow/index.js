@@ -14,7 +14,7 @@ const resolved = {}, sampled = {}, gripSample = {}, playerOptions = { id: 'playe
 const weather = {}, draw = {}, objectDraw = {}, npcV = {}, npcOptions = { id: '', grounded: true, gas: false, load01: 0.8 };
 const gripOut = { soft: 0, sand: 0, rut: 0, snow: 0 };
 const feet = new WeakMap(), identities = new WeakMap();
-let identity = 0, npcClock = 0, ready = false, snowAmount = 0, profile;
+let identity = 0, npcClock = 0, npcContacts = null, ready = false, snowAmount = 0, profile;
 const courier = { x: NaN, z: NaN, side: -1 };
 const suspension = createSnowSuspension((x, z, y) => {
   surfaces.resolve(x, z, y, undefined, resolved);
@@ -40,10 +40,20 @@ export function init(api) {
   objects = createSnowObjects({ scene: api.scene, onShed: api.onShed });
   for (const material of view.materials) api.material?.(material);
 }
-// Build the starting footprint behind the existing city loading screen.
+function refreshProfile () {
+  const next = A.profile();
+  if (profile !== undefined && next !== profile) {
+    // The authored profile can replace the drift geometry. Snowfall and
+    // thaw within the same profile keep the existing snowpack.
+    field.reset(); contacts.reset(); npcContacts = null; npcClock = 0;
+    surfaces.invalidate(); view.invalidate();
+  }
+  profile = next;
+}
+// Build the starting footprint while the city is still or behind a curtain.
 export function* prepare() {
   if (!A || A.snowAmount() <= 0.015) return;
-  snowAmount = A.snowAmount(); profile = A.profile();
+  snowAmount = A.snowAmount(); refreshProfile();
   surfaces.refresh(); surfaces.setFocus(A.V.x,A.V.z);
   field.setWeather({snowAmount, snowfall:A.snowfall(), thaw:A.thaw(), wetness:A.wetness(), wind:A.wind()});
   surfaces.resolve(A.V.x,A.V.z,A.V.y,undefined,resolved);
@@ -135,8 +145,18 @@ export function grip(V, car) {
 }
 function nearbyContacts(dt) {
   npcClock += dt;
-  if (npcClock < 0.1) return;
-  const elapsed = Math.min(0.25, npcClock); npcClock = 0;
+  if (!npcContacts) {
+    if (npcClock < 0.1) return;
+    npcContacts = nearbyContactBatch(Math.min(0.25, npcClock));
+    npcClock = 0;
+  }
+  const until = performance.now() + 1.2;
+  do {
+    if (npcContacts.next().done) { npcContacts = null; return; }
+  } while (performance.now() < until);
+}
+
+function* nearbyContactBatch(elapsed) {
   const V = A.V;
   let cars = 0;
   for (const t of A.traffic()) {
@@ -148,6 +168,7 @@ function nearbyContacts(dt) {
     npcV.air = false; npcV.wade = false; npcV.sink = undefined;
     npcOptions.id = idOf(t); npcOptions.halfLength = t.hl;
     contacts.vehicle(npcV, t.mesh, elapsed, npcOptions); cars++; ST.npcContacts++;
+    yield;
   }
   let people = 0;
   for (const list of A.walkers()) for (const p of list) {
@@ -170,19 +191,14 @@ function nearbyContacts(dt) {
       ST.steps++; people++;
     }
     last.x = p.x; last.z = p.z;
+    if (resolved.valid) yield;
   }
 }
-export function step(dt) {
+export function step(dt, visualDeadline = Infinity) {
   if (!A || !A.ready()) return;
   const started = performance.now();
   ready = ST.ready = true;
-  const nextProfile = A.profile();
-  if (profile !== undefined && nextProfile !== profile) {
-    // A new authored weather profile can replace the actual drift geometry.
-    // Ordinary snowfall/thaw within that profile retains the same snowpack.
-    field.reset(); contacts.reset(); surfaces.invalidate(); view.invalidate();
-  }
-  profile = nextProfile;
+  refreshProfile();
   snowAmount = A.snowAmount();
   weather.snowAmount = snowAmount; weather.snowfall = A.snowfall();
   weather.thaw = A.thaw(); weather.wetness = A.wetness(); weather.wind = A.wind();
@@ -190,6 +206,7 @@ export function step(dt) {
   surfaces.refresh();
   surfaces.resolve(A.V.x, A.V.z, A.V.y, ST.surfaceId, resolved);
   ST.surfaceId = resolved.surfaceId;
+  const contactStarted = performance.now();
   if (A.live() && snowAmount > 0.01) {
     const V = A.V;
     playerOptions.gas = !!A.IN.gas; playerOptions.brake = !!A.IN.brake; playerOptions.hand = !!A.IN.hand;
@@ -204,11 +221,13 @@ export function step(dt) {
       V.vz = V.vz * keep - Math.sin(V.h) * contact.bankPush;
     }
     nearbyContacts(dt);
-  } else contacts.clearEntity('player');
+  } else { contacts.clearEntity('player'); npcContacts = null; npcClock = 0; }
   field.step(dt);
-  draw.vx = A.V.vx; draw.vz = A.V.vz;
+  const viewStarted = performance.now();
+  draw.vx = A.V.vx; draw.vz = A.V.vz; draw.visualDeadline = visualDeadline;
   draw.x = A.V.x; draw.z = A.V.z; draw.surfaceId = ST.surfaceId; draw.snowAmount = snowAmount; draw.dt = dt;
   view.update(draw);
+  const objectsStarted = performance.now();
   objectDraw.player = A.car(); objectDraw.vehicles = A.traffic();
   objectDraw.benches = A.benches; objectDraw.canopies = A.canopies;
   objectDraw.x = A.V.x; objectDraw.z = A.V.z; objectDraw.snowAmount = snowAmount;
@@ -218,7 +237,11 @@ export function step(dt) {
   ST.gpuBytes = view.stats.gpuBytes + (objects.stats.gpuBytes || 0);
   ST.triangles = view.stats.triangles + objects.stats.triangles;
   ST.uploadBytes = view.stats.uploadBytes + objects.stats.uploadBytes;
-  ST.ms = performance.now() - started;
+  const end = performance.now();
+  ST.ms = end - started;
+  ST.contactMs = viewStarted - contactStarted;
+  ST.viewMs = objectsStarted - viewStarted;
+  ST.objectsMs = end - objectsStarted;
 }
 export const DEBUG = {
   ST, get field() { return field; }, get render() { return view?.stats; }, get objects() { return objects?.stats; }, get surfaces() { return surfaces; },
@@ -227,5 +250,5 @@ export const DEBUG = {
     surfaces.resolve(x, z, y, undefined, resolved);
     return field.sample(resolved.surfaceId, x, z, {});
   },
-  reset() { field?.reset(); contacts?.reset(); view?.invalidate(); surfaces?.invalidate(); },
+  reset() { field?.reset(); contacts?.reset(); npcContacts = null; npcClock = 0; view?.invalidate(); surfaces?.invalidate(); },
 };

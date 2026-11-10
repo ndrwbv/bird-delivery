@@ -2,9 +2,10 @@
 import {lookupCatalog,checkCatalog} from './land-package-catalog.js';
 import {assertOrdinaryEDL,checkManifest,canonical} from './land-package-key.js';
 import {precleanHashSteps} from '../landcache17a/preclean.js';
-import {decodeCheckpointSteps,prepareRestoreResultSteps} from '../landcache17a/checkpoint-codec.js';
+import {prepareCheckpointRestoreSteps,prepareDecodedRestoreSteps} from '../landcache17a/checkpoint-codec.js';
 import {limitsOf} from '../landcache17a/checkpoint-limits.js';
 import {sliceOptions} from '../landcache17a/cooperative.js';
+import {prefetchLandPackage} from './land-package-prefetch.js';
 
 const direct=(_name,fn)=>fn();
 const fault=code=>new Error('land-package-reader:'+code);
@@ -16,16 +17,16 @@ export function createLandPackageReader({catalog,manifest,descriptor,query='',tr
   fetchAsset=(url,options)=>fetch(url,options),digest=nativeDigest,timeoutMs=30000,maxBytes=65536,maxItems=2048,
   work=direct,steps=(_name,it)=>it,awaited=(_name,_kind,fn)=>fn(),mark=()=>{},flag=()=>{},count=()=>{},onResult=()=>{}}={}){
   let phase='idle',reason=null,iterator=null,gen=null,ctx=null,refs=null,running=false,closed=false,serial=0;
-  let controller=null,stream=null,wait=null,timer=null,transport=null,input=null,snapshot=null,commit=null;
+  let controller=null,stream=null,wait=null,timer=null,transport=null,input=null,commit=null,prefetched=null;
   let cleaned=true,committed=false,fatal=false,notified=false,precleanHash=null,wireSha256=null,rawSha256=null,entry=null,bytes=0;
   const meta=()=>({version:1,source:committed?'cache':'generated',phase,hit:committed,fatal,reason,
-    cleaned,bufferHeld:!!(transport||input||snapshot||commit),precleanHash,wireSha256,
+    cleaned,bufferHeld:!!(transport||input||commit||prefetched),precleanHash,wireSha256,
     expectedWireSha256:entry?.sha256||null,rawSha256,expectedRawSha256:entry?.rawSha256||null,bytes,encoding:entry?.encoding||null});
   const diagnostic=(fn,...args)=>{try{fn(...args);}catch{/* Diagnostics cannot change a committed result. */}};
   function notify(){if(cleaned&&!notified){notified=true;diagnostic(onResult,meta());}}
   function cleanup(){clearTimeout(timer);timer=null;controller?.abort();controller=null;
     if(stream){try{Promise.resolve(stream.cancel()).catch(()=>{});}catch{}stream=null;}
-    transport=null;input=null;snapshot=null;commit=null;wait=null;cleaned=true;}
+    prefetched?.close();prefetched=null;transport=null;input=null;commit=null;wait=null;cleaned=true;}
   function setFailure(value,isFatal=false){if(committed&&!isFatal)return;
     if(!reason||isFatal)reason=String(value?.message||value).slice(0,240);fatal||=isFatal;phase=fatal?'fatal':'fallback';serial++;
     controller?.abort();wait?.settle(false,fault(reason));}
@@ -39,8 +40,8 @@ export function createLandPackageReader({catalog,manifest,descriptor,query='',tr
   function fresh(){
     const s=ctx?.source;if(!s?.cover||!s.green||!s.finalMask||!s.ST)badTarget('TARGET_REQUIRED');
     if(ctx.isCurrent&&ctx.isCurrent()!==true)badTarget('TARGET_LIFETIME_CHANGED');
-    if(refs&&!refs.every((v,i)=>v===[s.cover,s.green,s.finalMask,s.finalMask.kept,s.ST][i]))badTarget('TARGET_REFERENCES_CHANGED');
     const m=s.finalMask;
+    if(refs&&(refs[0]!==s.cover||refs[1]!==s.green||refs[2]!==m||refs[3]!==m.kept||refs[4]!==s.ST))badTarget('TARGET_REFERENCES_CHANGED');
     if(s.ST.built!==false||s.ST.supportReady!==false||m.ready!==false||m.cells!==0||m.count!==0||m.segments?.length!==0||m.removedRegions?.length!==0)badTarget('TARGET_NOT_FRESH');
   }
   function alive(token){if(token!==serial||reason)throw fault(reason||'CANCELLED');fresh();}
@@ -51,6 +52,20 @@ export function createLandPackageReader({catalog,manifest,descriptor,query='',tr
     const dev=['http:','https:'].includes(base.protocol)&&globalThis.location?.href&&base.origin===new URL(globalThis.location.href).origin;
     need((local||dev)&&base.pathname==='/'&&!base.search&&!base.hash&&url.protocol===base.protocol&&url.host===base.host&&!url.search&&!url.hash,'LOCAL_URL');
     return url.href;
+  }
+  // Start a candidate off the main thread. Its identity is still checked
+  // against the generated inputs before any live field can be changed.
+  function prefetch({district,graphics}) {
+    if(prefetched||reason||phase!=='idle'||catalog?.version!==2||!trustedLimits)return;
+    try {
+      assertOrdinaryEDL(descriptor?.());
+      const checked=checkCatalog(catalog),slot=checked.coverage.find(row=>row.district===district&&row.graphics===graphics);
+      if(!slot)return;
+      const found=lookupCatalog(checked,{manifest,precleanHash:slot.precleanHash});
+      if(!found.hit)return;
+      prefetched=prefetchLandPackage(localURL(found.entry.path),found.entry,found.identity,limitsOf(trustedLimits));
+      if(prefetched)diagnostic(mark,'raisedland.package.prefetch.started');
+    }catch{diagnostic(flag,'landPackage.prefetchFailed');}
   }
   async function inflate(token,limit){
     need(typeof globalThis.DecompressionStream==='function','GZIP_UNSUPPORTED');
@@ -125,19 +140,32 @@ export function createLandPackageReader({catalog,manifest,descriptor,query='',tr
         if(!found.hit){reason=found.reason;phase='fallback';return false;}
         entry=found.entry;
         const limit=limits.maxHeaderBytes+limits.maxPayloadBytes+20;need(entry.bytes<=limit&&entry.rawBytes<=limit,'WIRE_LIMIT');
-        const url=localURL(entry.path);alive(token);controller=new AbortController();phase='reading';
-        transport=valueOf(yield waiting('raisedland.cache.read','cacheIO',()=>read(url,controller.signal,token,limit)));
-        alive(token);phase='inputCopy';yield* copyInput(token,'raisedland.cache.inputCopy');phase='fileHash';
-        const hash=valueOf(yield waiting('raisedland.cache.fileHash','cacheHash',()=>digest(input)));alive(token);
-        wireSha256=hashString(hash);need(wireSha256===entry.sha256,'FILE_HASH_MISMATCH');
-        if(entry.encoding==='gzip'){
-          phase='decompressing';transport=valueOf(yield waiting('raisedland.cache.decompress','cacheIO',()=>inflate(token,limit)));alive(token);input=null;
-          phase='rawCopy';yield* copyInput(token,'raisedland.cache.rawCopy');phase='rawHash';
-          rawSha256=hashString(valueOf(yield waiting('raisedland.cache.rawHash','cacheHash',()=>digest(input))));alive(token);
-        }else rawSha256=wireSha256;
-        need(input.length===entry.rawBytes&&rawSha256===entry.rawSha256,'RAW_HASH_MISMATCH');
-        phase='decoding';snapshot=yield* steps('raisedland.cache.decode',checked(decodeCheckpointSteps(input,found.identity,options),token));
-        phase='preparing';commit=yield* steps('raisedland.cache.prepareRestore',checked(prepareRestoreResultSteps(ctx.source,snapshot,{...options,prepared:true}),token));
+        const prepared=prefetched?.take();
+        if(prepared?.snapshot&&prefetched.precleanHash===precleanHash&&prepared.wireHash===entry.sha256&&prepared.rawHash===entry.rawSha256){
+          wireSha256=prepared.wireHash;rawSha256=prepared.rawHash;bytes=entry.bytes;
+          diagnostic(flag,'landPackage.prefetchHit');
+          phase='preparing';
+          // The trusted worker checked the same wire and raw identities and
+          // transferred private buffers. Install them after target preflight.
+          commit=yield* steps('raisedland.cache.prepareRestore',checked(prepareDecodedRestoreSteps(ctx.source,prepared.snapshot,{...options,prepared:true},true),token));
+        }else{
+          prefetched=null;
+          const url=localURL(entry.path);alive(token);controller=new AbortController();phase='reading';
+          transport=valueOf(yield waiting('raisedland.cache.read','cacheIO',()=>read(url,controller.signal,token,limit)));
+          alive(token);phase='inputCopy';yield* copyInput(token,'raisedland.cache.inputCopy');phase='fileHash';
+          const hash=valueOf(yield waiting('raisedland.cache.fileHash','cacheHash',()=>digest(input)));alive(token);
+          wireSha256=hashString(hash);need(wireSha256===entry.sha256,'FILE_HASH_MISMATCH');
+          if(entry.encoding==='gzip'){
+            phase='decompressing';transport=valueOf(yield waiting('raisedland.cache.decompress','cacheIO',()=>inflate(token,limit)));alive(token);input=null;
+            phase='rawCopy';yield* copyInput(token,'raisedland.cache.rawCopy');phase='rawHash';
+            rawSha256=hashString(valueOf(yield waiting('raisedland.cache.rawHash','cacheHash',()=>digest(input))));alive(token);
+          }else rawSha256=wireSha256;
+          need(input.length===entry.rawBytes&&rawSha256===entry.rawSha256,'RAW_HASH_MISMATCH');
+          commit=yield* prepareCheckpointRestoreSteps(ctx.source,input,found.identity,{...options,prepared:true},(name,it)=>{
+            phase=name==='decode'?'decoding':'preparing';
+            return steps('raisedland.cache.'+name,checked(it,token));
+          });
+        }
         alive(token);assertOrdinaryEDL(descriptor?.());need(typeof commit==='function','PREPARED_COMMIT');
         // Once entered, a commit exception is fatal: never clean over potentially installed state.
         phase='committing';try{work('raisedland.cache.commit',commit);}catch(error){error.landPackageFatal=true;throw error;}
@@ -154,5 +182,5 @@ export function createLandPackageReader({catalog,manifest,descriptor,query='',tr
     return iterator;
   }
   count('raisedland.cleanCalls',0);
-  return{tryReadSteps,cancel,meta,get fatal(){return fatal;}};
+  return{prefetch,tryReadSteps,cancel,meta,get fatal(){return fatal;}};
 }

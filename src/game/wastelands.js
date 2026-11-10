@@ -70,10 +70,15 @@ let A = null;
 const LOTS = [];
 let SNOW_MESH = null, snowFloor;
 const SNOW_TOP = new Map();
+const snowCell = (x, z) => Number.isInteger(x) && Number.isInteger(z) && Math.abs(x) < 32768 && Math.abs(z) < 32768
+  ? x * 65536 + z : x + ',' + z;
 // Same rounded, terrain-following profile as the distant drift mesh.
 export function snowTop(x, z, receiverY) {
   let top = -Infinity;
-  for (const d of SNOW_TOP.get(Math.floor(x / 16) + ',' + Math.floor(z / 16)) || []) {
+  const list = SNOW_TOP.get(snowCell(Math.floor(x / 16), Math.floor(z / 16)));
+  if (!list) return top;
+  for (let i = 0; i < list.length; i++) {
+    const d = list[i];
     if (Math.abs(x - d.x) > d.extent || Math.abs(z - d.z) > d.extent) continue;
     const dx = x - d.x, dz = z - d.z;
     const r = Math.hypot((dx * d.ux + dz * d.uz) / d.ra, (-dx * d.uz + dz * d.ux) / d.rb);
@@ -196,7 +201,7 @@ export function buildSnowDrifts (floor, fences, curbCover) {
       const d = { x: cx, z: cz, ux: s.ux, uz: s.uz, ra, rb, h, extent };
       for (let x = Math.floor((cx - extent) / 16); x <= Math.floor((cx + extent) / 16); x++)
         for (let z = Math.floor((cz - extent) / 16); z <= Math.floor((cz + extent) / 16); z++) {
-          const key = x + ',' + z, list = SNOW_TOP.get(key);
+          const key = snowCell(x, z), list = SNOW_TOP.get(key);
           if (list) list.push(d); else SNOW_TOP.set(key, [d]);
         }
       const first = positions.length / 3, sides = 12, radii = [0.46, 0.76, 1];

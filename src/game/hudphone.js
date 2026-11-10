@@ -231,7 +231,10 @@ export function showOrder ({ number, html, name = '', avatar = '', many = false,
   H.modal.hidden = false;
   document.body.classList.add('hp-order-open');
   const dialog = $('.hp-order-dialog');
-  dialog.classList.remove('hp-arrive'); void dialog.offsetWidth; dialog.classList.add('hp-arrive');
+  if (dialog.classList.contains('hp-arrive')) {
+    dialog.classList.remove('hp-arrive'); void dialog.offsetWidth;
+  }
+  dialog.classList.add('hp-arrive');
   open('courier');
   if (!demo) drawOrderMap(routeOverview);
   return true;

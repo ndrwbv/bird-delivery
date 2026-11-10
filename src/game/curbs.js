@@ -1,6 +1,7 @@
 import * as SOFTCITY from './softcity.js';
 import * as SOFTSURF from './softsurfaces.js';
-import {joinLandCurbs} from './landcurb.js';
+import {joinLandCurbsSteps} from './landcurb.js';
+import { CURB_STATS } from './landdata/curb-physics.js';
 /* ──────────────────────────────────────────────────────────────────────────
    Бордюры во дворах (автор 18.10.2026: «между газоном и дорожкой резкий стык, некрасивый. Дорожка обычно
    с двух сторон огорожена бордюром… во дворах всё ещё очень гладко… чтобы дорога отделялась от газонов
@@ -259,7 +260,15 @@ const hexOf = (x, z, k) => (MOB ? CURB.HEX[0] : hsh(x, z, 5) < CURB.CHIPS ? CURB
    линии сдвинута вдоль камня на +s·ta в начале и на −s·tb в конце; ta, tb = tg(половины угла излома), плюс — если газон
    со стороны, куда поворачивает дорожка, минус — снаружи поворота. en — свои нормали торцов [n0x, n0z, n1x, n1z] (дуга: по лучу
    из центра, как у веера плитки и соседнего отрезка); flat — без просадки (концы стыкуются с соседом по высоте) */
+function countUndrawnSections (count) {
+  ST.secs += count;
+  if (SOFTCITY.STYLE.geometry && !MOB) {
+    SOFTCITY.STATS.curbEdges += count;
+    if (!A.landTopAt && BERM && BW > 0) SOFTCITY.STATS.lawnEdges += count;
+  }
+}
 function section (x0, z0, x1, z1, nx, nz, lift, k, ta = 0, tb = 0, en = null, flat = false) {
+  if (A.drawSections === false && !TRACE) { countUndrawnSections(1); return; }
   const hw = CURB.W / 2 + CURB.IN / 2, ow = CURB.W / 2 - CURB.IN / 2;
   const n0x = en ? en[0] : nx, n0z = en ? en[1] : nz, n1x = en ? en[2] : nx, n1z = en ? en[3] : nz;
   let ux = 0, uz = 0;
@@ -320,7 +329,8 @@ function run (P, ux, uz, nx, nz, t0, t1, lift, ta = 0, tb = 0, fa = false, fb = 
     BW = CURB.BERM;
     for (const t of [t0 + 0.2, (t0 + t1) / 2, t1 - 0.2]) if (paved(P[0] + ux * t + nx * g, P[1] + uz * t + nz * g)) { BW = CURB.BERM_N; break; }
   }
-  for (let k = 0; k < n; k++) {
+  if (A.drawSections === false && !TRACE) countUndrawnSections(n);
+  else for (let k = 0; k < n; k++) {
     const a = k ? t0 + k * sl : t0, b = k + 1 < n ? t0 + (k + 1) * sl : t1;   // концы соседних секций — одно и то же число (общие вершины)
     section(P[0] + ux * a, P[1] + uz * a, P[0] + ux * b, P[1] + uz * b, nx, nz, lift, k0 + k, k ? 0 : ta, k + 1 < n ? 0 : tb, null, (!k && fa) || (k + 1 === n && fb));
   }
@@ -498,7 +508,7 @@ function* buildContours(api,visualOnly=false,t0=performance.now()){
     if(topology)topology.active=true;
     const edges=[];
     for(const e of api.contours()){if(e)edges.push(e);else yield 'бордюры: общий контур';}
-    const mesh=joinLandCurbs(edges,CURB.W);edges.length=0;
+    const mesh=yield* joinLandCurbsSteps(edges,CURB.W);edges.length=0;
     ST.contourOpen=(visualOnly?(ST.contourOpen||0):0)+mesh.open;ST.contourJoins=(visualOnly?(ST.contourJoins||0):0)+mesh.joins.length;
     const mix=(a,b,t)=>t===0?a:t===1?b:[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
     const top=p=>A.groundH(...p)+A.landTopAt(...p);
@@ -551,6 +561,7 @@ function* buildContours(api,visualOnly=false,t0=performance.now()){
       if(s.traceLast!==null&&(!s.next||s.next.traceFirst===null))topology.open.push(s.traceLast,1);
       if(s.traceLast!==null&&s.next?.traceFirst!==null&&s.next?.traceFirst!==undefined&&s.outB===s.next.outA)topology.links.push(s.traceLast,s.next.traceFirst);
     }
+    count=0;
     for(const j of mesh.joins){
       const h=top(j.p),fa=A.groundH(...j.a)+j.lift-.035,fb=A.groundH(...j.b)+j.lift-.035;
       LITM.color(CURB.HEX[0]);LITM.up(j.p[0],h,j.p[1],j.a[0],h,j.a[1],j.b[0],h,j.b[1]);
@@ -559,6 +570,7 @@ function* buildContours(api,visualOnly=false,t0=performance.now()){
         const prev=mesh.sections.find(s=>s.b===j.p&&s.outB===j.a),next=prev?.next;
         if(prev?.traceLast!==null&&prev?.traceLast!==undefined&&next?.traceFirst!==null&&next?.traceFirst!==undefined)topology.bridges.push(prev.traceLast,next.traceFirst,...j.p,...j.a,...j.b,h);
       }
+      if(visualOnly&&++count%8===0)yield 'бордюры: углы';
     }
     // После записи камня и сведений о стыках связанный граф больше
     // не нужен. Отпускаем его перед упаковкой опоры и загрузкой мешей.
@@ -568,7 +580,19 @@ function* buildContours(api,visualOnly=false,t0=performance.now()){
     if(!visualOnly){bgPack();ON=true;}ST.m=Math.round(ST.m);ST.ms=(visualOnly?ST.ms:0)+Math.round(performance.now()-t0);return ST;
 }
 
-export function* build (api) {
+export function snapshotPhysics(inputHash) {
+  if (!ON || !BF || !BWF || !BERM || MOB || TRACE || A.drawSections !== false) return null;
+  const cells = new Uint32Array(BI.size * 2);
+  let at = 0;
+  for (const [key, range] of BI) {
+    if (key < 0 || key > 0xffffffff || range > 0xffffffff) return null;
+    cells[at++] = key; cells[at++] = range;
+  }
+  return { inputHash, cells, segments: BF, berm: BWF,
+    stats: Object.fromEntries(CURB_STATS.map(key => [key, ST[key]])) };
+}
+
+export function* build (api, preparedPhysics) {
   const QS = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
   if (QS && QS.has('nocurbs')) return ST;
   if(api.visualOnly){
@@ -587,6 +611,15 @@ export function* build (api) {
   const t0 = performance.now();
   A = api; LITM = api.LITM; MOB = !!(api.mobile && api.mobile()); SEC = MOB ? CURB.SEC_MOB : CURB.SEC; ST.mob = MOB ? 1 : 0;
   if(api.contours){BERM=false;return yield* buildContours(api,false,t0);}
+  if (preparedPhysics && !ON && !MOB && BERM && !TRACE && api.drawSections === false) {
+    const { cells, segments, berm, stats } = preparedPhysics;
+    for (let i = 0; i < cells.length; i += 2) BI.set(cells[i], cells[i + 1]);
+    // The source views share the large draw archive; keep only the curb arrays.
+    BF = segments.slice(); BWF = berm.slice(); BG = null; ON = true;
+    for (const key of CURB_STATS) ST[key] = stats[key];
+    ST.ms = Math.round(performance.now() - t0);
+    return ST;
+  }
   const EVERY = !MOB && !OLD;                       // 0п35 (24.10.2026, «бордюры везде, где есть стыки между землёй и дорожками»): дорожки — по всему
   STRIPV = EVERY ? CURB.STRIP : CURB.STRIP_OLD;     // городу, стоянки, площадки, карманы, шов 0,25 м. Телефон и ?oldcurbs — как было (память)
   const C = A.CITY;

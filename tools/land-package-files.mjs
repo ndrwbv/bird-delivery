@@ -23,7 +23,7 @@ export async function runPreparationExports(slots,prepare,workers){
 }
 
 // Code only: no output/catalog/build-tree digest participates in source identity.
-export const PREPARATION_HELPERS=Object.freeze(['tools/land-package-files.mjs','tools/land-package-source-key.mjs','tools/land-package-build.mjs','tools/land-package-prepare.mjs','tools/probe-checks/land-package-district-export.js','tools/address-package-build.mjs','tools/address-package-prepare.mjs','tools/probe-checks/address-package-export.js','tools/probe-checks/address-package-fresh-export.js','tools/startup-environment.cjs']);
+export const PREPARATION_HELPERS=Object.freeze(['tools/land-package-files.mjs','tools/land-package-source-key.mjs','tools/land-package-build.mjs','tools/land-package-prepare.mjs','tools/land-surface-prepare.mjs','tools/deck-shader-prepare.mjs','tools/probe-checks/deck-shader-capture.js','tools/probe-checks/deck-shader-export.js','tools/probe-checks/land-package-district-export.js','tools/address-package-build.mjs','tools/address-package-prepare.mjs','tools/probe-checks/address-package-export.js','tools/probe-checks/address-package-fresh-export.js','tools/startup-environment.cjs']);
 const slash=value=>value.split(path.sep).join('/');
 const textFile=file=>/\.(?:[cm]?js|json|css|svg|txt|glsl|vert|frag|html|md)$/.test(file);
 function tree(root,dir=root){

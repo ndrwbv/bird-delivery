@@ -93,7 +93,7 @@ export default defineConfig(({ mode }) => {
   return ({
   base: './',
   plugins: [...(mode === 'yandex' ? [yandexSdk(), ...sfxList()] : [...sfxList(), editorFiles()]), ...(land ? [landPackagePlugin(land)] : []), ...(addresses?[addressPackagePlugin(addresses)]:[])],
-  define: { __BUILD__: JSON.stringify(buildLabel()), __RELEASE__: JSON.stringify(isRelease()), __LAND_PACKAGE_CATALOG__: JSON.stringify(land?.catalog || null), __CITY_SOURCE_BASE17B__:JSON.stringify(captureSource(repo).base), __ADDRESS_PACKAGE_CATALOG__:JSON.stringify(addresses?.catalog||null) },
+  define: { __BUILD__: JSON.stringify(buildLabel()), __RELEASE__: JSON.stringify(isRelease()), __LAND_PACKAGE_CATALOG__: JSON.stringify(land?.catalog || null), __LAND_SURFACE_CATALOG__: JSON.stringify(land?.surface || null), __DECK_SHADER_CATALOG__: JSON.stringify(land?.deckShaders || null), __CITY_SOURCE_BASE17B__:JSON.stringify(captureSource(repo).base), __ADDRESS_PACKAGE_CATALOG__:JSON.stringify(addresses?.catalog||null) },
   build: {
     target: 'es2022', outDir: 'dist/' + mode, assetsInlineLimit: 0, sourcemap: false, emptyOutDir: true,
     // sandbox.html — песочница для проверки механик (docs/SANDBOX.md): в web и Стиме есть, в Яндекс не попадает.

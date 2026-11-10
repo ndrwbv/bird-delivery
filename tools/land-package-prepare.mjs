@@ -115,7 +115,7 @@ async function main(){
    const {district,graphics:preset,repeat}=slot,label=(district?'district'+district+'-':'')+preset+'-'+repeat,fixture=preparationFixture(slot);
    const fixtureFile=path.join(out,label+'-fixture.json'),report=path.join(out,label+'.json'),file=path.join(out,label+'.land'),session='lp17b-'+randomUUID();
    fs.writeFileSync(fixtureFile,JSON.stringify(fixture),{flag:'wx'});
-   const args=[path.join(repo,'tools/probe.cjs'),...(process.platform==='linux'?['--no-sandbox','--disable-gpu-sandbox']:[]),
+   const args=[path.join(repo,'tools/probe.cjs'),...(process.platform==='linux'?['--no-sandbox','--disable-gpu-sandbox','--ozone-platform=headless']:[]),
     '--mode=steam','--dir='+dist,'--startup-trace','--startup-cold','--startup-session='+session,
     '--startup-fixture='+fixtureFile,'--fresh','--early','--size=deck','--max=0','--errors',
     '--q=gfxdev=deck&mute&startupdistrict='+district+'&landexport17b','--eval='+path.join(repo,'tools/probe-checks/land-package-district-export.js'),

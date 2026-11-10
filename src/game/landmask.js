@@ -3,7 +3,7 @@ import {drainSteps,sliceBudget,copyTypedSteps} from './landcache17a/cooperative.
    больше не может вернуть в него случайную зелёную щель между гранями.
    Та же область отвечает на запросы опоры и обрезает видимую землю. */
 import {createLandCover,intersectConvex} from './landcover.js';
-import {unionLandRegions,subtractLandRegions} from './landclean.js';
+import {normalizeLandRegions} from './landclean.js';
 import {pruneLandIslands} from './landislands.js';
 const CELL=32;
 export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[],indexCell=8){
@@ -50,7 +50,33 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[],indexCell
     if(out.length>1&&Math.hypot(out[0][0]-out.at(-1)[0],out[0][1]-out.at(-1)[1])<1e-8)out.pop();
     return out;
   };
-  function* finishSteps(){
+  function* normalizeGroups(groups,removeSpikes,createCleaner){
+    const apply=(group,result)=>{
+      group.regions=result.regions;
+      if(removeSpikes)removedRegions.push(...result.removed);else pending.push(group);
+    };
+    const label=removeSpikes?'чистые стыки газонов':'цельные контуры';
+    if(!createCleaner){
+      let n=0;
+      for(const group of groups){
+        apply(group,normalizeLandRegions(group,removeSpikes));
+        if(++n%(removeSpikes?16:64)===0)yield label;
+      }
+      return;
+    }
+    // Only data crosses the worker boundary. Group order and the triangulator
+    // stay with the main thread, including when a worker falls back to sync.
+    const inputs=groups.map(({core,regions})=>({core,regions}));
+    const cleaner=createCleaner(inputs,removeSpikes);
+    try{
+      for(let batch=0;batch<cleaner.batches;batch++){
+        const request=cleaner.take(batch),results=Array.isArray(request)?request:yield request;
+        for(let i=0;i<results.length;i++)apply(groups[batch*cleaner.batchSize+i],results[i]);
+        yield label;
+      }
+    }finally{cleaner.close();}
+  }
+  function* finishSteps(createCleaner){
     weld();yield 'стыки газонов';let n=0;
     // Объединяем соседние области до триангуляции. Клетки служат только
     // для поиска: их внутренние рёбра не должны становиться торцами камня.
@@ -61,18 +87,13 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[],indexCell
       group.regions.push(...entry.regions);
     }
     pending.length=0;
-    for(const group of groups.values()){
-      group.regions=unionLandRegions(group.regions,group.core);pending.push(group);
-      if(++n%64===0)yield 'цельные контуры';
-    }
-    groups.clear();weld();
+    const ordered=[...groups.values()];
+    groups.clear();
+    yield* normalizeGroups(ordered,false,createCleaner);
+    weld();
     // Подгонка общей точки может оставить обратный шип из нескольких
     // вершин. Убираем его после подгонки, до опоры, рисунка и камня.
-    n=0;
-    for(const group of pending){
-      const cleaned=unionLandRegions(group.regions,group.core);removedRegions.push(...subtractLandRegions(group.regions,cleaned));group.regions=cleaned;
-      if(++n%16===0)yield 'чистые стыки газонов';
-    }
+    yield* normalizeGroups(pending,true,createCleaner);
     pruneLandIslands(pending,{onRemove:p=>removedRegions.push(p),open:(x,z)=>{const state=stateAt(x,z);return state===undefined||state===false&&fallback(x,z);}});n=0;
     for(const {regions,triangulate}of pending){
       for(const p of regions){
@@ -97,7 +118,18 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[],indexCell
     const bounds=[Math.min(...p.map(q=>q[0])),Math.min(...p.map(q=>q[1])),Math.max(...p.map(q=>q[0])),Math.max(...p.map(q=>q[1]))];
     for(let i=Math.floor(bounds[0]/CELL);i<=Math.floor(bounds[2]/CELL);i++)for(let j=Math.floor(bounds[1]/CELL);j<=Math.floor(bounds[3]/CELL);j++){
       const state=stateIndex(i,j),x=i*CELL,z=j*CELL;
-      const q=intersectConvex(p,[[x,z],[x+CELL,z],[x+CELL,z+CELL],[x,z+CELL]]);if(!q.length)continue;
+      const inside=bounds[0]>=x&&bounds[1]>=z&&bounds[2]<=x+CELL&&bounds[3]<=z+CELL;
+      let q;
+      if(inside){
+        let area=0;
+        for(let k=0;k<p.length;k++){
+          const a=p[k],b=p[(k+1)%p.length];
+          area+=a[0]*b[1]-a[1]*b[0];
+        }
+        if(p.length<3||Math.abs(area)<=1e-8)continue;
+        q=p;
+      }else q=intersectConvex(p,[[x,z],[x+CELL,z],[x+CELL,z+CELL],[x,z+CELL]]);
+      if(!q.length)continue;
       if(state===true)yield* kept.inside(q);else if(state===false)yield* raw(q);else yield q;
     }
   }
@@ -143,7 +175,12 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[],indexCell
     const seen=new Set(),emitted=coalesce?null:new Set(),point=(x,z)=>Math.round(x*1e6)+','+Math.round(z*1e6);
     const edgeKey=(ax,az,bx,bz)=>{const a=point(ax,az),b=point(bx,bz);return a<b?a+':'+b:b+':'+a;};
     stats.edges=stats.segments=stats.length=stats.duplicates=0;
+    let sliceStarted = bounds ? performance.now() : 0;
     for(const i of segmentIds(bounds)){
+      if (bounds && performance.now() - sliceStarted >= 1.2) {
+        yield null;
+        sliceStarted = performance.now();
+      }
       const ax=segments[i],az=segments[i+1],bx=segments[i+2],bz=segments[i+3],id=edgeKey(ax,az,bx,bz);
       if(seen.has(id))continue;seen.add(id);stats.edges++;
       const dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz);if(len<1e-6)continue;
@@ -179,19 +216,25 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[],indexCell
         else{if(run)yield flush();run={a,b,left,lift};}
       }
       if(run)yield flush();
-      if(i%512===0)yield null;
+      if(!bounds&&i%512===0)yield null;
     }
   }
   function snapshot(){
     if(!ready||pending.length||removedRegions.length)throw Error('Mask checkpoint requires completed finishSteps');
     return {version:1,cell:CELL,indexCell,kept:kept.snapshot(),domain:new Map([...domain].map(([i,row])=>[i,new Map(row)])),segments,domainCells,ready};
   }
-  function* prepareRestoreSteps(value,options={}){
+  function* prepareRestoreSteps(value,options={},takeOwnership=false){
     if(value?.version!==1||value.cell!==CELL||value.indexCell!==indexCell||!value.ready)throw Error('Invalid mask checkpoint/target');
     const preflight=()=>{if(Object.isFrozen(pending)||Object.isFrozen(removedRegions))throw Error('Invalid mask checkpoint/target');};preflight();
-    const batch=sliceBudget(options),commitKept=yield* kept.prepareRestoreSteps(value.kept,options),nextDomain=new Map();
-    for(const[i,row]of value.domain){const copy=new Map();for(const[j,state]of row){copy.set(j,state);if(batch.charge())yield 'domain';}nextDomain.set(i,copy);if(batch.charge())yield 'row';}
-    const nextSegments=yield* copyTypedSteps(value.segments,batch),nextCells=value.domainCells,nextReady=value.ready,nextPending=[],nextRemoved=[];
+    const commitKept=yield* kept.prepareRestoreSteps(value.kept,options,takeOwnership);
+    const nextDomain=takeOwnership?value.domain:new Map();
+    let nextSegments=value.segments;
+    if(!takeOwnership){
+      const batch=sliceBudget(options);
+      for(const[i,row]of value.domain){const copy=new Map();for(const[j,state]of row){copy.set(j,state);if(batch.charge())yield 'domain';}nextDomain.set(i,copy);if(batch.charge())yield 'row';}
+      nextSegments=yield* copyTypedSteps(value.segments,batch);
+    }
+    const nextCells=value.domainCells,nextReady=value.ready,nextPending=[],nextRemoved=[];
     let committed=false;preflight();commitKept.preflight();
     const commit=()=>{if(committed)return;committed=true;commitKept();domain=nextDomain;pending=nextPending;removedRegions=nextRemoved;segments=nextSegments;domainCells=nextCells;ready=nextReady;segmentGrid=null;};commit.preflight=()=>{preflight();commitKept.preflight();};return commit;
   }

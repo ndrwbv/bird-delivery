@@ -18,12 +18,23 @@ export function createSnowSurfaces(A) {
   const bridges = new Map(), bridgeIds = new Map(), roofs = new Map(), roofIds = new WeakMap();
   const bridgeGrid = new Map(), roofGrid = new Map(), shelterGrid = new Map();
   let nextBridge = 1, nextRoof = 10000, roofCount = 0, shelterCount = 0;
-  const road = {}, chosen = {}, layerList = [];
-  const gridKey = (x, z) => `${Math.floor(x / 32)},${Math.floor(z / 32)}`;
+  const road = {}, chosen = {}, support = {}, layerList = [];
+  const cellKey = (x, z) => x >= -32768 && x <= 32767 && z >= -32768 && z <= 32767
+    ? (x << 16) | (z & 65535) : x + ',' + z;
+  const sampleKey = (id, x, z) => {
+    // Ground is the common case. Keep its coordinates in a signed
+    // 30-bit key so V8 can look it up without boxing a double.
+    if (id === 0) return x >= -16384 && x <= 16383 && z >= -16384 && z <= 16383
+      ? (x << 15) | (z & 32767) : x + ',' + z;
+    const cell = cellKey(x, z);
+    return typeof cell === 'number' ? id * 4294967296 + cell : id + ':' + cell;
+  };
+  const gridKey = (x, z) => cellKey(Math.floor(x / 32), Math.floor(z / 32));
+  const empty = [];
   function insert(grid, item, x0, z0, x1, z1) {
     for (let x = Math.floor(x0 / 32); x <= Math.floor(x1 / 32); x++)
       for (let z = Math.floor(z0 / 32); z <= Math.floor(z1 / 32); z++) {
-        const k = `${x},${z}`, list = grid.get(k);
+        const k = cellKey(x, z), list = grid.get(k);
         if (list) list.push(item); else grid.set(k, [item]);
       }
   }
@@ -52,7 +63,7 @@ export function createSnowSurfaces(A) {
     if (t < 0 || t > 1 || Math.hypot(x - b.x1 - dx * t, z - b.z1 - dz * t) > b.ws / 2) return NaN;
     return A.deckAt(b, t, x, z);
   }
-  function base(surfaceId, x, z, out) {
+  function base(surfaceId, x, z, out, groundY) {
     out.valid = true; out.surfaceId = surfaceId; out.materialId = 0; out.exposure = 1;
     let y;
     if (surfaceId >= 10000) {
@@ -61,13 +72,13 @@ export function createSnowSurfaces(A) {
       out.materialId = 4;
     } else if (surfaceId > 0) {
       y = NaN;
-      for (const b of bridges.get(surfaceId) || []) {
+      for (const b of bridges.get(surfaceId) || empty) {
         const h = bridgeHeight(b, x, z);
         if (Number.isFinite(h)) { y = h; break; }
       }
       out.materialId = 1;
     } else {
-      y = A.groundH(x, z);
+      y = groundY ?? A.groundH(x, z, support);
       if (!A.inBounds(x, z) || A.inHouse(x, z)) out.valid = false;
       const water = A.waterAt(x, z);
       if (y < 0 || water) {
@@ -83,22 +94,22 @@ export function createSnowSurfaces(A) {
   function resolve(x, z, previousY, previousSurfaceId, out = {}) {
     refreshRoofs();
     let id = 0, y = A.groundH(x, z), best = y;
-    const ice = A.iceY(x, z);
+    const ice = A.iceY(x, z), key = gridKey(x, z);
     if (ice != null && ice > best) best = ice;
-    for (const item of bridgeGrid.get(gridKey(x, z)) || []) {
+    for (const item of bridgeGrid.get(key) || empty) {
       const h = bridgeHeight(item.b, x, z);
       if (!Number.isFinite(h)) continue;
       if ((previousSurfaceId === item.id || previousY === undefined || Math.abs(h - previousY) < 2.5 || h - y < 1.8) && h >= best) {
         best = h; id = item.id;
       }
     }
-    for (const item of roofGrid.get(gridKey(x, z)) || []) {
+    for (const item of roofGrid.get(key) || empty) {
       const h = A.roofs.heightOf(item.r, x, z);
       if (Number.isFinite(h) && (previousY === undefined || previousY >= h - A.roofs.ROOF.STEP) && h > best) {
         best = h; id = item.id;
       }
     }
-    base(id, x, z, out);
+    base(id, x, z, out, y);
     return out;
   }
   function rawInitial(surfaceId, x, z, out = {}) {
@@ -110,8 +121,8 @@ export function createSnowSurfaces(A) {
     if (!out.valid) { out.legacyY = out.legacyTopY = out.baseY; return out; }
     if (surfaceId < 10000 && out.materialId !== 3) {
       const bridge = surfaceId !== 0;
-      A.roadSample(x, z, out.baseY, road, bridge);
-      if (!bridge) A.groundReceiver(x, z, out.baseY, road, out);
+      A.roadSample(x, z, out.baseY, road, bridge, bridge ? undefined : support);
+      if (!bridge) A.groundReceiver(x, z, out.baseY, road, out, support);
       else if (road.onRoad && road.bridge) out.baseY = road.baseY;
       if (out.materialId === 1) {
         out.thickness = road.roadThickness;
@@ -141,16 +152,22 @@ export function createSnowSurfaces(A) {
     }
     // Snowfall has no direct access to receivers underneath another floor.
     if (surfaceId < 10000) {
-      for (const p of shelterGrid.get(gridKey(x, z)) || []) {
+      const key = gridKey(x, z);
+      const shelters = shelterGrid.get(key) || empty;
+      for (let i = 0; i < shelters.length; i++) {
+        const p = shelters[i];
         if (p.broken || p.it?.down) continue;
         const cs=Math.cos(p.ry||0),sn=Math.sin(p.ry||0),dx=x-p.x,dz=z-p.z;
         if(Math.abs(dx*cs-dz*sn)<2.2 && Math.abs(dx*sn+dz*cs)<1.1 && out.baseY<(p.y||0)+2.5) { out.exposure=0;break; }
       }
-      for (const item of roofGrid.get(gridKey(x, z)) || []) {
-        const h = A.roofs.heightOf(item.r, x, z);
+      const roofs = roofGrid.get(key) || empty;
+      for (let i = 0; i < roofs.length; i++) {
+        const h = A.roofs.heightOf(roofs[i].r, x, z);
         if (Number.isFinite(h) && h > out.baseY + 0.5) { out.exposure = 0; break; }
       }
-      for (const item of bridgeGrid.get(gridKey(x, z)) || []) {
+      const bridges = bridgeGrid.get(key) || empty;
+      for (let i = 0; i < bridges.length; i++) {
+        const item = bridges[i];
         if (item.id === surfaceId) continue;
         const h = bridgeHeight(item.b, x, z);
         if (Number.isFinite(h) && h > out.baseY + 0.8) { out.exposure = 0; break; }
@@ -185,10 +202,12 @@ export function createSnowSurfaces(A) {
   // Rendering and physics ask the same vertex/cell centres repeatedly.
   // Cache exact vertices and cell centres in two 64² planes. Mixed parity
   // coordinates are rare and sampled directly: no 128² allocation of holes.
+  const restSamples = new Map(), restPool = [];
+  let restCount = 0;
   const cache = new Map(), floats = ['baseY','thickness','legacyY','legacyTopY','heading','packedDepth'];
   const bytes = ['compaction','wetness','ice','dirt','sand','exposure','rut','visualCoverage','edgeCover'];
   const floatCount = floats.length, byteCount = bytes.length;
-  let cacheClock = 0;
+  let cacheClock = 0, lastId, lastX, lastZ, lastTile;
   let focusX = 0, focusZ = 0;
   const stats = { bridges: bridges.size, cacheBytes: 0, cacheTiles: 0, samples: 0, hits: 0 };
   function finish(out) {
@@ -198,22 +217,30 @@ export function createSnowSurfaces(A) {
       : out.materialId === 2 && out.thickness < 0.13 ? 0.15 : undefined;
     return out;
   }
+  const nearFocus = (x,z) => Math.abs(x-focusX)<=24 && Math.abs(z-focusZ)<=24;
   function initial(id,x,z,out={}) {
-    if (Math.abs(x-focusX)>24 || Math.abs(z-focusZ)>24) return finish(rawInitial(id,x,z,out));
+    if (!nearFocus(x,z)) return finish(rawInitial(id,x,z,out));
     const ix=Math.round(x*16),iz=Math.round(z*16);
     if(Math.abs(ix-x*16)>1e-5 || Math.abs(iz-z*16)>1e-5) return finish(rawInitial(id,x,z,out));
     if ((ix&1)!==(iz&1)) return finish(rawInitial(id,x,z,out));
-    const tx=Math.floor(ix/128),tz=Math.floor(iz/128),k=id+':'+tx+':'+tz;
-    let c=cache.get(k);
-    if(!c) {
-      if(cache.size>=32) {
-        let oldest=null;
-        for(const item of cache.values()) if(!oldest || item.at<oldest.at) oldest=item;
-        cache.delete(oldest.key);
+    const tx=Math.floor(ix/128),tz=Math.floor(iz/128);
+    let c = lastTile;
+    if (!c || id !== lastId || tx !== lastX || tz !== lastZ) {
+      const k = sampleKey(id,tx,tz);
+      c = cache.get(k);
+      if (!c) {
+        if (cache.size >= 32) {
+          for (const item of cache.values()) if (!c || item.at < c.at) c = item;
+          cache.delete(c.key);
+          // Flags guard every payload read. Retain backing arrays as the
+          // car leaves a cell instead of creating another 280 KiB buffer.
+          c.key = k;
+          c.flags.fill(0);
+        } else c = {key:k,at:0,flags:new Uint8Array(8192),material:new Uint8Array(8192),f:new Float32Array(8192*floatCount),b:new Uint8Array(8192*byteCount)};
+        cache.set(k,c);
+        stats.cacheTiles=cache.size;stats.cacheBytes=cache.size*(8192*(2 + 4*floatCount + byteCount));
       }
-      c={key:k,at:0,flags:new Uint8Array(8192),material:new Uint8Array(8192),f:new Float32Array(8192*floatCount),b:new Uint8Array(8192*byteCount)};
-      cache.set(k,c);
-      stats.cacheTiles=cache.size;stats.cacheBytes=cache.size*(8192*(2 + 4*floatCount + byteCount));
+      lastId = id; lastX = tx; lastZ = tz; lastTile = c;
     }
     c.at=++cacheClock;
     const n=Math.floor((iz-tz*128)/2)*64+Math.floor((ix-tx*128)/2)+(ix&1)*4096;
@@ -224,14 +251,37 @@ export function createSnowSurfaces(A) {
       for(let j=0;j<byteCount;j++) c.b[n*byteCount+j]=Math.round(clamp(out[bytes[j]]||0)*255);
     } else {
       stats.hits++;out.valid=!!(c.flags[n]&2);out.deformable=!!(c.flags[n]&4);out.surfaceId=id;out.materialId=c.material[n];
-      for(let j=0;j<floatCount;j++) out[floats[j]]=c.f[n*floatCount+j];
-      for(let j=0;j<byteCount;j++) out[bytes[j]]=c.b[n*byteCount+j]/255;
+      // Named writes keep the hottest path independent of the lookup
+      // loop over property names. Packing and rounding stay the same.
+      const f = c.f, b = c.b, fi = n * floatCount, bi = n * byteCount;
+      out.baseY = f[fi]; out.thickness = f[fi + 1]; out.legacyY = f[fi + 2];
+      out.legacyTopY = f[fi + 3]; out.heading = f[fi + 4]; out.packedDepth = f[fi + 5];
+      out.compaction = b[bi] / 255; out.wetness = b[bi + 1] / 255; out.ice = b[bi + 2] / 255;
+      out.dirt = b[bi + 3] / 255; out.sand = b[bi + 4] / 255; out.exposure = b[bi + 5] / 255;
+      out.rut = b[bi + 6] / 255; out.visualCoverage = b[bi + 7] / 255; out.edgeCover = b[bi + 8] / 255;
       out.normalX=0;out.normalY=1;out.normalZ=0;out.topY=out.baseY+out.thickness;
     }
     return finish(out);
   }
-  return { initial, resolve, base, layersNear, refresh: refreshRoofs, stats,
+  function resting(id,x,z,out) {
+    if (nearFocus(x,z)) return initial(id,x,z,out);
+    // Distant rest vertices share four neighbours on the same grid.
+    // Reuse exact queries within the draw update and leave physics alone.
+    const ix = x*2, iz = z*2;
+    const key = Number.isInteger(ix) && Number.isInteger(iz) ? sampleKey(id,ix,iz) : id+':'+x+':'+z;
+    let value = restSamples.get(key);
+    if (!value) {
+      // The baseline only reads these samples until the end of this draw.
+      // Retain the slots across frames so the next tile can reuse them.
+      value = restPool[restCount] ??= {};
+      restCount++;
+      rawInitial(id,x,z,value);
+      restSamples.set(key,value);
+    }
+    return value;
+  }
+  return { initial, resting, beginDraw: () => { restSamples.clear(); restCount = 0; }, resolve, base, layersNear, refresh: refreshRoofs, stats,
     setFocus(x,z) { focusX=x;focusZ=z; },
-    invalidate() { cache.clear();stats.cacheBytes=stats.cacheTiles=0; },
+    invalidate() { cache.clear();lastTile=undefined;stats.cacheBytes=stats.cacheTiles=0; },
     sampleBase: (x, z, context, out) => resolve(x, z, context?.previousY, context?.previousSurfaceId, out) };
 }

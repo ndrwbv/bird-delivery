@@ -13,6 +13,7 @@ const blank = () => ({ valid: false, baseY: 0, thickness: 0, compaction: 0, wetn
 export function createSnowField ({ initial }) {
   if (typeof initial !== 'function') throw new TypeError('Snow field requires an initial surface sampler');
   const surfaces = new Map(), live = new Set(), archived = new Set();
+  let retired = null, spare = null;
   const base = blank(), centre = blank(), neighbour = blank(), pristine = blank();
   const weatherSample = { mass: 0, compaction: 0, added: 0, removed: 0 };
   const lookup = { tile: null, index: 0, x: 0, z: 0 };
@@ -32,6 +33,14 @@ export function createSnowField ({ initial }) {
     pickedUp: 0, deposited: 0, precipitation: 0, melted: 0, settled: 0,
     evictions: 0, coarseRestores: 0, overflow: 0, cachePressure: 0, season: 1,
   };
+
+  function beginStamp () {
+    stampId++;
+    workTiles.length = 0;
+    // Receiver selection may still hold a tile evicted during its stamp.
+    // Only reuse its buffers once the next stamp drops those references.
+    if (retired) { spare = retired; retired = null; spare.archive = null; }
+  }
 
   function initSample (id, x, z, out) {
     out.valid = false; out.baseY = 0; out.thickness = 0; out.compaction = 0;
@@ -82,23 +91,28 @@ export function createSnowField ({ initial }) {
     return out;
   }
 
+  function expandDirty (dirty, x, z) {
+    if (x < dirty.minX) dirty.minX = x;
+    if (x > dirty.maxX) dirty.maxX = x;
+    if (z < dirty.minZ) dirty.minZ = z;
+    if (z > dirty.maxZ) dirty.maxZ = z;
+  }
+
   function mark (tile, index) {
     tile.flags[index] |= CELL_DEFORMED;
     const x = index % N, z = (index / N) | 0;
-    tile.dirty.minX = Math.min(tile.dirty.minX, x); tile.dirty.maxX = Math.max(tile.dirty.maxX, x);
-    tile.dirty.minZ = Math.min(tile.dirty.minZ, z); tile.dirty.maxZ = Math.max(tile.dirty.maxZ, z);
-    for (let reader=0;reader<2;reader++) {
-      const dirty = reader ? tile.renderDirty.middle : tile.renderDirty.near;
-      dirty.minX = Math.min(dirty.minX, x); dirty.maxX = Math.max(dirty.maxX, x);
-      dirty.minZ = Math.min(dirty.minZ, z); dirty.maxZ = Math.max(dirty.maxZ, z);
-    }
+    expandDirty(tile.dirty, x, z);
+    expandDirty(tile.renderDirty.near, x, z);
+    expandDirty(tile.renderDirty.middle, x, z);
     tile.revision = ++revision; tile.dirty.revision = tile.revision;
-    // Only neighbouring render tiles that share this contact's edge need
-    // resampling. A footprint in the middle cannot dirty eight whole tiles.
-    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
-      if ((!dx && !dz) || dx < 0 && x > 1 || dx > 0 && x < N - 2
-        || dz < 0 && z > 1 || dz > 0 && z < N - 2) continue;
-      tile.edgeRevision[(dz + 1) * 3 + dx + 1] = tile.revision;
+    // A cell within two steps of an edge can affect that neighbour's mesh.
+    const edge = tile.edgeRevision, rev = tile.revision;
+    const side = x <= 1 ? -1 : x >= N - 2 ? 1 : 0;
+    const row = z <= 1 ? -3 : z >= N - 2 ? 3 : 0;
+    if (side) edge[4 + side] = rev;
+    if (row) {
+      edge[4 + row] = rev;
+      if (side) edge[4 + row + side] = rev;
     }
     stats.revision = revision;
   }
@@ -107,7 +121,7 @@ export function createSnowField ({ initial }) {
     let bytes = 0;
     for (const t of live) bytes += t.bytes + (t.archive?.bytes || 0);
     for (const t of archived) bytes += t.bytes;
-    stats.bytes = bytes + 65536; stats.fullTiles = live.size; stats.archivedTiles = archived.size;
+    stats.bytes = bytes + 65536 + (spare?.bytes || 0) + (retired?.bytes || 0) + (retired?.archive?.bytes || 0); stats.fullTiles = live.size; stats.archivedTiles = archived.size;
   }
 
   function makeTile (id, tx, tz, archive = null) {
@@ -117,14 +131,19 @@ export function createSnowField ({ initial }) {
       archiveTile(victim);
       trim();
     }
+    const storage = spare;
+    spare = null;
     const tile = {
-      surfaceId: id, tx, tz, mass: new Float32Array(COUNT), c: new Uint16Array(COUNT),
-      w: new Uint8Array(COUNT), ice: new Uint8Array(COUNT), dirt: new Uint8Array(COUNT), sand: new Uint8Array(COUNT),
-      exposure: new Uint8Array(COUNT), flags: new Uint8Array(COUNT), indices: new Uint16Array(COUNT), count: 0,
-      deltaM: new Float32Array(COUNT), deltaV: new Float32Array(COUNT), changedIndices: new Uint16Array(COUNT),
-      pending: new Uint32Array(COUNT), changedCount: 0, stamp: 0,
-      revision: ++revision, last: ++serial, fall, melt, weatherRevision,
-      edgeRevision: new Float64Array(9),
+      surfaceId: id, tx, tz, mass: storage?.mass ?? new Float32Array(COUNT), c: storage?.c ?? new Uint16Array(COUNT),
+      w: storage?.w ?? new Uint8Array(COUNT), ice: storage?.ice ?? new Uint8Array(COUNT),
+      dirt: storage?.dirt ?? new Uint8Array(COUNT), sand: storage?.sand ?? new Uint8Array(COUNT),
+      exposure: storage?.exposure ?? new Uint8Array(COUNT), flags: storage?.flags ?? new Uint8Array(COUNT),
+      indices: storage?.indices ?? new Uint16Array(COUNT), count: 0,
+      deltaM: storage?.deltaM ?? new Float32Array(COUNT), deltaV: storage?.deltaV ?? new Float32Array(COUNT),
+      changedIndices: storage?.changedIndices ?? new Uint16Array(COUNT), pending: storage?.pending ?? new Uint32Array(COUNT),
+      changedCount: 0, stamp: 0,
+      revision: ++revision, birth: revision, last: ++serial, fall, melt, weatherRevision,
+      edgeRevision: storage?.edgeRevision ?? new Float64Array(9),
       renderWeather: { near: -1, middle: -1 },
       renderDirty: {
         near: { minX: N, minZ: N, maxX: -1, maxZ: -1 },
@@ -132,6 +151,11 @@ export function createSnowField ({ initial }) {
       },
       archive, archived: false, dirty: { minX: N, minZ: N, maxX: -1, maxZ: -1, revision },
     };
+    if (storage) {
+      tile.flags.fill(0);
+      tile.pending.fill(0);
+      tile.edgeRevision.fill(0);
+    }
     tile.bytes = tile.mass.byteLength + tile.c.byteLength + tile.w.byteLength * 6 + tile.indices.byteLength +
       tile.deltaM.byteLength * 2 + tile.changedIndices.byteLength + tile.pending.byteLength;
     if (archive) { archived.delete(archive); stats.coarseRestores++; }
@@ -194,6 +218,10 @@ export function createSnowField ({ initial }) {
     }
     live.delete(tile); archived.add(a); surfaceMap(tile.surfaceId).set(tileCode(tile.tx, tile.tz), a);
     stats.initializedCells -= tile.count;
+    if (!retired) {
+      // The archived payload is independent of these detailed arrays.
+      retired = tile;
+    }
   }
 
   function trim () {
@@ -231,16 +259,12 @@ export function createSnowField ({ initial }) {
     const tx = Math.floor(gx / N), tz = Math.floor(gz / N);
     let tile = tileAt(id, tx, tz);
     const i = gx - tx * N + (gz - tz * N) * N;
-    out.tile = null; out.index = i; out.x = (gx + 0.5) * DX; out.z = (gz + 0.5) * DX;
-    if (!tile && !create) return out;
     if ((!tile || tile.archived) && create) tile = makeTile(id, tx, tz, tile || null);
-    // Eviction may sample an archived tile through the shared lookup scratch.
-    // Restore this lookup before exposing it to the caller.
+    if (tile && !tile.archived) integrate(tile);
+    // Eviction and weather integration use the same lookup scratch.
     out.tile = null; out.index = i; out.x = (gx + 0.5) * DX; out.z = (gz + 0.5) * DX;
     if (!tile) return out;
     if (tile.archived) { out.tile = tile; out.index = Math.floor((gx - tx * N) / AS) + Math.floor((gz - tz * N) / AS) * AN; return out; }
-    integrate(tile);
-    out.x = (gx + 0.5) * DX; out.z = (gz + 0.5) * DX;
     if (!tile.flags[i] && create) {
       initSample(id, out.x, out.z, centre);
       if (!centre.valid) return out;
@@ -262,7 +286,10 @@ export function createSnowField ({ initial }) {
 
   function cellState (id, gx, gz, out) {
     cell(id, gx, gz, false, lookup);
-    const tile = lookup.tile, i = lookup.index;
+    return readCellState(id, gx, gz, out, lookup.tile, lookup.index);
+  }
+
+  function readCellState (id, gx, gz, out, tile, i) {
     initSample(id, (gx + 0.5) * DX, (gz + 0.5) * DX, out);
     if (!out.valid) { out.mass = 0; return out; }
     out.pristineMass = initialMass(out);
@@ -366,7 +393,7 @@ export function createSnowField ({ initial }) {
 
   function settle () {
     if (!settleCount || season <= 0.001) return;
-    stampId++; workTiles.length = 0;
+    beginStamp();
     const count = Math.min(64, settleCount);
     for (let k = 0; k < count; k++) {
       const q = settleQueue[settleRead], id = q.id, gx = q.gx, gz = q.gz, passes = q.passes;
@@ -434,7 +461,7 @@ export function createSnowField ({ initial }) {
     const target = foot ? SNOW.FOOT_TARGET : object ? 0.72 : SNOW.WHEEL_TARGET;
     const slip = Math.min(3, Math.abs(contact.slipLong || 0) + Math.abs(contact.slipSide || 0));
     const dwell = dt * Math.min(1, (length + DX) / Math.max(length + DX, distance));
-    stats.contacts++; stampId++; workTiles.length = 0;
+    stats.contacts++; beginStamp();
     let availablePickup = Math.max(0, contact.pickupCapacity || 0) / season;
     let deposit = Math.max(0, contact.depositMass || 0) / season;
     const minDot = -halfLength, maxDot = distance + halfLength;
@@ -644,24 +671,64 @@ export function createSnowField ({ initial }) {
     }
     return r ? r + visualWeatherRevision * 100000000 : 0;
   }
+  const dirtyTexture = { bounds: null, mask: 0 };
+  function deformationPatch (id, tx, tz, previous, previousWeather) {
+    if (previousWeather !== visualWeatherRevision) return null;
+    const tile = tileAt(id, tx, tz), before = previous - previousWeather * 100000000;
+    if (!tile || tile.archived || tile.archive || tile.birth > before || tile.revision <= before) return null;
+    const dirty = getDirtyBounds(id, tx, tz, 'near');
+    if (!dirty) return null;
+    // A contact across a tile boundary dirties the corresponding one-cell
+    // strip in the other layer. Rebuild only those strips and the own patch.
+    let mask = 1 << 4;
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dz) continue;
+      const other = tileAt(id, tx + dx, tz + dz);
+      if (!(other?.edgeRevision[(1 - dz) * 3 + 1 - dx] > before)) continue;
+      if (other.archived || other.archive) return null;
+      mask |= 1 << ((dz + 1) * 3 + dx + 1);
+    }
+    dirtyTexture.bounds = dirty;
+    dirtyTexture.mask = mask;
+    return dirtyTexture;
+  }
   const renderSample = {};
   // Sparse physical cells plus one cell of padding on all four sides. The
   // GPU interpolates these heights over stationary snow geometry.
-  function writeDeformation (id, tx, tz, put) {
+  function writeDeformation (id, tx, tz, put, patch = null) {
+    const write = (tile, index, x, z) => {
+      // The texture loop already resolved the tile and its index. Keep
+      // the same weather integration without looking the tile up again.
+      if (!tile.archived) integrate(tile);
+      readCellState(id, tx * N + x, tz * N + z, renderSample, tile, index);
+      if (!renderSample.valid || !renderSample.deformable) return;
+      const depth = renderSample.mass / density(renderSample.compaction);
+      put((z + 1) * (N + 2) + x + 1, depth - renderSample.thickness, Math.max(0, renderSample.pristineVolume - depth));
+    };
     for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      if (patch && !(patch.mask & (1 << ((dz + 1) * 3 + dx + 1)))) continue;
       const tile = tileAt(id, tx + dx, tz + dz);
       if (!tile) continue;
-      const x0 = dx === -1 ? -1 : dx === 1 ? N : 0, x1 = dx ? x0 : N - 1;
-      const z0 = dz === -1 ? -1 : dz === 1 ? N : 0, z1 = dz ? z0 : N - 1;
+      const bounds = dx || dz ? null : patch?.bounds;
+      const x0 = bounds?.minX ?? (dx === -1 ? -1 : dx === 1 ? N : 0), x1 = bounds?.maxX ?? (dx ? x0 : N - 1);
+      const z0 = bounds?.minZ ?? (dz === -1 ? -1 : dz === 1 ? N : 0), z1 = bounds?.maxZ ?? (dz ? z0 : N - 1);
+      const area = (x1 - x0 + 1) * (z1 - z0 + 1);
+      // A fresh tire track modifies a small fraction of an 8×8 m tile.
+      // The initialized-cell index also includes all deformed live cells.
+      if (!tile.archived && !tile.archive && tile.count < area) {
+        for (let k = 0; k < tile.count; k++) {
+          const i = tile.indices[k];
+          if (!(tile.flags[i] & CELL_DEFORMED)) continue;
+          const x = i % N + dx * N, z = (i / N | 0) + dz * N;
+          if (x >= x0 && x <= x1 && z >= z0 && z <= z1) write(tile, i, x, z);
+        }
+        continue;
+      }
       for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
         const lx = x - dx * N, lz = z - dz * N;
         const i = lx + lz * N, ai = Math.floor(lx / AS) + Math.floor(lz / AS) * AN;
         if (tile.archived ? !tile.flags[ai] : !(tile.flags[i] & CELL_DEFORMED) && !tile.archive?.flags[ai]) continue;
-        cellState(id, tx * N + x, tz * N + z, renderSample);
-        if (!renderSample.valid || !renderSample.deformable) continue;
-        const depth = renderSample.mass / density(renderSample.compaction);
-        const delta = depth - renderSample.thickness;
-        put((z + 1) * (N + 2) + x + 1, delta, Math.max(0, renderSample.pristineVolume - depth));
+        write(tile, tile.archived ? ai : i, x, z);
       }
     }
   }
@@ -681,6 +748,7 @@ export function createSnowField ({ initial }) {
   }
   function reset () {
     surfaces.clear(); live.clear(); archived.clear(); workTiles.length = 0;
+    retired = spare = null;
     lookup.tile = null;
     for (const receiver of receivers) receiver.tile = null;
     settleRead = settleWrite = settleCount = settleClock = 0;
@@ -688,8 +756,9 @@ export function createSnowField ({ initial }) {
     for (const key of Object.keys(stats)) stats[key] = 0;
     stats.season = season; stats.revision = revision; stats.bytes = 65536;
   }
-  return { sample, stamp, setWeather, step, getRevision, getEdgeRevision, getDirtyBounds, clearDirty, deformationRevision, writeDeformation,
+  return { sample, stamp, setWeather, step, getRevision, getEdgeRevision, getDirtyBounds, clearDirty, deformationRevision, deformationPatch, writeDeformation,
     get deformationEpoch () { return revision + visualWeatherRevision * 100000000; },
+    get deformationWeather () { return visualWeatherRevision; },
     setFocus (x, z) { focusX = x; focusZ = z; },
     setProtection (predicate) { protectTile = typeof predicate === 'function' ? predicate : null; },
     reset, dispose: reset, stats };

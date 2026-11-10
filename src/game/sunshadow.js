@@ -675,15 +675,22 @@ function begin (why, dir, fp) {
 const now = () => performance.now();
 
 /* одна часть карты за кадр; последняя — карты меняются местами */
-const FCNT = new Map();
+const FCNT = new Map(), DRAWN = [];
 function part () {
   const t0 = performance.now();
   const m = MAPS[job.m], pt = job.parts[job.i];
-  for (let i = 0; i < PROX.length; i++) PROX[i].visible = false;
+  for (const proxy of DRAWN) proxy.visible = false;
+  DRAWN.length = 0;
   for (const f of FORM) { f.visible = false; f.count = 0; }
   FCNT.clear();
   for (const it of pt.it) {
-    if (it.p) { it.p.visible = it.p.parent === SHS; if (it.p.isInstancedMesh) it.p.count = it.p.userData.o.count; continue; }
+    if (it.p) {
+      if (it.p.parent !== SHS) continue;
+      it.p.visible = true;
+      if (it.p.isInstancedMesh) it.p.count = it.p.userData.o.count;
+      DRAWN.push(it.p);
+      continue;
+    }
     FCNT.set(it.src, (FCNT.get(it.src) || 0) + it.pk.n);
   }
   for (const [src, n] of FCNT) {
@@ -691,6 +698,7 @@ function part () {
     let o = 0;
     for (const it of pt.it) if (it.src === src) { f.instanceMatrix.array.set(it.pk.n * 16 === it.pk.m.length ? it.pk.m : it.pk.m.subarray(0, it.pk.n * 16), o * 16); o += it.pk.n; }
     f.count = n; f.visible = true;
+    DRAWN.push(f);
     if (f.instanceMatrix.clearUpdateRanges) { f.instanceMatrix.clearUpdateRanges(); f.instanceMatrix.addUpdateRange(0, n * 16); }
     f.instanceMatrix.needsUpdate = true;
   }
@@ -698,12 +706,20 @@ function part () {
   const prev = R.getRenderTarget(), ac = R.autoClear;
   R.autoClear = job.i === 0;                         // первая часть стирает карту, остальные дорисовывают
   R.setRenderTarget(m.rt);
-  const tq = DBG.gpu ? gpuBegin() : null;
-  R.render(SHS, LCAM);
-  if (tq) gpuEnd(tq);
-  ST.drawCalls = R.info.render.calls;
-  R.setRenderTarget(prev);
-  R.autoClear = ac;
+  // В этом проходе нужны только меши текущей части. Остальные остаются
+  // в общей сцене для следующего обхода и прогрева программ.
+  const all = SHS.children;
+  SHS.children = DRAWN;
+  let tq = null;
+  try {
+    if (DBG.gpu) tq = gpuBegin();
+    R.render(SHS, LCAM);
+    ST.drawCalls = R.info.render.calls;
+  } finally {
+    SHS.children = all;
+    try { if (tq) gpuEnd(tq); }
+    finally { R.setRenderTarget(prev); R.autoClear = ac; }
+  }
   job.i++;
   ST.draws++; ST.lastMs = +(performance.now() - t0).toFixed(2);
   if (job.i < job.parts.length) return;

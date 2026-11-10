@@ -178,6 +178,39 @@ function staticPart (city) {
   return out;
 }
 
+function bridgeContext (roads, groundH, fade = false) {
+  // мосты
+  const BR = [];
+  roads.forEach((r, ri) => {
+    if (!r.b) return;
+    const D = deckOf(r, groundH), ws = sidewalkW(r);
+    const segs = [];
+    for (let i = 1; i < r.p.length; i++)
+      segs.push({ x1: r.p[i - 1][0], z1: r.p[i - 1][1], x2: r.p[i][0], z2: r.p[i][1], s1: D.acc[i - 1], s2: D.acc[i] });
+    BR.push({ r, ri, L: D.L, fn: D.fn, ws, w: roadWidth(r), segs, acc: D.acc });
+  });
+  const deckY = (b, s, x, z) => Math.max(b.fn(s), groundH(x, z) + deckMin(s, b.L, fade));
+  /* на настиле ли точка: высота и мост, иначе null (как surfaceAt без prevY) */
+  function deckAt (x, z, pad = 1) {
+    for (const b of BR)
+      for (const g of b.segs) {
+        const dx = g.x2 - g.x1, dz = g.z2 - g.z1;
+        const t = ((x - g.x1) * dx + (z - g.z1) * dz) / (dx * dx + dz * dz || 1);
+        if (t < 0 || t > 1) continue;
+        if (Math.hypot(x - g.x1 - dx * t, z - g.z1 - dz * t) > b.ws / 2 + pad) continue;
+        const s = lerp(g.s1, g.s2, t);
+        return { y: deckY(b, s, x, z), b, s };
+      }
+    return null;
+  }
+
+  return { BR, deckAt, deckY, fade };
+}
+
+function refreshBridges (ctx, fade = false) {
+  return Object.assign(ctx, bridgeContext(ctx.roads, ctx.groundH, fade));
+}
+
 /* ── контекст: граф, сетки и высоты на текущих данных ──
    Строится заново после каждой починки — это миллисекунды. */
 export function mapContext (city, TH, o = {}) {
@@ -227,31 +260,6 @@ export function mapContext (city, TH, o = {}) {
   });
   const deg = q => { const n = NODES.get(pkey(q)); return n ? n.nb.size : 0; };
 
-  // мосты
-  const BR = [];
-  roads.forEach((r, ri) => {
-    if (!r.b) return;
-    const D = deckOf(r, groundH), ws = sidewalkW(r);
-    const segs = [];
-    for (let i = 1; i < r.p.length; i++)
-      segs.push({ x1: r.p[i - 1][0], z1: r.p[i - 1][1], x2: r.p[i][0], z2: r.p[i][1], s1: D.acc[i - 1], s2: D.acc[i] });
-    BR.push({ r, ri, L: D.L, fn: D.fn, ws, w: roadWidth(r), segs, acc: D.acc });
-  });
-  const deckY = (b, s, x, z) => Math.max(b.fn(s), groundH(x, z) + deckMin(s, b.L, o.fade));
-  /* на настиле ли точка: высота и мост, иначе null (как surfaceAt без prevY) */
-  function deckAt (x, z, pad = 1) {
-    for (const b of BR)
-      for (const g of b.segs) {
-        const dx = g.x2 - g.x1, dz = g.z2 - g.z1;
-        const t = ((x - g.x1) * dx + (z - g.z1) * dz) / (dx * dx + dz * dz || 1);
-        if (t < 0 || t > 1) continue;
-        if (Math.hypot(x - g.x1 - dx * t, z - g.z1 - dz * t) > b.ws / 2 + pad) continue;
-        const s = lerp(g.s1, g.s2, t);
-        return { y: deckY(b, s, x, z), b, s };
-      }
-    return null;
-  }
-
   // дома, въезды, подъезды, парковки: от улиц не зависят — строим один раз на city
   const { housesNear, inHouse, wallDist, lotDist } = STATIC.get(city) || staticPart(city);
 
@@ -268,8 +276,8 @@ export function mapContext (city, TH, o = {}) {
     return best;
   }
 
-  return { city, TH, ter, groundH, B, inBounds, roads, SEGS, segsNear, NODES, deg, BR, deckAt, deckY,
-    inHouse, wallDist, lotDist, nearestOther, housesNear, fade: !!o.fade };
+  return { city, TH, ter, groundH, B, inBounds, roads, SEGS, segsNear, NODES, deg,
+    ...bridgeContext(roads, groundH, !!o.fade), inHouse, wallDist, lotDist, nearestOther, housesNear };
 }
 
 /* ── тупики ──
@@ -697,14 +705,15 @@ export function fixMap (city, TH, o = {}) {
   const before = o.before ? checkMap(city, TH) : null;       // для отчёта ?mapcheck: как было
   const T = {}, lap = (k, f) => { const t = now(); const r = f(); T[k] = Math.round((now() - t) * 10) / 10; return r; };
   let ctx = lap('ctx', () => mapContext(city, TH));
-  lap('joints', () => fixJoints(ctx, note));
-  ctx = mapContext(city, TH);
-  lap('cross', () => fixGradeCrossings(ctx, note));
+  if (lap('joints', () => fixJoints(ctx, note))) ctx = mapContext(city, TH);
+  if (lap('cross', () => fixGradeCrossings(ctx, note))) ctx = mapContext(city, TH);
   lap('paths', () => fixPaths(ctx, note));
   // рельефу нужны только сами улицы (массивы те же) и высоты — контекст не пересобираем
   ctx.report = !!o.report;
   lap('terrain', () => fixTerrain(ctx, note));
-  ctx = mapContext(city, TH);
+  delete ctx.report;
+  // Полотно изменилось только по высоте. Индекс осей и граф те же.
+  refreshBridges(ctx);
   ctx = lap('bridges', () => fixBridges(ctx, note));
   // после обрезки мостов у набережных — ещё раз: к новым кускам тоже пришиваем
   if (lap('joints2', () => fixJoints(ctx, note))) ctx = mapContext(city, TH, { fade: true });
@@ -789,20 +798,24 @@ function fixJoints (ctx, note) {
    Разметка и бордюры у перекрёстка обрываются сами. */
 function fixGradeCrossings (ctx, note) {
   const X = gradeCrossings(ctx);
+  let changed = false;
   // с конца: вставки в одну улицу не сдвигают ещё не обработанные сегменты
   X.sort((a, b) => b.sa.i - a.sa.i || b.sb.i - a.sb.i);
   for (const c of X) {
     const find = (r, s) => r.p.findIndex((v, k) => k > 0 && r.p[k - 1][0] === s.x1 && r.p[k - 1][1] === s.z1 && v[0] === s.x2 && v[1] === s.z2);
     const ia = find(c.a, c.sa), ib = find(c.b, c.sb);
     if (ia < 0 || ib < 0) continue;
+    const length = c.a.p.length;
     const qa = splitAt(c.a, ia, c.x, c.z, 0.6);
+    changed ||= c.a.p.length !== length;
     const ib2 = find(c.b, c.sb);
     if (ib2 < 0) continue;
     // во вторую — ровно та же точка, иначе узлы не совпадут
     const b0 = c.b.p[ib2 - 1], b1 = c.b.p[ib2];
-    if (qa[0] === b0[0] && qa[1] === b0[1]) { /* уже общий */ } else if (qa[0] === b1[0] && qa[1] === b1[1]) { /* уже общий */ } else c.b.p.splice(ib2, 0, [qa[0], qa[1]]);
+    if (qa[0] === b0[0] && qa[1] === b0[1]) { /* уже общий */ } else if (qa[0] === b1[0] && qa[1] === b1[1]) { /* уже общий */ } else { c.b.p.splice(ib2, 0, [qa[0], qa[1]]); changed = true; }
     note('node', c.x, c.z, `junction node where "${c.a.n || 'road'}" crosses "${c.b.n || 'road'}"`);
   }
+  return changed;
 }
 
 /* 2б. Дорожки сквозь дома. В выгрузке дворовая дорожка местами идёт через
@@ -979,6 +992,7 @@ function slopeLimit (S, y, slope, y0, y1, L) {
 function fixBridges (ctx, note) {
   const { roads } = ctx;
   // а) обрезка концов
+  let trimmed = false;
   for (const b of ctx.BR.slice()) {
     const r = b.r;
     for (const end of [0, 1]) {
@@ -1006,10 +1020,11 @@ function fixBridges (ctx, note) {
       const plain = { ...r, p: piece };
       delete plain.b; delete plain.dk;
       roads.push(plain);
+      trimmed = true;
       note('trim', p[end ? p.length - 1 : 0][0], p[end ? p.length - 1 : 0][1], `${r.n || 'bridge'}: first ${cut.toFixed(1)} m of the deck became a plain road (junction under the parapets)`);
     }
   }
-  ctx = mapContext(ctx.city, ctx.TH);
+  if (trimmed) ctx = mapContext(ctx.city, ctx.TH);
   // б) профиль
   for (const b of ctx.BR) {
     const r = b.r, L = b.L, N = Math.max(2, Math.ceil(L / 3));
@@ -1045,9 +1060,9 @@ function fixBridges (ctx, note) {
     }
   }
   // г) пары настилов
-  ctx = mapContext(ctx.city, ctx.TH);
+  refreshBridges(ctx);
   pairDecks(ctx, note);
-  ctx = mapContext(ctx.city, ctx.TH, { fade: true });
+  refreshBridges(ctx, true);
   // в) разрывы: что так и не пролезло под настил. По одному и заново —
   // после разреза список дорог и дорожек уже другой (мосты — те же, контекст не пересобираем)
   let cuts = 0;

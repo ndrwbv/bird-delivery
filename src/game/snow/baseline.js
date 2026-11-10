@@ -3,30 +3,37 @@
    The fine CPU contact field remains independent of this visual sampling. */
 export function createSnowBaseline(surfaces) {
   const STEP = 0.5, SIDE = 16, LIMIT = 256;
-  const cache = new Map(), source = {}, neighbour = {};
-  let lastKey, lastTile;
+  const cache = new Map(), sourceSample = {}, neighbourSample = {};
+  let lastId, lastX, lastZ, lastTile;
   const points = Array.from({ length: 4 }, () => ({ base: 0, depth: 0, nx: 0, nz: 0, edge: 1, valid: false }));
   const offsets = [[-STEP, 0], [STEP, 0], [0, -STEP], [0, STEP]];
   function node(id, ix, iz, out) {
-    const tx = Math.floor(ix / SIDE), tz = Math.floor(iz / SIDE), key = `${id}:${tx}:${tz}`;
-    let tile = key === lastKey ? lastTile : cache.get(key);
-    if (!tile) {
-      if (cache.size >= LIMIT) cache.delete(cache.keys().next().value);
-      tile = { flags: new Uint8Array(SIDE * SIDE), values: new Float32Array(SIDE * SIDE * 5) };
+    const tx = Math.floor(ix / SIDE), tz = Math.floor(iz / SIDE);
+    if (!lastTile || id !== lastId || tx !== lastX || tz !== lastZ) {
+      const key = id === 0 && tx >= -16384 && tx <= 16383 && tz >= -16384 && tz <= 16383
+        ? (tx << 15) | (tz & 32767) : `${id}:${tx}:${tz}`;
+      let tile = cache.get(key);
+      if (!tile) {
+        if (cache.size >= LIMIT) {
+          const oldest = cache.keys().next().value;
+          tile = cache.get(oldest);
+          cache.delete(oldest);
+          tile.flags.fill(0);
+        } else tile = { flags: new Uint8Array(SIDE * SIDE), values: new Float32Array(SIDE * SIDE * 5) };
+      } else cache.delete(key);
       cache.set(key, tile);
-    } else if (key !== lastKey) {
-      cache.delete(key); cache.set(key, tile);
+      lastId = id; lastX = tx; lastZ = tz; lastTile = tile;
     }
-    lastKey = key; lastTile = tile;
+    const tile = lastTile;
     const k = (iz - tz * SIDE) * SIDE + ix - tx * SIDE;
     if (!tile.flags[k]) {
       const x = ix * STEP, z = iz * STEP;
-      surfaces.initial(id, x, z, source);
+      const source = surfaces.resting(id, x, z, sourceSample);
       let depth = source.deformable ? source.thickness : 0, sum = 4*depth, weight = 4, nx = 0, nz = 0, lip = false;
       // Smooth only compatible receivers. A positive symmetric kernel cannot
       // overshoot into a sharp peak or mix a bridge with the ground below it.
       if (source.valid) for (const [dx, dz] of offsets) {
-        surfaces.initial(id, x + dx, z + dz, neighbour);
+        const neighbour = surfaces.resting(id, x + dx, z + dz, neighbourSample);
         const sameMaterial = source.materialId === neighbour.materialId;
         const same = neighbour.valid && Math.abs(source.baseY - neighbour.baseY) <= (sameMaterial ? 0.22 : 0.075);
         if (!same) { lip = true; continue; }
@@ -79,7 +86,7 @@ export function createSnowBaseline(surfaces) {
       // Matches render.js indices (a,c,b), (b,c,d), not bilinear quads.
       return u + v <= 1 ? ha*(1-u-v) + hb*u + hc*v : hb*(1-v) + hc*(1-u) + hd*(u+v-1);
     },
-    clear() { cache.clear(); lastKey = lastTile = undefined; },
+    clear() { cache.clear(); lastTile = undefined; },
     get bytes() { return cache.size * SIDE * SIDE * 21; },
   };
 }

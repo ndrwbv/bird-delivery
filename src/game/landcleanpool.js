@@ -1,21 +1,34 @@
-/* Только независимое раскрытие клеток — в рабочих потоках. Объединение,
-   цвета заполнения и запись в сцену остаются в исходном порядке.
+/* Независимые клетки и группы полигонов считаются в рабочих потоках.
+   Стыковка между группами, цвета заполнения и запись идут в исходном порядке.
    Не более одной ожидающей пачки на поток: результаты всего города
    одновременно в памяти не копятся. ?landworkers=0 — синхронная сверка. */
 import { STARTUP } from './startuptrace.js';
-import {landCleanTileRegion} from './landclean.js';
+import {landCleanTileRegion,normalizeLandRegions} from './landclean.js';
 
 const makeWorker=()=>new Worker(new URL('./landclean.worker.js',import.meta.url),{type:'module'});
 export function createLandCleaner({cover,green,cores,batchSize=64,workerCount,workerFactory=makeWorker,timeoutMs=10000,stats={}}){
+  return createPool({items:cores,batchSize,workerCount,workerFactory,timeoutMs,stats,
+    init:()=>({type:'init',cover:cover.snapshot(),green:green.snapshot(),trace:STARTUP.enabled}),
+    message:(id,cores)=>({type:'batch',id,cores}),calculate:core=>landCleanTileRegion(cover,green,core),
+    label:'расчёт газонов',trace:'worker.cleanContours'});
+}
+export function createLandRegionCleaner(groups,removeSpikes){
+  return createPool({items:groups,batchSize:12,workerFactory:makeWorker,timeoutMs:10000,stats:{},
+    init:()=>({type:'region-init',trace:STARTUP.enabled}),
+    message:(id,groups)=>({type:'region-batch',id,groups,removeSpikes}),
+    calculate:group=>normalizeLandRegions(group,removeSpikes),
+    label:'сведение контуров',trace:'worker.landRegions'});
+}
+function createPool({items,batchSize,workerCount,workerFactory,timeoutMs,stats,init,message,calculate,label,trace}){
   const query=typeof location!=='undefined'?new URLSearchParams(location.search):null;
   const requested=query?.has('landworkers')?Number(query.get('landworkers')):null;
   const hardware=typeof navigator!=='undefined'?navigator.hardwareConcurrency||4:4;
   const count=Math.max(0,Math.min(3,Math.floor(workerCount??requested??(hardware>=6?3:2))||0));
   let active=count>0&&(workerFactory!==makeWorker||typeof Worker!=='undefined'),closed=false,cursor=0,frontier=0;
-  const slots=[],entries=new Map(),total=Math.ceil(cores.length/batchSize);
+  const slots=[],entries=new Map(),total=Math.ceil(items.length/batchSize);
   stats.workers=0;stats.workerBatches=0;stats.workerFallbacks=0;
-  const slice=id=>cores.slice(id*batchSize,(id+1)*batchSize);
-  const sync=id=>slice(id).map(core=>landCleanTileRegion(cover,green,core));
+  const slice=id=>items.slice(id*batchSize,(id+1)*batchSize);
+  const sync=id=>slice(id).map(calculate);
   function entry(id){
     let e=entries.get(id);if(e)return e;
     e={};e.promise=new Promise((resolve,reject)=>{e.resolve=resolve;e.reject=reject;});
@@ -37,19 +50,19 @@ export function createLandCleaner({cover,green,cores,batchSize=64,workerCount,wo
     for(const s of slots){
       if(!s.ready||s.id!==null||cursor>=total||cursor>=frontier+count)continue;
       const id=cursor++;entry(id);s.id=id;arm(s);
-      try{s.worker.postMessage({type:'batch',id,cores:slice(id)});}catch(error){fail(error);break;}
+      try{s.worker.postMessage(message(id,slice(id)));}catch(error){fail(error);break;}
     }
   }
   if(active){
     try{
-      const source={type:'init',cover:cover.snapshot(),green:green.snapshot(),trace:STARTUP.enabled};
+      const source=init();
       for(let i=0;i<count;i++){
         const s={worker:workerFactory(),ready:false,id:null,timer:null};slots.push(s);
         s.worker.onmessage=({data})=>{
           if(!active)return;
           if(data?.type==='ready'&&!s.ready){STARTUP.worker('worker.init',data.workMs);clearTimeout(s.timer);s.ready=true;pump();return;}
           if(data?.type==='batch'&&data.id===s.id&&Array.isArray(data.result)&&data.result.length===slice(data.id).length){
-            clearTimeout(s.timer);const id=s.id;s.id=null;stats.workerBatches++;STARTUP.worker('worker.cleanContours',data.workMs);entry(id).resolve(data.result);pump();return;
+            clearTimeout(s.timer);const id=s.id;s.id=null;stats.workerBatches++;STARTUP.worker(trace,data.workMs);entry(id).resolve(data.result);pump();return;
           }
           fail(Error(data?.message||'Неверный ответ расчёта земли'));
         };
@@ -64,7 +77,7 @@ export function createLandCleaner({cover,green,cores,batchSize=64,workerCount,wo
       if(closed||!active)return sync(id);
       frontier=id;for(const k of entries.keys())if(k<id)entries.delete(k);
       const e=entry(id);pump();
-      return {label:'расчёт газонов',wait:e.promise,sync:()=>{shutdown();return sync(id);}};
+      return {label,wait:e.promise,sync:()=>{shutdown();return sync(id);}};
     },
     close(){closed=true;shutdown();},
     batches:total,batchSize

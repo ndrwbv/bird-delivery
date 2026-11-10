@@ -8,7 +8,7 @@ import {createLandMask} from './landmask.js';
 import {landPaintEdges,shoreLine} from './landlayers.js';
 import {mergeLandPieces} from './landpieces.js';
 import {landSurfacePieces,SURFACE_STATS} from './landpatches.js';
-import {createLandCleaner} from './landcleanpool.js';
+import {createLandCleaner,createLandRegionCleaner} from './landcleanpool.js';
 export const ON = typeof location!=='undefined'&&!new URLSearchParams(location.search).has('oldland');
 export const LIFT=LAND_LIFT;
 export const cover=ON?createLandCover():null,green=ON?createLandCover():null;
@@ -178,7 +178,7 @@ export function* cleanContours({M,triangulate,skip,terrain,groundH,deferDraw=fal
     cleaner.close();cleaner=null;
     // Все клетки считают исходный город: добавляем исправления в общий
     // контур только после обхода, чтобы порядок клеток не влиял на форму.
-    yield* finalMask.finishSteps();
+    yield* finalMask.finishSteps(createLandRegionCleaner);
     for(let i=0;i<finalMask.removedRegions.length;i++){
       fillPatch(finalMask.removedRegions[i]);finalMask.removedRegions[i]=null;
       if(i%64===63)yield 'завершённые покрытия';
@@ -217,7 +217,15 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
     if(bounds&&(!(bounds.length===4)||!bounds.every(Number.isFinite)||bounds[0]>=bounds[2]||bounds[1]>=bounds[3]))throw Error('Неверные границы участка земли');
     const frame=bounds?[[bounds[0],bounds[1]],[bounds[2],bounds[1]],[bounds[2],bounds[3]],[bounds[0],bounds[3]]]:null;
     const clip=p=>!frame||p.every(v=>v[0]>=bounds[0]&&v[0]<=bounds[2]&&v[1]>=bounds[1]&&v[1]<=bounds[3])?p:intersectConvex(p,frame);
-    const intersects=p=>!bounds||Math.min(...p.map(v=>v[0]))<=bounds[2]&&Math.max(...p.map(v=>v[0]))>=bounds[0]&&Math.min(...p.map(v=>v[1]))<=bounds[3]&&Math.max(...p.map(v=>v[1]))>=bounds[1];
+    const intersects = p => {
+      if (!bounds) return true;
+      let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+      for (const [x, z] of p) {
+        left = Math.min(left, x); right = Math.max(right, x);
+        top = Math.min(top, z); bottom = Math.max(bottom, z);
+      }
+      return left <= bounds[2] && right >= bounds[0] && top <= bounds[3] && bottom >= bounds[1];
+    };
     const tessellate=(outer,holes)=>({points:[...outer,...holes.flat()],triangles:triangulate(outer,holes)});
     const surfaceParts=(parts,extra=0)=>landSurfacePieces(mergeLandPieces(parts),tessellate,(a,b)=>{
       const y=p=>{const h=groundH(...p);return Math.fround(h+landLift(h)+extra);};
@@ -233,6 +241,7 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
       }
     };
     const stride=bounds?1:128;
+    let sliceStarted = bounds ? performance.now() : 0;
     let work=0;if(!bounds)ST.paintWalls=0;else ST.paintWalls??=0;
     // Окрашенные участки и голая земля не перекрываются. Записываем
     // цветные части первыми: готовый ряд затем отдаётся целиком,
@@ -280,13 +289,30 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
       for(let j=bj;j<ej;j++)for(let i=bi;i<ei;i++){
         const x=x0+i*g,z=z0+j*g;
         for(const tri of [[[x,z],[x+g,z],[x,z+g]],[[x+g,z+g],[x,z+g],[x+g,z]]]){
+          if(bounds && performance.now()-sliceStarted>=1.1){
+            yield 'земля';
+            sliceStarted=performance.now();
+          }
           const local=clip(tri);if(!local.length)continue;
           const raised=!tri.every(q=>skip?.(...q));
           const parts=raised?(finalMask.ready?finalMask.parts(local,q=>cover.cut(q)):cover.cut(local)):[local];
-          const bareParts=surfaceParts([...parts].flatMap(p=>raised?green.cut(p):[p]));
+          const pieces=[];
+          for(const part of parts){
+            if(bounds && performance.now()-sliceStarted>=1.1){
+              yield 'земля';
+              sliceStarted=performance.now();
+            }
+            if(raised)pieces.push(...green.cut(part));
+            else pieces.push(part);
+          }
+          const bareParts=surfaceParts(pieces);
           const hex=groundHex(groundH((tri[0][0]+tri[1][0]+tri[2][0])/3,(tri[0][1]+tri[1][1]+tri[2][1])/3));
           // Под цветным слоем нет второй скрытой поверхности земли.
           for(const bare of bareParts){
+            if(bounds && performance.now()-sliceStarted>=1.1){
+              yield 'земля';
+              sliceStarted=performance.now();
+            }
             M.color(hex);draw(bare,0,raised);
             if(!raised)continue;
             for(const edge of landPaintEdges(bare,green,finalMask.ready?finalMask:null)){
@@ -298,8 +324,8 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
             }
           }
         }
-        if(++work%stride===0)yield 'земля';
       }
+      if(!bounds && ++work%stride===0)yield 'земля';
     }
     if(flushThrough)yield* flushThrough(Infinity);
     ST.baseTop=(bounds?(ST.baseTop||0):0)+ST.top-paintTop;

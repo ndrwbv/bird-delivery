@@ -66,7 +66,11 @@ else
   export BUILD_VERSION=0.0.0
   land_pid= address_pid=
   if [ -z "$draft" ] || ! has_package "city-land-$key.tar.gz"; then
-    node tools/land-package-prepare.mjs --single-export "--out=$output/land" &
+    (
+      node tools/land-package-prepare.mjs --single-export "--out=$output/land" &&
+      node tools/land-surface-prepare.mjs "--package=$output/land/package" "--out=$output/surface" &&
+      node tools/deck-shader-prepare.mjs "--package=$output/land/package" "--out=$output/deck-shaders"
+    ) &
     land_pid=$!
   fi
   if [ -z "$draft" ] || ! has_package "city-address-$key.tar.gz"; then

@@ -229,10 +229,22 @@ function targetValid(target,snapshot){
  return st;
 }
 export function* prepareRestoreResultSteps(target,snapshot,{prepared=false,limits={},work,...options}={}){
- yield* validateCheckpointSteps(snapshot,{limits,work,...options});ok(prepared===true,'RESTORE_PHASE');const st=targetValid(target,snapshot),refs=[target.cover,target.green,target.finalMask,target.finalMask.kept,target.ST];
+ yield* validateCheckpointSteps(snapshot,{limits,work,...options});
+ return yield* prepareDecodedRestoreSteps(target,snapshot,{prepared,work,...options});
+}
+// The decoder validates its owned snapshot. Keep it private through prepare so
+// there is no second walk over the same vertices, indices and mask cells.
+export function* prepareCheckpointRestoreSteps(target,input,identity,{limits={},work,...options},stage){
+ const snapshot=yield* stage('decode',decodeCheckpointSteps(input,identity,{limits,work,...options}));
+ return yield* stage('prepareRestore',prepareDecodedRestoreSteps(target,snapshot,{work,...options}));
+}
+// Only for private snapshots returned by this decoder, including through
+// the application's own package worker. External snapshots use the validator.
+export function* prepareDecodedRestoreSteps(target,snapshot,{prepared=false,work,...options}={},takeOwnership=false){
+ ok(prepared===true,'RESTORE_PHASE');const st=targetValid(target,snapshot),refs=[target.cover,target.green,target.finalMask,target.finalMask.kept,target.ST];
  const resultStats=Object.fromEntries(RESULT_FIELDS.map(k=>[k,snapshot.resultStats[k]]));
  const commits=[];
- for(const[name,model,value]of [['cover',target.cover,snapshot.cover],['green',target.green,snapshot.green],['mask',target.finalMask,snapshot.mask]])commits.push(yield* phaseSteps('raisedland.cache.restore.'+name,model.prepareRestoreSteps(value,options),work));
+ for(const[name,model,value]of [['cover',target.cover,snapshot.cover],['green',target.green,snapshot.green],['mask',target.finalMask,snapshot.mask]])commits.push(yield* phaseSteps('raisedland.cache.restore.'+name,model.prepareRestoreSteps(value,options,takeOwnership),work));
  const currentRefs=[target.cover,target.green,target.finalMask,target.finalMask.kept,target.ST];ok(refs.every((v,i)=>v===currentRefs[i]),'TARGET_CHANGED');
  ok(commits.every(fn=>typeof fn==='function'),'TARGET_PREPARED');for(const commit of commits)commit.preflight?.();targetValid(target,snapshot);
  // Caller must commit immediately, without yielding or mutating target/snapshot after prepare returns.

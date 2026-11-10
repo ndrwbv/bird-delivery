@@ -112,10 +112,18 @@ if (steam && has('--steam-overlay')) { try { SW.electronEnableSteamOverlay(); } 
 
 const safe = fn => { try { return fn(); } catch (e) { log('steam:', e.message); return null; } };
 
+function deckHardware () {
+  if (process.platform !== 'linux') return false;
+  try {
+    const model = fs.readFileSync('/sys/devices/virtual/dmi/id/product_name', 'utf8').trim();
+    return model === 'Jupiter' || model === 'Galileo';
+  } catch (e) { return false; }
+}
+
 ipcMain.on('steam:boot', e => {
   e.returnValue = {
     available: !!steam,
-    deck: !!(steam && safe(() => steam.utils.isSteamRunningOnSteamDeck())) || process.env.SteamDeck === '1',
+    deck: !!(steam && safe(() => steam.utils.isSteamRunningOnSteamDeck())) || process.env.SteamDeck === '1' || deckHardware(),
     launched: steamLaunched(),
     lang: steam ? safe(() => steam.apps.currentGameLanguage()) || '' : '',
     name: steam ? safe(() => steam.localplayer.getName()) || '' : '',

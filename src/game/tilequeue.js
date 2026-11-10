@@ -1,6 +1,6 @@
 /* One builder at a time: raised land and the mesher share scratch buffers.
    Pending work contains only IDs/priorities, never meshes or decoded payloads. */
-export function createTileQueue({build,publish,dispose=()=>{},onRequest=()=>{},onError=()=>{},maxPending=128}) {
+export function createTileQueue({build,publish,dispose=()=>{},onRequest=()=>{},onError=()=>{},onStep=null,maxPending=128}) {
   let pending=new Map(),active=null,epoch=0;
   const stats={epoch:0,queued:0,active:0,cancelled:0,maxQueued:0};
   const refresh=()=>{stats.epoch=epoch;stats.queued=pending.size;stats.active=+!!active;stats.maxQueued=Math.max(stats.maxQueued,pending.size);};
@@ -26,6 +26,7 @@ export function createTileQueue({build,publish,dispose=()=>{},onRequest=()=>{},o
     let result;
     try{
       result=job.it.next();
+      onStep?.(result.done?'публикация':result.value);
       if(result.done){
         if(job.epoch===epoch&&pending.has(job.id))publish(job.id,result.value);
         else dispose(result.value);

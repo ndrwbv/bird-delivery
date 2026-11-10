@@ -22,6 +22,8 @@ import './game/progressboot.css';
 import { pollPad } from './input/gamepad.js';
 import { makePadMenu } from './input/padmenu.js';
 import {selectAddressBoot17b} from './game/addressboot17b.js';
+import { primeWinterRoadWorker, takeWinterRoadWorker } from './game/winter-road-client.js';
+import { primeDeckShaders } from './game/landdata/deck-shaders-client.js';
 
 // журнал ошибок и зависаний (docs/CRASHES.md) — первым делом: ловит и ошибки загрузки игры
 CRASH.init();
@@ -59,37 +61,111 @@ if (Platform.id !== 'yandex') {
 }
 
 // Стим (и dev) — Северск, Яндекс — Москва; ?map= — для отладки
-const want = new URLSearchParams(location.search).get('map') || (Platform.id === 'yandex' ? 'moscow' : 'seversk');
+const query = new URLSearchParams(location.search);
+const want = query.get('map') || (Platform.id === 'yandex' ? 'moscow' : 'seversk');
 const mapId = MAP_IDS.includes(want) ? want : MAP_IDS[0];
-useMap(await STARTUP.awaited('map.readParseImport', 'module', () => loadMap(mapId)));
-STARTUP.mark('map.ready', { mapId });
-document.documentElement.dataset.city = mapId;
-
+const deck = Platform.steam?.deck || /steamos|steam deck/i.test(navigator.userAgent);
+const launch = Platform.id === 'steam' && mapId === 'seversk' &&
+  !['nocareer', 'kids', 'hellrun', 'doorpreview'].some(key => query.has(key)) &&
+  (query.has('fastmenu') || window.__startupHost?.nativeDeckLaunch || deck && !query.has('debug') && !window.__startupHost);
 // This is only a cheap candidate choice. The game validates its full actual previsual key.
 const addressCatalog17=typeof __ADDRESS_PACKAGE_CATALOG__!=='undefined'?__ADDRESS_PACKAGE_CATALOG__:null;
 const addressBoot17=selectAddressBoot17b({mode:import.meta.env.MODE,mapId,deck:!!Platform.steam?.deck,userAgent:navigator.userAgent,
   get:(key,fallback)=>{const value=Platform.store.get(key);return value===undefined?fallback:value;},query:location.search,catalog:addressCatalog17});
-if(addressBoot17.enabled){
-  const {ADDRESS_PACKAGE_PRELOAD17B}=await import('./game/addresspackage17b.js');
-  await STARTUP.awaited('addresses.preload','cacheIO',()=>ADDRESS_PACKAGE_PRELOAD17B.preload({
-    enabled:true,graphics:addressBoot17.graphics,catalog:addressCatalog17,
-  }));
+let launchMenu = null, launchAction = null, mapRead = null, addressRead = null;
+const readMap = () => mapRead ||= STARTUP.awaited('map.readParseImport', 'module', () => loadMap(mapId));
+function readAddresses () {
+  // Ранний вход получает адреса при сборке города. Готовый снимок
+  // на этом пути нужен только для явных сравнений с генератором.
+  if (!addressBoot17.enabled || (launch && !addressBoot17.diagnostic)) return;
+  return addressRead ||= import('./game/addresspackage17b.js').then(({ ADDRESS_PACKAGE_PRELOAD17B }) =>
+    STARTUP.awaited('addresses.preload', 'cacheIO', () => ADDRESS_PACKAGE_PRELOAD17B.preload({
+      enabled: true, graphics: addressBoot17.graphics, catalog: addressCatalog17,
+    })));
 }
+if (launch) {
+  const prepareRoadWorker = () => {
+    if (deck && !(query.has('debug') && query.has('deckroadsync'))) {
+      primeWinterRoadWorker(() => STARTUP.mark('winterRoad.worker.ready'));
+    }
+  };
+  const shaderCatalog = typeof __DECK_SHADER_CATALOG__ === 'undefined' ? null : __DECK_SHADER_CATALOG__;
+  const shaderSourceHash = typeof __CITY_SOURCE_BASE17B__ === 'undefined' ? null : __CITY_SOURCE_BASE17B__.sourceHash;
+  let shaderAttempted = false, stopShaders = null;
+  const prepareShaders = () => {
+    if (shaderAttempted || !deck || !shaderCatalog || (query.has('gfxdev') && query.get('gfxdev') !== 'deck') ||
+        (query.has('debug') && (query.has('deckshaderdirect') || query.has('deckshaderbake')))) return;
+    shaderAttempted = true;
+    const forced = query.get('gfx');
+    const high = forced === 'high' || (!['low', 'mid'].includes(forced) && Platform.store.get('dlv-gfx')?.deck?.p === 'high');
+    if (high) stopShaders = primeDeckShaders(shaderCatalog, shaderSourceHash);
+  };
+  launchMenu = await import('./game/menu.js');
+  const boot = document.getElementById('boot');
+  document.body.classList.add('career');
+  document.body.classList.remove('booting');
+  document.getElementById('big').hidden = false;
+  boot?.classList.add('gone');
+  const selection = launchMenu.launchMenu({ Store: Platform.store, quit: () => Platform.quit(), pollPad });
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    STARTUP.mark('launch.menu');
+    // Чтение карты может идти за меню. Синхронное построение мира
+    // остаётся за выбором действия, чтобы док принимал ввод сразу.
+    setTimeout(() => {
+      if (!launchAction || launchAction === 'go') {
+        prepareRoadWorker();
+        prepareShaders();
+      }
+      readMap().catch(() => {});
+      readAddresses()?.catch(() => {});
+    }, 0);
+  }));
+  launchAction = await selection;
+  if (launchAction === 'go') {
+    prepareRoadWorker();
+    prepareShaders();
+  } else {
+    takeWinterRoadWorker(false);
+    stopShaders?.();
+  }
+  STARTUP.mark('launch.select', { action: launchAction });
+  document.body.classList.add('booting');
+  boot?.classList.remove('gone');
+}
+useMap(await readMap());
+STARTUP.mark('map.ready', { mapId });
+document.documentElement.dataset.city = mapId;
+
+await readAddresses();
 
 // город строится синхронно при импорте: сначала даём браузеру нарисовать экран загрузки
 await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
 // время запуска (docs/AGENTS.md → «Запуск до меню»): window.__boot — мс от старта страницы
-const BOOT = window.__boot = { pre: Math.round(performance.now()) };
+const BOOT = window.__boot = { pre: Math.round(performance.now()), launchAction };
 await STARTUP.awaited('game.import', 'module', () => import('./game/game.js'));
 STARTUP.mark('game.module.ready');
 BOOT.game = Math.round(performance.now());
 document.title = (await import('./game/brands.js')).OWN.pizza();
 Platform.ready();
-// первый кадр игры готов — загрузка плавно уходит, интерфейс плавно проявляется
-requestAnimationFrame(() => requestAnimationFrame(() => {
-  BOOT.menu = Math.round(performance.now());
-  STARTUP.mark('menu.visible');
+function hideBoot (immediate = false) {
   document.body.classList.remove('booting');
   const boot = document.getElementById('boot');
-  if (boot) { boot.classList.add('gone'); setTimeout(() => boot.remove(), 600); }
-}));
+  if (!boot) return;
+  if (immediate) boot.remove();
+  else { boot.classList.add('gone'); setTimeout(() => boot.remove(), 600); }
+}
+if (launchAction === 'go') {
+  // Действие уже выбрано в раннем меню. Экран загрузки остаётся
+  // на месте, пока город готовится к смене.
+  requestAnimationFrame(() => {
+    if (!launchMenu.resumeLaunch('go', () => hideBoot(true))) hideBoot();
+  });
+} else {
+  // Первый кадр обычного меню: плавно убрать экран загрузки.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    BOOT.menu = Math.round(performance.now());
+    STARTUP.mark('menu.visible');
+    hideBoot();
+    if (launchAction) requestAnimationFrame(() => launchMenu.resumeLaunch(launchAction));
+  }));
+}

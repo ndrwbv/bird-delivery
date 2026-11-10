@@ -3,12 +3,13 @@ import { createTileQueue } from './tilequeue.js';
 /* Подробная поверхность нужна вокруг камеры, а не сразу во всём городе.
    Опора и правила движения уже готовы; до замены остаётся исходная земля.
    Готовый участок публикуется целиком, затем скрывается его старый слой. */
-export function createLandStream({terrain,build,upload=null,warm=null,publish=()=>{},dispose=()=>{},visible=()=>false,radius=832,retries=0,now=()=>performance.now()}) {
+export function createLandStream({terrain,build,upload=null,warm=null,publish=()=>{},dispose=()=>{},visible=()=>false,radius=832,retries=0,profile=false,now=()=>performance.now()}) {
   const size=terrain.g*16,x0=terrain.x0,z0=terrain.z0;
   const nx=Math.ceil((terrain.nx-1)/16),nz=Math.ceil((terrain.nz-1)/16);
   const ready=new Uint8Array(nx*nz),uploaded=new Uint8Array(nx*nz),warmed=new Uint8Array(nx*nz),failed=new Set(),attempts=new Map(),cells=new Map();
   const stats={ready:0,uploaded:0,warmed:0,total:nx*nz,steps:0,maxStep:0,ms:0,failed:0};
-  let visualSeed=0x5a17,focus=null,lastPlan=null;
+  let visualSeed=0x5a17,focus=null,lastPlan=null,stage=null;
+  if(profile)stats.stages=Object.create(null);
   // UUID мешей three.js используют Math.random. Догрузка рисунка не
   // должна менять случайные события и поведение людей во время смены.
   const quiet=fn=>{const previous=Math.random;Math.random=()=>((visualSeed=(Math.imul(visualSeed,1664525)+1013904223)>>>0)/4294967296);try{return fn();}finally{Math.random=previous;}};
@@ -32,7 +33,7 @@ export function createLandStream({terrain,build,upload=null,warm=null,publish=()
       owned=false;return value;
     } finally {if(owned)dispose(value);}
   }
-  const queue=createTileQueue({build:buildTile,dispose,
+  const queue=createTileQueue({build:buildTile,dispose,onStep:profile?value=>{stage=value;}:null,
     onError(id){
       const count=(attempts.get(id)||0)+1;
       if(count>retries){failed.add(id);attempts.delete(id);}
@@ -81,7 +82,14 @@ export function createLandStream({terrain,build,upload=null,warm=null,publish=()
       // Не скрываем исходный участок при ошибке. Предохранитель кадра
       // запишет исключение, а очередь сможет строить соседние участки.
       stats.failed++;throw error;
-    } finally {const ms=now()-t;stats.ms+=ms;stats.maxStep=Math.max(stats.maxStep,ms);stats.steps++;}
+    } finally {
+      const ms=now()-t;stats.ms+=ms;stats.maxStep=Math.max(stats.maxStep,ms);stats.steps++;
+      if(profile&&ms>=1){
+        const key=typeof stage==='string'?stage:'геометрия';
+        const part=stats.stages[key]??={ms:0,max:0,over4:0};
+        part.ms+=ms;part.max=Math.max(part.max,ms);part.over4+=+(ms>4);
+      }
+    }
   }
   function* warmCell(id,value) {
     const it=warm(value);let result;

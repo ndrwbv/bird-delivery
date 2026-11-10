@@ -143,6 +143,12 @@ jobs:
           args=("--out=$RUNNER_TEMP/bird-land-preparation")
           if [ "$CHECKS" != true ]; then args+=(--single-export); fi
           xvfb-run -a node tools/land-package-prepare.mjs "${args[@]}"
+          node tools/land-surface-prepare.mjs \
+            "--package=$RUNNER_TEMP/bird-land-preparation/package" \
+            "--out=$RUNNER_TEMP/bird-land-surface"
+          node tools/deck-shader-prepare.mjs \
+            "--package=$RUNNER_TEMP/bird-land-preparation/package" \
+            "--out=$RUNNER_TEMP/bird-deck-shaders"
       - uses: actions/upload-artifact@v4
         with:
           name: prepared-land-data

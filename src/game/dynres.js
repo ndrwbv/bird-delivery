@@ -26,6 +26,7 @@
    на прошлой ступени кадр влез бы (качели из-за самого подъёма, а не новая нагрузка) — следующий
    подъём ждёт вдвое дольше (0,5 → 1 → 2 с); 6 с без спусков — снова 0,5 с. Первые 1,5 с смены
    (и после паузы, повтора, катсцены) не смотрим: видеокарта догружает текстуры.
+   На Deck с аппаратным таймером учитываем первые замеры сразу.
 
    С автоспуском дальности (cull.js govern) не спорит: тот медленный (2 с долгих кадров,
    виноват код игры) и режет дальность; этот быстрый и смотрит только на видеокарту.
@@ -65,6 +66,7 @@ export function init (hooks) {
     ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
   } catch (e) { ext = null; }
   STATS.timer = !!ext;
+  warm = warmTime();
   /* программа растяжки — сейчас, при загрузке: проверка сборки и места uniform — ожидание видеокарты, под нагрузкой
      в смене это был бы рывок до 30 мс в момент первого спуска (замер 17.10.2026) */
   try { glInit(); if (!bad) texFit(); H.renderer.resetState(); } catch (e) { bad = true; }
@@ -73,6 +75,7 @@ export function init (hooks) {
 export const k = () => K;
 /* есть ли таймер видеокарты (облегчение кадра — tune.js: без него смотрит на промежутки между кадрами) */
 export const timer = () => !!ext && !DEBUG.noTimer;
+const warmTime = () => GFX.device() === 'deck' && timer() ? 0 : WARM_T;
 const on = () => (DEBUG.force !== null ? DEBUG.force : !!GFX.dynOn());
 const budget = () => { const f = GFX.fpsCap(); return 1000 / Math.min(f || 60, 60); };
 
@@ -223,8 +226,11 @@ export function step (raw, work, active) {
   const got = ext && pend.length ? poll() : null;
   if (got) for (const g of got) { keep(STATS.gpu, +g.ms.toFixed(2)); if (DEBUG.sink) DEBUG.sink.push(g.ms); if (Math.abs(g.k - K) < 1e-3) TUNE.gpu(g.ms); }
   if (DEBUG.pin !== null) { setLvl(Math.max(0, Math.min(LV.length - 1, DEBUG.pin | 0))); return; }
-  if (!on() || !active) { reset(); warm = WARM_T; return; }
-  if (!(raw > 0) || raw > 0.25) { warm = Math.max(warm, 0.5); return; }   // после паузы / загрузки — не замер
+  if (!on() || !active) { reset(); warm = warmTime(); return; }
+  if (!(raw > 0) || raw > 0.25) {
+    if (warmTime()) warm = Math.max(warm, 0.5);   // пауза не считается кадром для запасного пути
+    return;
+  }
   if (warm > 0) { warm -= raw; hiN = 0; return; }   // первые 1,5 с смены (и после паузы, повтора, катсцены): видеокарта догружает текстуры — не повод
   clock += raw; STATS.frames++;
   if (K < 1) STATS.low++;
@@ -282,7 +288,7 @@ function untimed (ms, work, B) {
 }
 
 /* кадр мимо смены (повтор, катсцена, вступление) — перед его отрисовкой: разрешение полное */
-export function idle () { if (lvl) reset(); warm = WARM_T; }
+export function idle () { if (lvl) reset(); warm = warmTime(); }
 /* после отрисовки кадра мимо begin / end (повтор, катсцена, вступление, меню, пока город достраивается): «мягкие края» —
    и тут, чтобы края не прыгали при входе в катсцену и выходе из неё */
 export function post () {

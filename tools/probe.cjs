@@ -16,6 +16,9 @@
                             и window.__probeReady !== false. Песочница интерфейса: --page=ui.html — панель
                             (window.__uilab), --page=ui.html --q=frame — сам экран (window.__ui), docs/SANDBOX.md
                             Редактор города: --page=editor.html (window.__editor; ждёт, пока город достроится)
+   --deck-native            оконный замер на физической Deck, Steam / кадр 1280×800 / CPU ×1
+   --deck-launch            нажать «Начать смену» в раннем меню (--deck-native --early --startup-trace)
+   --deck-present[=path]    записать вывод композитора в оконном тесте Deck (при path сохраняет трассу)
    --size=desktop|phone|phone-land|phone-se|phone-big|deck|WxH   1280×720 / 390×844 с касаниями (стоя — с ?portrait:
                             игра на телефоне только боком, orient.js) / 844×390 боком / 667×375 iPhone SE боком /
                             932×430 большой боком / 1280×800
@@ -40,6 +43,7 @@
    --startup-deck           только startup Steam: host User-Agent Steam Deck, без ?gfxdev
    --startup-production-query  только startup Steam: без автоматических debug/nolb/lang; mute сохраняется
    --land-package-district=0|3|7  ожидаемый реальный район экспорта (0); только вместе с --land-package-export
+   --land-surface-out=file записать готовый рисунок земли вокруг пиццерии (Steam, --startup-trace, ?landmeshbake)
    --seed=N                 Math.random с зерном — город одинаковый от запуска к запуску (сравнить до/после)
    --cpuprofile=f.cpuprofile  профиль процессора загрузки (до меню) — для разбора, что долго строится
    --runprofile=f.cpuprofile  профиль процессора, пока идёт скрипт; --allocprofile=f.heapprofile — выборка
@@ -65,12 +69,28 @@
    --timeout=360            секунд на всё
    Код выхода: 1 — необработанная ошибка в странице, исключение в скрипте, игра не загрузилась.
    Каждый запуск — с чистым сохранением (своя сессия в памяти и своя папка userData). */
-const { app, BrowserWindow, protocol, net, session, nativeImage } = require('electron');
+const { app, BrowserWindow, protocol, net, session, nativeImage, screen, contentTracing } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { ensureBuild, BASE } = require('./probe-build.cjs');
+
+async function writeRendererChunks(out, size, read, error) {
+  const fd = fs.openSync(out, 'wx');
+  let done = false;
+  try {
+    for (let offset = 0; offset < size; offset += 65536) {
+      const count = Math.min(65536, size - offset);
+      const block = Buffer.from(await read(offset, count), 'base64');
+      if (block.length !== count || fs.writeSync(fd, block) !== count) throw Error(error);
+    }
+    done = true;
+  } finally {
+    fs.closeSync(fd);
+    if (!done) fs.unlinkSync(out);
+  }
+}
 
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const a = argv.find(x => x.startsWith('--' + k + '=')); return a ? a.slice(k.length + 3) : d; };
@@ -83,6 +103,19 @@ const SIZES = { desktop: [1280, 720], phone: [390, 844], 'phone-land': [844, 390
 const SZ = arg('size', 'desktop');
 const [W, H] = SIZES[SZ] || (/^\d+x\d+$/.test(SZ) ? SZ.split('x').map(Number) : SIZES.desktop);
 const PHONE = SZ === 'phone' || SZ.startsWith('phone-');
+const NATIVE_DECK = has('deck-native'), DECK_LAUNCH = has('deck-launch');
+const PRESENT_TRACE = arg('deck-present'), DECK_PRESENT = has('deck-present') || PRESENT_TRACE !== undefined;
+if (DECK_PRESENT && !NATIVE_DECK) throw Error('--deck-present требует --deck-native');
+if (DECK_LAUNCH && (!NATIVE_DECK || !has('early') || !has('startup-trace'))) {
+  throw Error('--deck-launch требует --deck-native --early --startup-trace');
+}
+if (NATIVE_DECK) {
+  let product = '';
+  try { product = fs.readFileSync('/sys/devices/virtual/dmi/id/product_name', 'utf8').trim(); } catch (e) { /* нет DMI */ }
+  if (!['Jupiter', 'Galileo'].includes(product) || !GAME || MODE !== 'steam' || SZ !== 'deck' || +arg('cpu', 1) !== 1 || has('kids')) {
+    throw Error('--deck-native требует физическую Steam Deck, --mode=steam --size=deck и CPU ×1');
+  }
+}
 const MAXC = +arg('max', 4000);
 const err = (...a) => process.stderr.write(a.join(' ') + '\n');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -113,6 +146,7 @@ if (STARTUP_SESSION) {
 const STARTUP_HOST = { processEpochMs: Math.round(performance.timeOrigin), electron: process.versions.electron,
   chrome: process.versions.chrome, node: process.versions.node, platform: process.platform, arch: process.arch, seed: arg('seed', null), cpuThrottle: +arg('cpu', 1), bootcpu: has('bootcpu') };
 if(ADMISSION_SETTINGS)STARTUP_HOST.admission=ADMISSION_SETTINGS;
+if (DECK_LAUNCH) STARTUP_HOST.nativeDeckLaunch = true;
 if(STARTUP_ENVIRONMENT.noLanguage||STARTUP_ENVIRONMENT.deck||STARTUP_ENVIRONMENT.productionQuery)STARTUP_HOST.environment=STARTUP_ENVIRONMENT;
 app.setPath('userData', UD);
 if (app.dock) app.dock.hide();
@@ -208,13 +242,18 @@ app.whenReady().then(async () => {
     window.__lateSeed = n => { let h = ${+arg('seed') >>> 0} ^ 0x9E3779B9; for (let i = 0; i < n.length; i++) h = Math.imul(h ^ n.charCodeAt(i), 0x01000193); a = h; }; })();` : '';
   fs.writeFileSync(pre, (startupFixture ? `try { localStorage.clear(); const F = ${JSON.stringify(startupFixture)}; for (const k of Object.keys(F)) localStorage.setItem(k, JSON.stringify(F[k])); } catch(e) { throw e; }` : '') + `try { const S = ${JSON.stringify(seed)}; for (const k in S) if (localStorage.getItem(k) === null) localStorage.setItem(k, JSON.stringify(S[k])); } catch (e) {}` + touch);
 
-  const win = new BrowserWindow({ width: W, height: H, useContentSize: true, show: false,
-    webPreferences: { offscreen: true, backgroundThrottling: false, session: SES, preload: pre, sandbox: false, contextIsolation: !PHONE } });
+  const displays = NATIVE_DECK ? screen.getAllDisplays() : [];
+  const panel = displays.find(d => Math.abs(d.size.width / d.size.height - 1.6) < 0.02 && d.size.width <= 1280);
+  const display = NATIVE_DECK ? panel || screen.getPrimaryDisplay() : null;
+  const win = new BrowserWindow({ width: W, height: H, useContentSize: true, show: NATIVE_DECK,
+    ...(NATIVE_DECK ? { width: 1152, height: 720, x: display.bounds.x + 32, y: display.bounds.y + 32,
+      resizable: false, autoHideMenuBar: true } : {}),
+    webPreferences: { offscreen: !NATIVE_DECK, backgroundThrottling: false, session: SES, preload: pre, sandbox: false, contextIsolation: !PHONE } });
   if(STARTUP_ENVIRONMENT.deck){
     const nativeUA=win.webContents.getUserAgent(),actualUA=require('./startup-environment.cjs').startupUserAgent(nativeUA,STARTUP_ENVIRONMENT);
     win.webContents.setUserAgent(actualUA);STARTUP_HOST.userAgent={native:nativeUA,actual:actualUA,scope:'host Steam Deck device emulation; not physical hardware'};
   }
-  win.webContents.setFrameRate(60);
+  if (!NATIVE_DECK) win.webContents.setFrameRate(60);
   const errors = [];
   let uncaught = 0;
   win.webContents.on('console-message', (e, level, msg, line, src) => {
@@ -401,7 +440,7 @@ app.whenReady().then(async () => {
   if (arg('q')) q.push(arg('q').replace(/^[?&]/, ''));
   const url = 'app://g/' + PAGE + '?' + q.join('&');
   const dbg = win.webContents.debugger;
-  if ((has('bootcpu') && +arg('cpu', 1) > 1) || arg('cpuprofile') || rnd || MEM || INIT_SCRIPT !== null || STARTUP_BENCH) {
+  if ((has('bootcpu') && +arg('cpu', 1) > 1) || arg('cpuprofile') || rnd || MEM || INIT_SCRIPT !== null || STARTUP_BENCH || NATIVE_DECK) {
     try {
       await win.loadURL('app://g/__blank').catch(() => {});   // тот же источник: рендерер не сменится при переходе на игру
       dbg.attach('1.3');
@@ -416,6 +455,21 @@ app.whenReady().then(async () => {
       if (rnd || MEM || INIT_SCRIPT !== null || STARTUP_BENCH) await dbg.sendCommand('Page.enable');
       if (rnd) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: rnd });
       if (INIT_SCRIPT !== null) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: INIT_SCRIPT });
+      // Окно Deck остаётся видимым на панели, даже если автор пишет на другом
+      // мониторе. Пауза по скрытию окна остаётся в силе.
+      if (NATIVE_DECK) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', {
+        source: "window.addEventListener('blur', event => event.stopImmediatePropagation(), true)",
+      });
+      if (DECK_LAUNCH) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', {
+        source: `(() => {
+          const click = () => {
+            const button = document.querySelector('#cr-menu[data-launch-menu] .k-go button');
+            if (button && window.__startupTrace?.report().marks['launch.menu']) button.click();
+            else requestAnimationFrame(click);
+          };
+          requestAnimationFrame(click);
+        })()`,
+      });
       if (MEM) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: GLMEM });   // видеопамять — с первого вызова WebGL
       if (arg('cpuprofile')) { await dbg.sendCommand('Profiler.enable'); await dbg.sendCommand('Profiler.setSamplingInterval', { interval: 250 }); await dbg.sendCommand('Profiler.start'); }
     } catch (e) { if(ADMISSION_SETTINGS?.mode==='settled')throw new Error('probe: settled admission debugger setup failed: '+e.message); if (INIT_SCRIPT !== null) throw new Error('probe: init-script не установлен: ' + e.message); err('probe: отладчик загрузки:', e.message); }
@@ -456,6 +510,12 @@ app.whenReady().then(async () => {
     try { const { profile } = await dbg.sendCommand('Profiler.stop'); fs.writeFileSync(path.resolve(arg('cpuprofile')), JSON.stringify(profile)); err('probe: профиль загрузки →', path.resolve(arg('cpuprofile'))); } catch (e) { err('probe: профиль не снят:', e.message); }
   }
   await js(INSTALL);
+  if (NATIVE_DECK) {
+    const actualDisplay = screen.getDisplayMatching(win.getBounds());
+    const nativeDeck = { launch: DECK_LAUNCH, displayHz: actualDisplay.displayFrequency, scale: actualDisplay.scaleFactor,
+      features: app.getGPUFeatureStatus(), ...(DECK_PRESENT ? { tracePresent: true } : {}) };
+    await js('window.__probe.nativeDeck=' + JSON.stringify(nativeDeck));
+  }
   if (arg('sa')) {                                    // --sa=59,21 — вырез по бокам и полоска «домой», как у iPhone боком
     const [l, b] = arg('sa').split(',').map(Number);
     await js(`(() => { const r = document.documentElement.style; r.setProperty('--sa-l', '${+l || 0}px'); r.setProperty('--sa-r', '${+l || 0}px'); r.setProperty('--sa-b', '${+b || 0}px'); })()`);
@@ -476,6 +536,11 @@ app.whenReady().then(async () => {
       if (ALLOCP) { await dbg.sendCommand('HeapProfiler.enable'); await dbg.sendCommand('HeapProfiler.startSampling', { samplingInterval: 16384, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true }); }
     } catch (e) { err('probe: профиль не включился:', e.message); }
   }
+  let presentation;
+  if (DECK_PRESENT) {
+    presentation = require('./probe-deck-present.cjs');
+    await contentTracing.startRecording({ included_categories: presentation.categories, trace_buffer_size_in_kb: 32768 });
+  }
   let result, evalErr = null;
   if (CODE) {
     try {
@@ -490,6 +555,15 @@ app.whenReady().then(async () => {
     }
   }
   if (finished) return;
+  if (presentation) {
+    try {
+      const file = await contentTracing.stopRecording(PRESENT_TRACE ? path.resolve(PRESENT_TRACE) : path.join(UD, 'deck-present.json'));
+      if (!evalErr) {
+        if (!result?.results) throw Error('--deck-present требует сцен из tools/probe-checks/deck-native.js');
+        result.presented = presentation.readPresentations(JSON.parse(fs.readFileSync(file, 'utf8')), result.results);
+      }
+    } catch (e) { evalErr ||= String(e.message || e); }
+  }
   let landExport=null,landExportError=null,landExportDiagnostics=null;
   if(arg('land-export')){
     ({landExport,landExportError,landExportDiagnostics,evalErr}=await require('./land-export-host.cjs').exportWithDiagnostics({js,priorEvalErr:evalErr,uncaught,errors,allowed:!!arg('land-export-manifest')&&STARTUP_BENCH&&!MEM&&!RUNP&&!ALLOCP,args:{file:arg('land-export'),manifestFile:arg('land-export-manifest'),dist:DIST,repo:path.resolve(__dirname,'..')}}));
@@ -502,6 +576,30 @@ app.whenReady().then(async () => {
     ({landPackageExport,landPackageExportError,landPackageExportDiagnostics}=exported);evalErr=exported.evalErr;
   }
   if (finished) return;
+  if (arg('land-surface-out')) {
+    if (MODE !== 'steam' || !STARTUP_BENCH || arg('seed') || evalErr || uncaught || errors.length || !result?.captureSurface) {
+      throw Error('Экспорт рисунка земли требует обычной Steam-сборки, готовых контуров и завершённого города');
+    }
+    const out = path.resolve(arg('land-surface-out'));
+    const size = await js('window.__landSurfaceBake.size()');
+    const { SURFACE_LIMIT } = await import('../src/game/landdata/surface-tiles.js');
+    if (!Number.isSafeInteger(size) || size <= 0 || size > SURFACE_LIMIT) throw Error('Размер рисунка земли');
+    await writeRendererChunks(out, size,
+      (offset, count) => js('window.__landSurfaceBake.chunk(' + offset + ',' + count + ')'),
+      'Не удалось записать рисунок земли');
+  }
+  if (arg('deck-shader-out')) {
+    if (MODE !== 'steam' || !STARTUP_BENCH || arg('seed') || INIT_SCRIPT === null ||
+        evalErr || uncaught || errors.length || !result?.captureDeckShaders) {
+      throw Error('Экспорт шейдеров требует подготовленной Steam-сборки и первого управляемого кадра');
+    }
+    const out = path.resolve(arg('deck-shader-out')), size = result.bytes;
+    const { SHADER_ARCHIVE_LIMIT } = await import('../src/game/landdata/deck-shader-format.js');
+    if (!Number.isSafeInteger(size) || size <= 0 || size > SHADER_ARCHIVE_LIMIT) throw Error('Размер пакета шейдеров');
+    await writeRendererChunks(out, size,
+      (offset, count) => js('window.__deckShaderCapture.chunk(' + offset + ',' + count + ')'),
+      'Не удалось записать пакет шейдеров');
+  }
   const tEval = Date.now() - T0;
   if (RUNP) { try { const { profile } = await dbg.sendCommand('Profiler.stop'); fs.writeFileSync(path.resolve(RUNP), JSON.stringify(profile)); err('probe: профиль скрипта →', path.resolve(RUNP)); } catch (e) { err('probe: профиль не снят:', e.message); } }
   if (ALLOCP) { try { const { profile } = await dbg.sendCommand('HeapProfiler.stopSampling'); fs.writeFileSync(path.resolve(ALLOCP), JSON.stringify(profile)); err('probe: выделения памяти →', path.resolve(ALLOCP)); } catch (e) { err('probe: выделения не сняты:', e.message); } }

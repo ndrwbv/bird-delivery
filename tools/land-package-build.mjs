@@ -8,8 +8,12 @@ import {captureSource,sha256} from './land-package-files.mjs';
 import {DEFAULT_LIMITS} from '../src/game/landcache17a/checkpoint-limits.js';
 import {LAND_PACKAGE_LIMITS} from '../src/game/landdata/land-package-config.js';
 import {decodeCheckpoint} from '../src/game/landcache17a/checkpoint-codec.js';
+import { decodeSurfaceTiles, SURFACE_LIMIT } from '../src/game/landdata/surface-tiles.js';
+
+import { shaderManifest, shaderArchive, SHADER_TEXT_LIMIT } from '../src/game/landdata/deck-shader-format.js';
 
 const rawCeiling=DEFAULT_LIMITS.maxPayloadBytes+DEFAULT_LIMITS.maxHeaderBytes+20;
+
 export function verifyLandPackage({repo,dir,catalogFile='catalog.json'}){
  dir=fs.realpathSync(dir);
  // Historical v1 remains parseable by checkCatalog; a NEW product build requires all four v2 slots.
@@ -32,7 +36,37 @@ export function verifyLandPackage({repo,dir,catalogFile='catalog.json'}){
   decodeCheckpoint(new Uint8Array(raw.buffer,raw.byteOffset,raw.byteLength),makeIdentity(catalog.manifest,entry.precleanHash),{limits:LAND_PACKAGE_LIMITS});
   assets.push({path:entry.path,file:real,bytes:entry.bytes,sha256:entry.sha256});
  }
- return{catalog,assets};
+ let surface = null;
+ const surfaceFile = path.join(dir, 'surface.json');
+ if (fs.existsSync(surfaceFile)) {
+  surface = JSON.parse(fs.readFileSync(surfaceFile, 'utf8'));
+  need(surface.version === 1 && /^[a-f0-9]{64}$/.test(surface.sha256) &&
+    catalog.entries.some(entry => entry.rawSha256 === surface.contourSha256) &&
+    surface.path === 'city-data/'+surface.sha256+'.surface', 'SURFACE_MANIFEST');
+  need(Number.isSafeInteger(surface.bytes) && surface.bytes > 0 && surface.bytes <= SURFACE_LIMIT, 'SURFACE_BUDGET');
+  const file = path.join(dir, surface.path), real = fs.realpathSync(file);
+  need(!path.relative(dir, real).startsWith('..') && !fs.lstatSync(file).isSymbolicLink(), 'SURFACE_PATH');
+  need(fs.statSync(real).size === surface.bytes, 'SURFACE_LENGTH');
+  const bytes = fs.readFileSync(real);
+  need(sha256(bytes) === surface.sha256, 'SURFACE_SHA');
+  decodeSurfaceTiles(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+  assets.push({path:surface.path, file:real, bytes:surface.bytes, sha256:surface.sha256});
+ }
+ let deckShaders = null;
+ const shaderFile = path.join(dir, 'deck-shaders.json');
+ if (fs.existsSync(shaderFile)) {
+   deckShaders = JSON.parse(fs.readFileSync(shaderFile, 'utf8'));
+   need(shaderManifest(deckShaders, declared.sourceHash), 'DECK_SHADER_MANIFEST');
+   const file = path.join(dir, deckShaders.path), real = fs.realpathSync(file);
+   need(!path.relative(dir, real).startsWith('..') && !fs.lstatSync(file).isSymbolicLink(), 'DECK_SHADER_PATH');
+   need(fs.statSync(real).size === deckShaders.bytes, 'DECK_SHADER_LENGTH');
+   const bytes = fs.readFileSync(real);
+   need(sha256(bytes) === deckShaders.sha256, 'DECK_SHADER_SHA');
+   const decoded = gunzipSync(bytes, { maxOutputLength: SHADER_TEXT_LIMIT });
+   need(shaderArchive(JSON.parse(decoded.toString('utf8')), deckShaders.programs), 'DECK_SHADER_ARCHIVE');
+   assets.push({ path: deckShaders.path, file: real, bytes: deckShaders.bytes, sha256: deckShaders.sha256 });
+ }
+ return{catalog,assets,surface,deckShaders};
 }
 export function landPackagePlugin(checked){
  return{name:'prepared-land-package',generateBundle(){

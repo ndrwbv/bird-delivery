@@ -46,6 +46,10 @@ import * as DYN from './dynres.js';              // «мыло»: снежинк
 import { SEE_U, SEE_FN } from './seethru.js';    // деревья, кусты и столбы между камерой и машиной тают (seethru.js, 0п47)
 import { BAYER_FN } from './fade.js';
 import { indexPile } from './pileindex.js';
+import { createSeasonPileStore } from './season-pile-store.js';
+import { joinPackedPile } from './season-pile-join.js';
+import { startSeasonPile } from './season-pile-job.js';
+import { STARTUP } from './startuptrace.js';
 import { clearPlayArea } from './playclearance.js';
 import * as RLAND from './raisedland.js';
 import { WOOD_ON, WOOD } from './treeform.js';      // деревья «как в глубинке» (2г6, 2г10): два тона кроны, снег на ветках толще, шапки на соснах; ?oldwood — по-старому
@@ -194,6 +198,13 @@ vec3 seasonTint (vec3 c, float dryK, float snowK, float landK) {
   float green = smoothstep(0.05, 0.18, c.g - max(c.r, c.b)) * dryK;
   float water = smoothstep(0.08, 0.2, c.b - c.r) * step(c.g, c.b);
   float road = (1.0 - smoothstep(0.05, 0.12, sat)) * (1.0 - smoothstep(0.4, 0.62, lum));
+  // Без склона шум не влияет на цвет. Поднятая зелёная кромка сохраняет снег.
+  if (up == 0.0) {
+    if (uHeat > 0.0) c = mix(c, c * vec3(1.25, 0.92, 0.58) + vec3(0.07, 0.025, 0.0), uHeat * 0.6);
+    float cov = landK * smoothstep(0.5, 0.82, uSnow) * clamp(snowK, 0.0, 1.0) * (1.0 - water) * (1.0 - road) * step(0.02, green);
+    vec3 snow = mix(vec3(0.88, 0.91, 0.97), vec3(0.46, 0.48, 0.52), road * 0.6);
+    return mix(c, mix(snow, vec3(0.66, 0.68, 0.72), yardP * 0.55), cov);
+  }
   // шум пятен (снег, сухая трава, грязь): сетка шума повёрнута (37° и −53°), у двух октав — каждая по-своему,
   // Ровная сетка по осям мира рисовала пятна углами и клетками — снег лежал «квадратами» (О6, 09.10.2026)
   // крупная октава ещё и сдвинута мелкой (без лишних вызовов шума): край пятна извилистый, а не ромбом
@@ -319,13 +330,15 @@ float winterNoise(vec2 p) {
              mix(winterHash(i + vec2(0.0, 1.0)), winterHash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 ` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-float grit = smoothstep(0.65, 0.82, winterNoise(vRoadXZ * 5.0)) * 0.18
-           + smoothstep(0.78, 0.9, winterNoise(vRoadXZ * 1.2 + vec2(17.0))) * 0.025;
-diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.56, 0.47, 0.39), vRoadSand * grit);
 // Same stationary coverage as the detailed surface.
-if (vRoadBlend < 0.05) discard;`);
+if (vRoadBlend < 0.05) discard;
+if (vRoadSand > 0.0) {
+  float grit = smoothstep(0.65, 0.82, winterNoise(vRoadXZ * 5.0)) * 0.18
+             + smoothstep(0.78, 0.9, winterNoise(vRoadXZ * 1.2 + vec2(17.0))) * 0.025;
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.56, 0.47, 0.39), vRoadSand * grit);
+}`);
   };
-  m.customProgramCacheKey = () => 'winter-road-grit-blend8';
+  m.customProgramCacheKey = () => 'winter-road-grit-blend9';
   // Packed roadway never switches to the local deformable grid.
   m.userData.snowStatic = true;
   return m;
@@ -446,106 +459,9 @@ function garlandMat () {
   return m;
 }
 
-/* нормаль листвы октаэдром (ось — вверх): u — 6 бит в aux.z над палитрой (2 бита), v — 8 бит в aux.w (pileMat разбирает) */
-function octN (c, v0, nv, x, y, z, pal, nrm) {
-  const w = nrm ? nrm.w : 0;
-  for (let i = v0; i < v0 + nv; i++) {
-    const px = c.p[i * 3], py = c.p[i * 3 + 1], pz = c.p[i * 3 + 2];
-    let ax = px - x, ay = py - y, az = pz - z, l = Math.hypot(ax, ay, az) || 1;
-    ax /= l; ay /= l; az /= l;
-    if (w) {
-      let bx = px - nrm.cx, by = py - nrm.cy, bz = pz - nrm.cz, m = Math.hypot(bx, by, bz) || 1;
-      ax = ax * (1 - w) + bx / m * w; ay = ay * (1 - w) + by / m * w; az = az * (1 - w) + bz / m * w;
-    }
-    const s = Math.abs(ax) + Math.abs(ay) + Math.abs(az) || 1;
-    let u = ax / s, v = az / s;
-    if (ay < 0) { const u2 = (1 - Math.abs(v)) * (u >= 0 ? 1 : -1), v2 = (1 - Math.abs(u)) * (v >= 0 ? 1 : -1); u = u2; v = v2; }
-    c.a[i * 4 + 2] = pal + (Math.round((u * 0.5 + 0.5) * 63) << 2);
-    c.a[i * 4 + 3] = Math.round((v * 0.5 + 0.5) * 255);
-  }
-}
-
-/* ─── своя склейка: клетки по сто метров, позиция + цвет + aux ─── */
-function Pile (CH = CELL) {                      // CH — клетка склейки, м
-  const cells = new Map();
-  const landParts = RLAND.ON ? [] : null;
-  let landRoot = null;
-  const col = new THREE.Color(), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), P = new THREE.Vector3(), Sc = new THREE.Vector3();
-  let tris = 0;
-  const byNum = new Map(), RGB = new Map();         // клетка по числу (строка-ключ на каждую вещь стоила), цвет по строке — разобранный
-  function cell (x, z) {
-    const i = Math.floor(x / CH), j = Math.floor(z / CH), kn = (i + 50000) * 100000 + j + 50000;
-    let c = byNum.get(kn);
-    if (!c) {
-      const k = i + ',' + j;
-      c = cells.get(k);
-      if (!c) cells.set(k, c = { k, n: 0, cap: 2048, p: new Float32Array(2048 * 3), c: new Uint8Array(2048 * 3), a: new Uint8Array(2048 * 4) });
-      byNum.set(kn, c);
-    }
-    return c;
-  }
-  /* вершины шаблона после сдвига, поворота и масштаба — в массив out с o */
-  function write (tpl, out, o, x, y, z, sx, sy, sz, rx, ry, rz) {
-    M.compose(P.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz, 'YZX')), Sc.set(sx, sy, sz));
-    const e = M.elements, nv = tpl.length / 3;
-    for (let i = 0; i < nv; i++) {
-      const vx = tpl[i * 3], vy = tpl[i * 3 + 1], vz = tpl[i * 3 + 2], q = o + i * 3;
-      out[q] = e[0] * vx + e[4] * vy + e[8] * vz + e[12];
-      out[q + 1] = e[1] * vx + e[5] * vy + e[9] * vz + e[13];
-      out[q + 2] = e[2] * vx + e[6] * vy + e[10] * vz + e[14];
-    }
-  }
-  function room (c, add) {
-    if (c.n + add <= c.cap) return;
-    while (c.n + add > c.cap) c.cap = Math.ceil(c.cap * 1.5);   // запас ×1,5 (был ×2: на телефоне ~28 МБ пустого из 90 к пику поздней сборки, 23.10.2026)
-    const p = new Float32Array(c.cap * 3), cc = new Uint8Array(c.cap * 3), a = new Uint8Array(c.cap * 4);
-    p.set(c.p); cc.set(c.c); a.set(c.a);
-    c.p = p; c.c = cc; c.a = a;
-  }
-  return {
-    /* tpl — неиндексированные вершины шаблона; поворот: X, потом Z, потом Y */
-    /* возвращает, где лежат вершины: клетка и первая вершина */
-    /* shade — низ куска темнее, верх светлее (кроны, trees.js): 0 — ровный цвет */
-    /* lift — на сколько м поднять вершину зимой (по вершине шаблона, снег на ветках толще: treeform.js), liftK — множитель */
-    /* nrm — мягкая листва (2г6, treeform.js): { cx, cy, cz, w } — центр кроны и доля «от центра кроны» в нормали (остальное —
-       от середины комка x, y, z); у листвы (вид 1; вид 0 с палитрой 2 — хвоя) нормаль вершины пишется в aux.z (старшие 6 бит)
-       и aux.w (8 бит) октаэдром — без лишней памяти; шейдер рисует крону плавно, без граней */
-    add (tpl, x, y, z, sx, sy, sz, rx, ry, rz, hex, kind = 0, seed = 0, pal = 0, shade = 0, lift = null, liftK = 1, nrm = null) {
-      const c = cell(x, z), nv = tpl.length / 3, v0 = c.n;
-      room(c, nv);
-      write(tpl, c.p, v0 * 3, x, y, z, sx, sy, sz, rx, ry, rz);
-      let rgb = RGB.get(hex);
-      if (rgb === undefined) {
-        col.set(hex);
-        rgb = (Math.round(col.r * 255) << 16) | (Math.round(col.g * 255) << 8) | Math.round(col.b * 255);
-        if (typeof hex === 'string' || typeof hex === 'number') RGB.set(hex, rgb);
-      }
-      const r = rgb >> 16, g = (rgb >> 8) & 255, b = rgb & 255;
-      const sd = Math.max(1, Math.min(254, Math.round(seed * 253) + 1));
-      for (let i = v0; i < v0 + nv; i++) {
-        const o = i * 3, q = i * 4;
-        if (shade) {
-          const f = 1 + shade * (0.6 * tpl[(i - v0) * 3 + 1] - 0.12);
-          c.c[o] = Math.min(255, r * f); c.c[o + 1] = Math.min(255, g * f); c.c[o + 2] = Math.min(255, b * f);
-        } else { c.c[o] = r; c.c[o + 1] = g; c.c[o + 2] = b; }
-        c.a[q] = kind; c.a[q + 1] = sd; c.a[q + 2] = pal; c.a[q + 3] = lift ? Math.min(255, Math.round(lift[i - v0] * liftK * 200)) : 0;
-      }
-      if (WOOD_ON && (kind === 1 || (kind === 0 && pal === 2))) octN(c, v0, nv, x, y, z, pal, nrm);
-      c.n += nv;
-      tris += nv / 3;
-      if (landParts && !RLAND.ST.built) landParts.push({ c, v0, nv, x: landRoot ? landRoot[0] : x, z: landRoot ? landRoot[1] : z });
-      return { key: c.k, v0, nv };
-    },
-    landAnchor (x, z) { landRoot = x === undefined ? null : [x, z]; },
-    raiseLand (delta) {
-      for (const q of landParts || []) {
-        const h = delta(q.x, q.z), a = q.c.p;
-        if (h && a) for (let v = q.v0; v < q.v0 + q.nv; v++) a[v * 3 + 1] += h;
-      }
-      if (landParts) landParts.length = 0;
-    },
-    write,
-    tris: () => tris,
+function Pile (CH = CELL) {
+  const store = createSeasonPileStore({ THREE, CH, WOOD_ON, raisedLand: RLAND.ON, landBuilt: () => RLAND.ST.built });
+  return Object.assign(store, {
     /* keep — позиции остаются в памяти: их правят на ходу (сугробы). steps — то же шагами по 24 клетки
        (поздняя сборка, latebuild.js) */
     build (mat, keep) { const it = this.steps(mat, keep); for (;;) { const r = it.next(); if (r.done) return r.value; } },
@@ -553,7 +469,7 @@ function Pile (CH = CELL) {                      // CH — клетка скле
       const out = [];
       out.byKey = new Map();
       let i = 0;
-      for (const c of cells.values()) {
+      for (const c of store.cells().values()) {
         if (!c.n) continue;
         if (++i % 24 === 0) yield 'pile';
         const g = new THREE.BufferGeometry();
@@ -565,25 +481,12 @@ function Pile (CH = CELL) {                      // CH — клетка скле
         C.scene.add(m);
         out.push(m); out.byKey.set(c.k, m);
       }
-      cells.clear(); byNum.clear();
+      store.clear();
       return out;
     },
-    cells: () => cells,
-    clear () { cells.clear(); byNum.clear(); },
-    /* клетку уже переложили в склейку (jointSteps): её массивы — вон сразу, а не после всех клеток (на телефоне исходники
-       деревьев и сугробов ~150 МБ жили рядом с готовыми склейками — пик поздней сборки, 23.10.2026) */
-    drop (k) {
-      const c = cells.get(k);
-      if (!c) return;
-      cells.delete(k);
-      const [i, j] = k.split(',').map(Number);
-      byNum.delete((i + 50000) * 100000 + j + 50000);
-      c.p = c.c = c.a = null; c.n = c.cap = 0;
-    },
-    /* память клеток (отладка): МБ занято массивами / из них вершинами */
-    mem () { let cap = 0, used = 0; for (const c of cells.values()) { cap += c.cap * 10; used += c.n * 10; } return { cells: cells.size, cap: +(cap / 1048576).toFixed(1), used: +(used / 1048576).toFixed(1) }; },
-  };
+  });
 }
+
 function dropArr () { this.array = null; }
 
 /* Несколько склеек с одним материалом — одним мешем на клетку (17.10.2026, docs/AGENTS.md «Слои статики»): сугробы, кучи
@@ -611,9 +514,10 @@ function bounds (g) {
   g.boundingSphere = new THREE.Sphere(new THREE.Vector3(cx, cy, cz), Math.sqrt(r2));
   g.boundingBox = new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, y1, z1));
 }
-function* jointSteps (piles, mat, nKeep) {
+function* jointSteps (piles, mat, nKeep, packed = null) {
   const keys = new Set();
   for (const P of piles) for (const k of P.cells().keys()) keys.add(k);
+  if (packed) for (const k of packed.keys()) keys.add(k);
   const out = [], offs = piles.map(() => new Map());
   out.byKey = new Map();
   let i = 0;
@@ -621,8 +525,13 @@ function* jointSteps (piles, mat, nKeep) {
     if (++i % 24 === 0) yield 'pile';
     let n = 0, nk = 0;
     const parts = piles.map((P, pi) => { const c = P.cells().get(k), cn = c ? c.n : 0; n += cn; if (pi < nKeep) nk += cn; return c; });
-    if (!n) continue;
-    let pp = new Float32Array(n * 3), cc = new Uint8Array(n * 3), aa = new Uint8Array(n * 4);
+    const stat = packed?.get(k);
+    if (!n && !stat) continue;
+    const t0 = performance.now();
+    const joined = stat ? joinPackedPile(stat, nk) : null;
+    let pp = joined?.p ?? new Float32Array(n * 3);
+    let cc = joined?.c ?? new Uint8Array(n * 3);
+    let aa = joined?.a ?? new Uint8Array(n * 4);
     let o = 0;
     for (let pi = 0; pi < parts.length; pi++) {
       const c = parts[pi];
@@ -632,10 +541,13 @@ function* jointSteps (piles, mat, nKeep) {
       o += c.n;
     }
     for (const P of piles) P.drop(k);
+    if (stat) {
+      n += stat.n;
+      offs[piles.length - 1].set(k, o);
+      packed.delete(k);
+    }
     const g = new THREE.BufferGeometry();
-    // ?nopileix — контрольная сборка без общих вершин, для замера памяти и вида.
-    const t0 = performance.now();
-    const indexed = /[?&]nopileix(&|$)/.test(location.search) ? null : indexPile(pp, cc, aa, nk);
+    const indexed = joined ? (joined.index ? joined : null) : PILE_INDEX ? indexPile(pp, cc, aa, nk) : null;
     if (indexed) {
       pp = indexed.p; cc = indexed.c; aa = indexed.a;
       const ia = new THREE.BufferAttribute(indexed.index, 1);
@@ -743,14 +655,33 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 const pickR = (r, a) => a[(r() * a.length) | 0];
 
 /* ─────────────── инициализация ─────────────── */
-let PILE = null, GARL = null, DRIFTP = null, DRIFT_MESH = [], LEAFP = null, LEAF_MESH = [];
+let PILE = null, PILE_JOB = null, GARL = null, DRIFTP = null, DRIFT_MESH = [], LEAFP = null, LEAF_MESH = [];
 const DECID = [], SPRUCES = [], SEA_ITEMS = [], DRIFTS = new Map(), LEAVES = new Map(), FIRS = [], FIGHT_SPOTS = [];
+const driftCell = (i, j) => i * 65536 + j;
+const DRIFT_TOP = new Map();
+function registerDriftTop (d) {
+  const i = Math.floor(d.x / 20), j = Math.floor(d.z / 20);
+  // A flattened drift can grow in XZ. Keep its widest bounds within
+  // the original 3×3 query and read the current height on every sample.
+  const reach = 1.25 * d.W + 1.15 * d.L;
+  const i0 = Math.max(i - 1, Math.floor((d.x - reach) / 20));
+  const i1 = Math.min(i + 1, Math.floor((d.x + reach) / 20));
+  const j0 = Math.max(j - 1, Math.floor((d.z - reach) / 20));
+  const j1 = Math.min(j + 1, Math.floor((d.z + reach) / 20));
+  for (let u = i0; u <= i1; u++) for (let v = j0; v <= j1; v++) {
+    const key = driftCell(u, v), list = DRIFT_TOP.get(key);
+    if (list) list.push(d); else DRIFT_TOP.set(key, [d]);
+  }
+}
+const noDrifts = [];
 const SLIDES = [];
 /* ледяные горки дворов { x, z, ry, H, L, k, it } — на них катаются люди (yardlife.js) */
 export const slides = () => SLIDES;
 let MESH_GARL = [], MESH_PILE = [];
 /* ?nojoint — сугробы, листья и деревья по-старому, тремя мешами на клетку (для замера «до/после») */
 const JOINT_OFF = typeof location !== 'undefined' && /[?&]nojoint(&|$)/.test(location.search);
+// ?nopileix — контрольная сборка без общих вершин.
+const PILE_INDEX = typeof location === 'undefined' || !/[?&]nopileix(&|$)/.test(location.search);
 const BUILT = { trees: 0, pile: 0, garl: 0, drifts: 0, bulbs: 0, items: 0 };
 
 /* ctx: THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH, curbAt, nearestRoad, roadWidth, drivable,
@@ -761,10 +692,15 @@ export const pileMem = () => ({ pile: PILE && PILE.mem(), drift: DRIFTP && DRIFT
   index: MESH_PILE.map(m => m.geometry.userData.pileIndex).filter(Boolean) });
 export function initSeasons (ctx) {
   C = ctx; THREE = ctx.THREE;
-  const q = new URLSearchParams(location.search).get('season');
+  const query = new URLSearchParams(location.search);
+  const q = query.get('season');
   if (q !== null && q !== '' && !Number.isNaN(+q)) { SEA = wrap(+q); FORCED = true; }
   else readSaved();
-  PILE = Pile(); GARL = Pile(CELL * 2); DRIFTP = Pile(); LEAFP = Pile();   // гирлянды редкие и мелкие — клетки 400 м (17.10.2026): вдвое меньше вызовов, лишних вершин за кадром — мало
+  const pileCell = ctx.streamTreeMesh && query.has('debug') && query.has('deckpile128') ? 128 : CELL;
+  if (ctx.streamTreeMesh && PILE_INDEX && !EDL.ED.on && !JOINT_OFF)
+    PILE_JOB = startSeasonPile({ cell: pileCell, wood: WOOD_ON, raised: RLAND.ON });
+  PILE = PILE_JOB?.producer ?? Pile(pileCell);
+  GARL = Pile(CELL * 2); DRIFTP = Pile(pileCell); LEAFP = Pile(pileCell);   // гирлянды редкие и мелкие — клетки 400 м (17.10.2026): вдвое меньше вызовов, лишних вершин за кадром — мало
   smashMat(C.SMASH_MAT);
   apply();
 }
@@ -975,7 +911,7 @@ export function narrowDrifts () {
    кусок ~0,65 с, меню между шагами отвечает. Шаги — по счёту улиц и домов, не по времени */
 export function* seasonSteps () {
   const { CITY, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds, ZEBRAS, NODE_IDX, nodeDeg, LAMP_SPOTS } = C;
-  const T = tpls(), P = PILE, G = GARL;
+  const T = tpls(), G = GARL;
   const svk = C.MAP.id === 'seversk';
   // копии вершин горок и снеговиков: чтобы вернуть их к зиме
   for (const it of SEA_ITEMS) if (it.mesh) it.seaPos = it.mesh.geometry.attributes.position.array.slice(it.v0 * 3, (it.v0 + it.nv) * 3);
@@ -1009,10 +945,12 @@ export function* seasonSteps () {
     if (!C.snowFences.fits(x, z, 1.25 * Math.max(L, W))) return;
     const y = groundH(x, z) + C.curbAt(x, z) + 0.02;
     const at = DRIFTP.add(T.snowMound, x, y, z, W, H, L, 0, ry, 0, DRIFT_HEX, 3, seed);
-    const k = Math.floor(x / 20) + ',' + Math.floor(z / 20);
+    const k = driftCell(Math.floor(x / 20), Math.floor(z / 20));
     if (!DRIFTS.has(k)) DRIFTS.set(k, []);
-    DRIFTS.get(k).push({ x, y, z, L, H, W, ry, cs: Math.cos(ry), sn: Math.sin(ry), s: 1, t: 0, ...at, pile: DRIFTP,
-      seed: Math.max(1, Math.min(254, Math.round(seed * 253) + 1)) / 255 });
+    const d = { x, y, z, L, H, W, ry, cs: Math.cos(ry), sn: Math.sin(ry), s: 1, t: 0, ...at, pile: DRIFTP,
+      seed: Math.max(1, Math.min(254, Math.round(seed * 253) + 1)) / 255 };
+    DRIFTS.get(k).push(d);
+    registerDriftTop(d);
     BUILT.drifts++;
     // осенью рядом — кучи листьев (по зерну видны, как опавшие листья: uFallen), пониже и рыжие. Не строем через
     // каждые 5 м, как валы: где-то кучки гуще, где-то пусто (пятна 9 и 23 м), сдвиг вдоль улицы ±1,8 м, размер ×0,5—1,4
@@ -1157,6 +1095,9 @@ export function* seasonSteps () {
     firs++;
   }
 
+  // Статические деревья уже размещены и получили поправки высоты.
+  // Рабочий поток упакует их, пока собираются гирлянды.
+  PILE_JOB?.dispatch();
   // ── гирлянды: по фасадам части домов — провисающими петлями над первым этажом
   const PAL_MULTI = ['#ff5a4a', '#ffd23f', '#5aff7a', '#5aa8ff', '#ff7ae0'], PAL_WARM = ['#ffe6a0', '#ffd98a', '#fff2c8'];
   let bulbs = 0;
@@ -1205,7 +1146,21 @@ export function* seasonSteps () {
     yield 'pile';
   }
   MESH_GARL = yield* GARL.steps(garlandMat());
-  yield 'garlmesh';
+  const treeResult = yield PILE_JOB ? PILE_JOB.take() : 'garlmesh';
+  if (PILE_JOB) {
+    PILE = Pile(PILE_JOB.cell);
+    if (treeResult) {
+      STARTUP.worker('seasons.pile', treeResult.ms);
+      STARTUP.count('seasons.pile.cells', treeResult.cells.size);
+      STARTUP.count('seasons.pile.prepacked', treeResult.reused);
+    } else {
+      STARTUP.flag('seasons.pileFallback');
+      STARTUP.flag('seasons.pileFallback.' + PILE_JOB.failure);
+      STARTUP.work('seasons.pileFallback', () => PILE_JOB.recover(PILE));
+    }
+    PILE_JOB.clear();
+    PILE_JOB = null;
+  }
   if (EDL.ED.on || JOINT_OFF) {
     // сугробы — отдельно: их позиции живые (разбиваются и отрастают)
     DRIFT_MESH = yield* DRIFTP.steps(MESH_PILE[0] ? MESH_PILE[0].material : pileMat(), true);
@@ -1216,7 +1171,7 @@ export function* seasonSteps () {
     yield 'drift';
   } else {
     // сугробы, кучи листьев и деревья — одним мешем на клетку (jointSteps): живые сугробы и листья — в начале клетки
-    const J = yield* jointSteps([DRIFTP, LEAFP, PILE], pileMat(), 2);
+    const J = yield* jointSteps([DRIFTP, LEAFP, PILE], pileMat(), 2, treeResult?.cells);
     MESH_PILE = J.out; DRIFT_MESH = []; LEAF_MESH = [];
     for (const list of DRIFTS.values()) for (const d of list) { d.mesh = J.out.byKey.get(d.key); d.v0 += J.offs[0].get(d.key) || 0; }
     for (const list of LEAVES.values()) for (const d of list) { d.mesh = J.out.byKey.get(d.key); d.v0 += J.offs[1].get(d.key) || 0; }
@@ -1443,35 +1398,57 @@ function stepSky (dt) {
 let driftT = 0, dragT = 0, redressT = 0, CAM_DIR = null, growT = 0;
 const GROW = [];                                          // разбитые — ждут, пока отрастут
 const driftVertex = { x: 0, y: 0, z: 0 };
+const driftFloors = new WeakMap();
+function driftFloorLayout(tpl) {
+  let layout = driftFloors.get(tpl);
+  if (layout) return layout;
+  const columns = new Map(), offsets = [], column = new Uint16Array(tpl.length / 3);
+  for (let i = 0; i < tpl.length; i += 3) {
+    const key = tpl[i] + ',' + tpl[i + 2];
+    let index = columns.get(key);
+    if (index === undefined) {
+      index = offsets.length;
+      columns.set(key, index);
+      offsets.push(i);
+    }
+    column[i / 3] = index;
+  }
+  layout = { offsets, column, heights: new Float64Array(offsets.length), cover: new Float64Array(offsets.length) };
+  driftFloors.set(tpl, layout);
+  return layout;
+}
 function driftShape (d, s) {
   const m = d.mesh;
   if (!m) return;
   const pa = m.geometry.attributes.position;
   if (!pa.array) return;
-  (d.pile || DRIFTP).write(d.pile === LEAFP ? tpls().mound : tpls().snowMound, pa.array, d.v0 * 3, d.x, d.y - (1 - s) * 0.05, d.z, d.W * (1 + (1 - s) * 0.25), d.H * s, d.L * (1 + (1 - s) * 0.15), 0, d.ry, 0);
+  const tpl = d.pile === LEAFP ? tpls().mound : tpls().snowMound;
+  const first = d.v0 * 3, pos = pa.array;
+  (d.pile || DRIFTP).write(tpl, pos, first, d.x, d.y - (1 - s) * 0.05, d.z, d.W * (1 + (1 - s) * 0.25), d.H * s, d.L * (1 + (1 - s) * 0.15), 0, d.ry, 0);
   if (d.floor !== undefined) {
-    const heights = new Map();
-    const pos = pa.array, box = m.geometry.boundingBox, sphere = m.geometry.boundingSphere;
+    const { offsets, column, heights, cover } = driftFloorLayout(tpl);
+    const { boundingBox: box, boundingSphere: sphere } = m.geometry;
     let radiusSq = sphere ? sphere.radius * sphere.radius : 0;
-    const floorAt = (x, z) => {
-      const key = x + ',' + z;
-      let floor = heights.get(key);
-      if (!floor) { floor = { y: C.snowFloor(x, z), cover: C.snowCurbCover(x, z) }; heights.set(key, floor); }
-      return floor;
-    };
-    for (let i = d.v0 * 3; i < (d.v0 + d.nv) * 3; i += 9) {
-      const a = floorAt(pos[i], pos[i + 2]), b = floorAt(pos[i + 3], pos[i + 5]), c = floorAt(pos[i + 6], pos[i + 8]);
-      const span = Math.max(a.y, b.y, c.y) - Math.min(a.y, b.y, c.y);
+    // Rotation is only around Y. A template column keeps one world X/Z.
+    for (let j = 0; j < offsets.length; j++) {
+      const at = first + offsets[j], x = pos[at], z = pos[at + 2];
+      heights[j] = C.snowFloor(x, z);
+      cover[j] = C.snowCurbCover(x, z);
+    }
+    for (let v = 0; v < d.nv; v += 3) {
+      const i = first + v * 3;
+      const a = heights[column[v]], b = heights[column[v + 1]], c = heights[column[v + 2]];
+      const span = Math.max(a, b, c) - Math.min(a, b, c);
       if (span > 0.065) {
         const x = (pos[i] + pos[i + 3] + pos[i + 6]) / 3, z = (pos[i + 2] + pos[i + 5] + pos[i + 8]) / 3;
-        if ((a.y + b.y + c.y) / 3 - floorAt(x, z).y > 0.055) {
+        if ((a + b + c) / 3 - C.snowFloor(x, z) > 0.055) {
           pos.copyWithin(i + 3, i, i + 3); pos.copyWithin(i + 6, i, i + 3);
           continue;
         }
       }
       for (let j = 0; j < 3; j++) {
-        const at = i + j * 3, floor = j === 0 ? a : j === 1 ? b : c;
-        pos[at + 1] = floor.y + (pos[at + 1] - d.floor) * floor.cover;
+        const at = i + j * 3, floor = column[v + j];
+        pos[at + 1] = heights[floor] + (pos[at + 1] - d.floor) * cover[floor];
         driftVertex.x = pos[at]; driftVertex.y = pos[at + 1]; driftVertex.z = pos[at + 2];
         box?.expandByPoint(driftVertex);
         if (sphere) radiusSq = Math.max(radiusSq, sphere.center.distanceToSquared(driftVertex));
@@ -1538,7 +1515,7 @@ function stepCar (dt) {
   }
   if (A.drift < 0.01) return;
   for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
-    for (const d of DRIFTS.get(i + ',' + j) || []) {
+    for (const d of DRIFTS.get(driftCell(i, j)) || noDrifts) {
       if (d.seed >= A.drift || d.s < 0.5) continue;
       if (C.snowOwns?.(V.x, V.z, C.groundH(V.x, V.z))) continue;
       const dx = V.x - d.x, dz = V.z - d.z;
@@ -1564,22 +1541,22 @@ export function driftTop (x, z, receiverY) {
 }
 function driftTop0 (x, z, receiverY) {
   if ((A.drift || 0) < 0.01) return -Infinity;
-  const ci = Math.floor(x / 20), cj = Math.floor(z / 20);
+  const list = DRIFT_TOP.get(driftCell(Math.floor(x / 20), Math.floor(z / 20)));
+  if (!list) return -Infinity;
   let top = -Infinity;
-  for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
-    for (const d of DRIFTS.get(i + ',' + j) || []) {
-      if (d.seed >= A.drift) continue;
-      const dx = x - d.x, dz = z - d.z, s = d.s;
-      const W = d.W * (1 + (1 - s) * 0.25), L = d.L * (1 + (1 - s) * 0.15);
-      if (Math.abs(dx) > W + L || Math.abs(dz) > W + L) continue;
-      const lx = dx * d.cs - dz * d.sn, lz = dx * d.sn + dz * d.cs;
-      const e = Math.hypot(lx / W, lz / L);
-      if (e >= 1) continue;
-      const k = bankProfile(e);
-      const floor = d.floor === undefined ? d.y : (receiverY ??= C.snowFloor(x, z)) + 0.002;
-      const y = floor - (1 - s) * 0.05 + d.H * s * k;
-      if (y > top) top = y;
-    }
+  for (let i = 0; i < list.length; i++) {
+    const d = list[i];
+    if (d.seed >= A.drift) continue;
+    const dx = x - d.x, dz = z - d.z, s = d.s;
+    const W = d.W * (1 + (1 - s) * 0.25), L = d.L * (1 + (1 - s) * 0.15);
+    if (Math.abs(dx) > W + L || Math.abs(dz) > W + L) continue;
+    const lx = dx * d.cs - dz * d.sn, lz = dx * d.sn + dz * d.cs;
+    const e = Math.hypot(lx / W, lz / L);
+    if (e >= 1) continue;
+    const k = bankProfile(e);
+    const floor = d.floor === undefined ? d.y : (receiverY ??= C.snowFloor(x, z)) + 0.002;
+    const y = floor - (1 - s) * 0.05 + d.H * s * k;
+    if (y > top) top = y;
   }
   return top;
 }
@@ -1922,6 +1899,8 @@ export const kit = () => ({ Pile, tpls, hsh, rngAt, splash: (x, y, z, n, k) => s
 /* Сборка земли закончена: ещё не загруженные деревья и кучи следуют за своим основанием. */
 export function raiseLand(delta) {
   for (const p of [PILE, DRIFTP, LEAFP, GARL]) if (p) p.raiseLand(delta);
+  // В обычном городе на этом этапе стоят все деревья кроме новогодних.
+  PILE_JOB?.prepack();
   const seen = new Set();
   for (const list of [DECID, SPRUCES, FIRS, ...DRIFTS.values(), ...LEAVES.values()]) for (const q of list) {
     if (seen.has(q) || ![q.x, q.y, q.z].every(Number.isFinite)) continue;

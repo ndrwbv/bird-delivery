@@ -69,7 +69,7 @@ const VELVET = `
     float fine = mdNoise(q * 0.9 + 3.0) * 0.6 + mdNoise(q * 2.7) * 0.4;
     c *= 0.88 + 0.22 * fine * (1.0 - smoothstep(0.3, 0.9, fwidth(q.x * 2.7)));
     // под травинками (meadow.js) земля темнее и глубже — трава её затеняет; гаснет вместе с травой вдали
-    if (uMdOn > 0.5) {
+    if (uMdOn > 0.5 && uMdCover.z > 0.0) {
       vec2 cuv = (q - uMdWin.xy) * uMdWin.z + 0.5;
       vec2 ce = abs(cuv - 0.5);
       float cov = texture2D(uMdMap, cuv).r * (1.0 - smoothstep(0.42, 0.48, max(ce.x, ce.y)))
@@ -193,57 +193,62 @@ const EDGE_GLSL = `
     float mgr = smoothstep(0.05, 0.18, mc0.g - max(mc0.r, mc0.b));
     if (mup > 0.0 && mgr < 0.5) {
       vec2 q = vSW.xz;
-      vec3 c = diffuseColor.rgb;
-      float wn = mdNoise(q * 1.7) * 0.55 + mdNoise(q * 4.9 + 3.0) * 0.3 + mdNoise(q * 12.0 + 7.0) * 0.15;
-      vec3 grass = vec3(0.30, 0.56, 0.19) * (0.7 + 0.25 * mdNoise(q * 0.7 + 2.0) + 0.2 * wn);   // как газон (#95c579): «бархат» после сезона красит его так же
-      vec3 earth = vec3(0.30, 0.16, 0.075) * (0.8 + 0.4 * mdNoise(q * 2.3 + 1.0));
       float isTr = mdTag(mc0, uMdTr0) + mdTag(mc0, uMdTr1) + mdTag(mc0, uMdTr2);
       float isTe = mdTag(mc0, uMdTe);
-      float isPath = mdTag(mc0, uMdPy) + mdTag(mc0, uMdPw) + mdTag(mc0, uMdPp);
-      if (isTr > 0.5) {
-        float mid = mdNoise(q * 0.6 + 11.0);
-        c = mix(earth, earth * vec3(1.35, 1.25, 1.1), smoothstep(0.45, 0.8, mid) * 0.7);   // вытоптано до светлого
-        float pb = step(0.93, mdHash(floor(q * 9.0)));                                         // камешки
-        c = mix(c, vec3(0.42, 0.38, 0.33), pb * (1.0 - smoothstep(0.1, 0.3, fwidth(q.x * 9.0))) * 0.7);
-      }
-      if (isTe > 0.5) c = mix(grass, earth * 1.08, smoothstep(0.52, 0.64, mdNoise(q * 1.4 + 5.0) * 0.7 + wn * 0.3));
       vec2 muv = (q - uMdWin.xy) * uMdWin.z + 0.5;
       vec2 me = abs(muv - 0.5);
       float mwin = uMdOn * (1.0 - smoothstep(0.40, 0.47, max(me.x, me.y)));
-      if (mwin > 0.0) {
-        float r = 0.3 * uMdWin.z;
-        float l0 = texture2D(uMdMap, muv).r;
-        float ln = max(max(texture2D(uMdMap, muv + vec2(r, 0.0)).r, texture2D(uMdMap, muv - vec2(r, 0.0)).r),
-                       max(texture2D(uMdMap, muv + vec2(0.0, r)).r, texture2D(uMdMap, muv - vec2(0.0, r)).r));
-        ln = max(ln * 0.8, l0);
-        if (isPath > 0.5) {
-          float aE = texelFetch(uMdMap, min(ivec2(clamp(muv, 0.0, 1.0) * uMdN), ivec2(int(uMdN) - 1)), 0).a;
-          if (aE > 0.05) {
-            float ang = (aE - 0.1) / 0.85 * 3.14159265;
-            vec2 dir = vec2(cos(ang), sin(ang));
-            float u = dot(q, dir) / 1.15;
-            float k = floor(u), fw = fwidth(u), ks = floor(u + 0.5);                      // плита и ближайший шов
-            float vis = (1.0 - smoothstep(0.06, 0.2, fw)) * mwin * (1.0 - smoothstep(0.1, 0.4, uSnow));   // зимой — под снегом
-            float an = floor(aE * 300.0);
-            float h1 = mdHash(vec2(k, an)), h2 = mdHash(vec2(ks + 17.0, an));          // h2 — шов (тот же жребий у травы meadow.js)
-            float tone = h1 < 0.18 ? 0.78 : h1 > 0.82 ? 1.07 : 0.93 + 0.1 * h1;
-            c *= mix(1.0, tone, vis);
-            c = mix(c, c * vec3(0.86, 0.95, 0.76), (h1 < 0.18 ? 0.55 : 0.0) * vis);                    // просела — сыро, мох
-            float e = abs(u - ks) * 1.15;
-            float sw = h2 < 0.3 ? 0.055 : 0.018;
-            float seam = (1.0 - smoothstep(sw, sw + max(fw * 1.15, 0.012), e)) * vis;
-            c *= 1.0 - 0.12 * (1.0 - smoothstep(0.0, 0.1, e)) * vis;                                   // фаска у шва
-            c = mix(c, h2 < 0.3 ? grass * (0.7 + 0.5 * mdNoise(q * 8.0)) : c * 0.68, seam * (h2 < 0.3 ? smoothstep(0.3, 0.6, mdNoise(q * 3.0 + ks)) : 1.0));
+      // За пределами маски обычное полотно не меняет свой цвет.
+      if (mwin > 0.0 || isTr > 0.5 || isTe > 0.5) {
+        vec3 c = diffuseColor.rgb;
+        float wn = mdNoise(q * 1.7) * 0.55 + mdNoise(q * 4.9 + 3.0) * 0.3 + mdNoise(q * 12.0 + 7.0) * 0.15;
+        vec3 grass = vec3(0.30, 0.56, 0.19) * (0.7 + 0.25 * mdNoise(q * 0.7 + 2.0) + 0.2 * wn);   // как газон (#95c579)
+        if (isTr > 0.5 || isTe > 0.5) {
+          vec3 earth = vec3(0.30, 0.16, 0.075) * (0.8 + 0.4 * mdNoise(q * 2.3 + 1.0));
+          if (isTr > 0.5) {
+            float mid = mdNoise(q * 0.6 + 11.0);
+            c = mix(earth, earth * vec3(1.35, 1.25, 1.1), smoothstep(0.45, 0.8, mid) * 0.7);   // вытоптано до светлого
+            float pb = step(0.93, mdHash(floor(q * 9.0)));                                         // камешки
+            c = mix(c, vec3(0.42, 0.38, 0.33), pb * (1.0 - smoothstep(0.1, 0.3, fwidth(q.x * 9.0))) * 0.7);
           }
+          if (isTe > 0.5) c = mix(grass, earth * 1.08, smoothstep(0.52, 0.64, mdNoise(q * 1.4 + 5.0) * 0.7 + wn * 0.3));
         }
-        float amp = isPath > 0.5 ? 1.15 : isTr + isTe > 0.5 ? 1.25 : 0.85;
-        float cr = ln * (0.62 + amp * (wn - 0.5));
-        float gk = smoothstep(0.36, 0.44, cr) * mwin;
-        float sk = smoothstep(0.24, 0.36, cr) * (1.0 - gk) * mwin;
-        c = mix(c, c * vec3(0.72, 0.66, 0.55), sk * 0.6);
-        c = mix(c, grass, gk);
+        if (mwin > 0.0) {
+          float isPath = mdTag(mc0, uMdPy) + mdTag(mc0, uMdPw) + mdTag(mc0, uMdPp);
+          float r = 0.3 * uMdWin.z;
+          float l0 = texture2D(uMdMap, muv).r;
+          float ln = max(max(texture2D(uMdMap, muv + vec2(r, 0.0)).r, texture2D(uMdMap, muv - vec2(r, 0.0)).r),
+                         max(texture2D(uMdMap, muv + vec2(0.0, r)).r, texture2D(uMdMap, muv - vec2(0.0, r)).r));
+          ln = max(ln * 0.8, l0);
+          if (isPath > 0.5 && uSnow < 0.4) {
+            float aE = texelFetch(uMdMap, min(ivec2(clamp(muv, 0.0, 1.0) * uMdN), ivec2(int(uMdN) - 1)), 0).a;
+            if (aE > 0.05) {
+              float ang = (aE - 0.1) / 0.85 * 3.14159265;
+              vec2 dir = vec2(cos(ang), sin(ang));
+              float u = dot(q, dir) / 1.15;
+              float k = floor(u), fw = fwidth(u), ks = floor(u + 0.5);                      // плита и ближайший шов
+              float vis = (1.0 - smoothstep(0.06, 0.2, fw)) * mwin * (1.0 - smoothstep(0.1, 0.4, uSnow));   // зимой — под снегом
+              float an = floor(aE * 300.0);
+              float h1 = mdHash(vec2(k, an)), h2 = mdHash(vec2(ks + 17.0, an));          // h2 — шов (тот же жребий у травы meadow.js)
+              float tone = h1 < 0.18 ? 0.78 : h1 > 0.82 ? 1.07 : 0.93 + 0.1 * h1;
+              c *= mix(1.0, tone, vis);
+              c = mix(c, c * vec3(0.86, 0.95, 0.76), (h1 < 0.18 ? 0.55 : 0.0) * vis);                    // просела — сыро, мох
+              float e = abs(u - ks) * 1.15;
+              float sw = h2 < 0.3 ? 0.055 : 0.018;
+              float seam = (1.0 - smoothstep(sw, sw + max(fw * 1.15, 0.012), e)) * vis;
+              c *= 1.0 - 0.12 * (1.0 - smoothstep(0.0, 0.1, e)) * vis;                                   // фаска у шва
+              c = mix(c, h2 < 0.3 ? grass * (0.7 + 0.5 * mdNoise(q * 8.0)) : c * 0.68, seam * (h2 < 0.3 ? smoothstep(0.3, 0.6, mdNoise(q * 3.0 + ks)) : 1.0));
+            }
+          }
+          float amp = isPath > 0.5 ? 1.15 : isTr + isTe > 0.5 ? 1.25 : 0.85;
+          float cr = ln * (0.62 + amp * (wn - 0.5));
+          float gk = smoothstep(0.36, 0.44, cr) * mwin;
+          float sk = smoothstep(0.24, 0.36, cr) * (1.0 - gk) * mwin;
+          c = mix(c, c * vec3(0.72, 0.66, 0.55), sk * 0.6);
+          c = mix(c, grass, gk);
+        }
+        diffuseColor.rgb = c;
       }
-      diffuseColor.rgb = c;
     }
   }
 }
@@ -278,6 +283,6 @@ export function lawnMat (m) {
     if (!MD.OLD) Object.assign(sh.uniforms, MD.MU, MDT);
     sh.fragmentShader = 'uniform float uLawnLo;\nuniform float uLawnQ;\n' + (MD.OLD ? '' : EDGE_HEAD) + f;
   };
-  m.customProgramCacheKey = () => key + 'lawn' + (MD.OLD ? '' : 'md');
+  m.customProgramCacheKey = () => key + 'lawn-3' + (MD.OLD ? '' : 'md');
   return m;
 }

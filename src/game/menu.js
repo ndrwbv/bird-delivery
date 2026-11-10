@@ -87,6 +87,11 @@ function openShiftApp () {
 }
 
 function act (a) {
+  if (A.launchSelect) {
+    if (a === 'quit') A.quit();
+    else A.launchSelect(a);
+    return;
+  }
   if (A.canNavigate && !A.canNavigate()) return;
   if (a !== 'go') SHIFTAPP.close(false);
   if (a === 'storytest') {
@@ -127,13 +132,14 @@ function card (key, ico, title, sub, cls) {
   return c;
 }
 
-export function show ({ openShift = false } = {}) {
+export function show ({ openShift = false, launchPending = false } = {}) {
   if (!A || !build()) return;
   SHIFTAPP.close(false);
   // надпись логотипа — название пиццерии на языке игрока (brands.js OWN.pizza → #big-t), по слову в строку
   const logo = ($('big-t') ? $('big-t').textContent : '') || t('Птица Пицца');
   el.querySelector('.crm-logo').innerHTML = logo.trim().split(/\s+/).map(w => '<span>' + esc(w) + '</span>').join('');
-  const go = card('go', '▶', t('на смену'), '', 'main');
+  const launch = !!A.launchSelect;
+  const go = card('go', '▶', t(launch ? 'Начать смену' : 'на смену'), '', 'main');
   // вернуться в прежний район, пока открыты не все (открыто всё — выбор и так перед каждой сменой)
   if (DIST.has() && DIST.opened() > 1 && !DIST.allOpen()) {
     const b = document.createElement('button');
@@ -142,8 +148,10 @@ export function show ({ openShift = false } = {}) {
     go.appendChild(b);
   }
   const cards = [go];
-  const qr = card('quick', '»', t('быстрый заезд'), QR.normalAvailable() ? t('сезон, машина, длина смены · без копилки и сюжета') : QR.available() ? t('Ад на земле') : t('откроется после первой смены'));
-  if (!QR.available()) qr.classList.add('off');
+  const normalQuick = launch ? +A.Store.get('dlv-shifts', 0) >= 1 : QR.normalAvailable();
+  const quickAvailable = launch || QR.available();
+  const qr = card('quick', '»', t('быстрый заезд'), normalQuick ? t('сезон, машина, длина смены · без копилки и сюжета') : quickAvailable ? t('Ад на земле') : t('откроется после первой смены'));
+  if (!quickAvailable) qr.classList.add('off');
   cards.push(qr,
     card('garage', '⌂', t('гараж'), t('машины, броня, мотор, покраска')),
     card('ride', '~', t('покататься'), t('без заказов и без часов смены')));
@@ -161,13 +169,59 @@ export function show ({ openShift = false } = {}) {
   upd();
   syncDebugButton();
   hint();
-  if (CITY.check(() => show({ openShift }))) return;   // сначала праздник открытия города
+  if (launch || launchPending || CITY.check(() => show({ openShift }))) return;   // сначала праздник открытия города
   if (openShift) requestAnimationFrame(() => {
     // Повторная сборка меню или выбор игрока до первого кадра отменяют открытие.
     if (!go.isConnected || !shown() || curKey !== 'go' || A.S.state !== 'title' || A.panelOpen?.() || QR.root() || CITY.root() || modal()) return;
     openShiftApp();
   });
 }
+// Док карьеры доступен до импорта мира. Он принимает те же действия,
+// а после загрузки их выполняют обычные кнопки и обработчики.
+export function launchMenu ({ Store, quit, pollPad }) {
+  return new Promise(resolve => {
+    let frame = 0;
+    A = { Store, Snd: {}, canQuit: true, quit, launchSelect: action => {
+      cancelAnimationFrame(frame);
+      removeEventListener('keydown', key);
+      delete el.dataset.launchMenu;
+      el.inert = true;
+      resolve(action);
+    } };
+    const key = event => {
+      const d = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+      if (d && flip(d)) event.preventDefault();
+    };
+    const pad = () => {
+      const p = pollPad();
+      const d = +(p.menuRight || p.pageR) - +(p.menuLeft || p.pageL);
+      if (d) flip(d);
+      frame = requestAnimationFrame(pad);
+      if (p.menuOk) CZ.card()?.querySelector('button[data-main]')?.click();
+    };
+    show();
+    el.dataset.launchMenu = 'true';
+    focus();
+    addEventListener('keydown', key);
+    frame = requestAnimationFrame(pad);
+  });
+}
+
+export function resumeLaunch (action, ready) {
+  if (!el) return false;
+  if (action === 'go') {
+    if (A.canNavigate && !A.canNavigate()) { el.inert = false; return false; }
+    STARTUP.request({ menuKey: 'go', district: DIST.cur() });
+    A.menuGo(true, () => { el.inert = false; ready?.(); });
+    return true;
+  }
+  el.inert = false;
+  const i = CZ.find(action);
+  if (i < 0) { act(action); return; }
+  CZ.go(i);
+  CZ.card()?.querySelector('button[data-main]')?.click();
+}
+
 /* подсказка внизу — значком того, чем играют сейчас (glyphs.js): [A] / [Enter]; пальцем — «свайп · тап» */
 function hint () {
   const h = el && el.querySelector('.crm-hint');

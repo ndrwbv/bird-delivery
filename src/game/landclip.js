@@ -5,6 +5,19 @@ export function clippedMesher(M,bounds,{includeMaxX=false,includeMaxZ=false}={})
   if(!Array.isArray(bounds)||bounds.length!==4||!bounds.every(Number.isFinite)||bounds[0]>=bounds[2]||bounds[1]>=bounds[3])throw Error('Неверные границы участка камня');
   const [x0,z0,x1,z1]=bounds;
   const inside=p=>p[0]>=x0&&p[0]<=x1&&p[2]>=z0&&p[2]<=z1;
+  // Most curb faces are wholly inside the tile or outside its seam halo.
+  // Classify their coordinates before allocating polygon vertices.
+  const classify = (v, n) => {
+    let left = v[0], right = left, top = v[2], bottom = top;
+    for (let i = 3; i < n; i += 3) {
+      left = Math.min(left, v[i]); right = Math.max(right, v[i]);
+      top = Math.min(top, v[i + 2]); bottom = Math.max(bottom, v[i + 2]);
+    }
+    if (right < x0 || left > x1 || bottom < z0 || top > z1 ||
+        !includeMaxX && left === x1 && right === x1 ||
+        !includeMaxZ && top === z1 && bottom === z1) return -1;
+    return +(left >= x0 && right <= x1 && top >= z0 && bottom <= z1);
+  };
   // Вертикальная грань ровно на шве принадлежит участку справа/снизу.
   // Обычные поверхности, только касающиеся шва, остаются у обоих соседей.
   const owned=p=>(includeMaxX||!p.every(v=>v[0]===x1))&&(includeMaxZ||!p.every(v=>v[2]===z1));
@@ -33,14 +46,21 @@ export function clippedMesher(M,bounds,{includeMaxX=false,includeMaxZ=false}={})
     const p=clip(points);if(!p.length||!owned(p))return;
     for(let i=1;i<p.length-1;i++)if(area(p[0],p[i],p[i+1])>1e-20)(up?M.up:M.tri).call(M,...p[0],...p[i],...p[i+1],...normals);
   };
+  const addTriangle = (v, up) => {
+    const k = classify(v, 9);
+    if (k < 0) return;
+    if (k > 0) { (up ? M.up : M.tri).call(M, ...v); return; }
+    triangle([v.slice(0,3),v.slice(3,6),v.slice(6,9)],up,v.slice(9));
+  };
   const api={
     color(...args){M.color(...args);return api;},
-    up(...v){triangle([v.slice(0,3),v.slice(3,6),v.slice(6,9)],true);},
-    tri(...v){triangle([v.slice(0,3),v.slice(3,6),v.slice(6,9)],false,v.slice(9));},
+    up(...v){addTriangle(v,true);},
+    tri(...v){addTriangle(v,false);},
     quad(...v){
+      const k = classify(v, 12);
+      if (k < 0) return;
+      if (k > 0) { M.quad(...v); return; }
       const p=[v.slice(0,3),v.slice(3,6),v.slice(6,9),v.slice(9,12)];
-      if(!owned(p))return;
-      if(p.every(inside)){M.quad(...v);return;}
       // У неплоской четвёрки две разные плоскости: сохраняем диагональ
       // Mesher.quad, иначе отрезанная грань получит другую высоту/нормаль.
       triangle([p[0],p[1],p[2]],false,v.slice(12));
