@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192">
+  <filter id="grain" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency=".18 .24" numOctaves="3" seed="27" stitchTiles="stitch"/>
+    <feColorMatrix values="0 0 0 0 0
+                           0 0 0 0 0
+                           0 0 0 0 0
+                           .33 .34 .33 0 0"/>
+    <feDiffuseLighting surfaceScale="4.3" diffuseConstant="1" lighting-color="#fff7ed">
+      <feDistantLight azimuth="225" elevation="42"/>
+    </feDiffuseLighting>
+    <feComponentTransfer><feFuncA type="linear" slope=".42"/></feComponentTransfer>
+  </filter>
+  <rect width="192" height="192" filter="url(#grain)"/>
+</svg>

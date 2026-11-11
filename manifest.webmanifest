@@ -1,0 +1,15 @@
+{
+  "name": "Птица Пицца",
+  "short_name": "Птица Пицца",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#3d0d01",
+  "theme_color": "#3d0d01",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-32.png", "sizes": "32x32", "type": "image/png" }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "id": "gennady",
+  "name": "Геннадий",
+  "version": "dialogue_prototype_3",
+  "format": "portrait_sprite",
+  "spriteSize": [
+    1070,
+    1470
+  ],
+  "sprites": {
+    "idle": "character/gennady/fullbody/idle.png",
+    "talk": "character/gennady/fullbody/talk.png",
+    "blink": "character/gennady/fullbody/blink.png",
+    "smile": "character/gennady/fullbody/smile.png",
+    "angry": "character/gennady/fullbody/angry.png"
+  },
+  "presentation": {
+    "spriteAnchor": "bottom-center",
+    "horizontalLayout": "character_left_dialogue_right",
+    "uiStyle": "dark_olive_military_panel_speaker_label_no_avatar",
+    "camera": "tall_courier_slightly_downward"
+  },
+  "animation": {
+    "idleBreath": {
+      "periodSeconds": 3.5,
+      "scaleX": [
+        0.998,
+        1.002
+      ],
+      "scaleY": [
+        0.998,
+        1.004
+      ]
+    },
+    "blink": {
+      "intervalSeconds": [
+        3.5,
+        7.0
+      ],
+      "durationSeconds": 0.12
+    },
+    "talk": {
+      "stateSwitchSeconds": [
+        0.15,
+        0.3
+      ],
+      "onlyWhenNpcSpeaking": true
+    },
+    "expression": {
+      "smile": "on_positive_reaction",
+      "angry": "on_negative_reaction"
+    }
+  },
+  "encounter": {
+    "id": "gennady_doctors_sausage",
+    "type": "one_shot",
+    "retryIfShiftEnds": true,
+    "dialogue": [
+      {
+        "speaker": "gennady",
+        "text": "драсте",
+        "emotion": "talk"
+      },
+      {
+        "speaker": "courier",
+        "text": "драсте, ваша пицца",
+        "emotion": "idle"
+      },
+      {
+        "speaker": "courier",
+        "text": "у вас в заказе было...",
+        "choices": [
+          {
+            "text": "диабло",
+            "next": "wrong"
+          },
+          {
+            "text": "пеперони",
+            "next": "right"
+          }
+        ],
+        "nodeId": "choose"
+      },
+      {
+        "nodeId": "wrong",
+        "speaker": "gennady",
+        "text": "не, не мое",
+        "emotion": "angry",
+        "next": "choose"
+      },
+      {
+        "nodeId": "right",
+        "speaker": "courier",
+        "text": "вот ваша пеперони"
+      },
+      {
+        "speaker": "gennady",
+        "text": "заебок, ща я на нее колбаской докторской насыплю, а то вы заебали жмотить мяса",
+        "emotion": "smile"
+      },
+      {
+        "speaker": "gennady",
+        "text": "вот ваши {amount}"
+      },
+      {
+        "speaker": "gennady",
+        "text": "досвидания",
+        "end": true
+      }
+    ]
+  },
+  "notes": [
+    "Warm grainy game illustration based on the supplied style reference; private apartment entry hall background, no UI or NPC.",
+    "All facial states use the identical base body, alpha, shirt texture and canvas. Only face regions vary.",
+    "The small sausage prop was removed; the raised hand is empty.",
+    "Guide, cutline and silhouette mask are derived from the same idle alpha.",
+    "Russian adult dialogue is canonical; the kids build uses a separate profanity-free line."
+  ]
+}
