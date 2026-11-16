@@ -2,23 +2,24 @@ import { t } from '../i18n/index.js';
 import { createMinimap } from './vk-minimap.js';
 import './vk-hud.css';
 
-const mapIcon = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 5.5 7.5 3l5 2.5 5-2.5v11.5l-5 2.5-5-2.5-5 2.5zM7.5 3v11.5m5-9V17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
 const nitroIcon = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m11 1-7 10h5l-1 8 8-11h-5z" fill="currentColor"/></svg>';
 
-let updateMinimap, destination, details, name, deadline, payment, gain, shift, nitro, charge, pizza, heat;
+let nav, updateMinimap, details, name, deadline, payment, gain, shift, nitro, charge, pizza;
 let shownTime;
 let payTimer;
 
-export function init (radar, left, right, buildings, roads, driveMax) {
-  const nav = document.createElement('button');
+export function init (radar, left, right, buildings) {
+  nav = document.createElement('button');
   nav.className = 'vk-nav';
   nav.type = 'button';
   nav.title = t('карта района');
-  nav.innerHTML = '<span class="vk-nav-heading"><span class="vk-nav-map">' + mapIcon + '</span><span class="vk-nav-copy"><strong class="vk-nav-destination"></strong><span class="vk-nav-details" hidden><span class="vk-nav-name"></span><span class="vk-nav-deadline"></span></span></span></span><canvas class="vk-minimap" aria-hidden="true" hidden></canvas>';
-  destination = nav.querySelector('.vk-nav-destination');
+  nav.setAttribute('aria-label', nav.title);
+  nav.setAttribute('aria-describedby', 'vk-nav-details');
+  nav.hidden = true;
+  nav.innerHTML = '<canvas class="vk-minimap" aria-hidden="true"></canvas><span class="vk-nav-details" id="vk-nav-details" hidden><span class="vk-nav-name"></span><span class="vk-nav-deadline"></span></span>';
   details = nav.querySelector('.vk-nav-details');
   [name, deadline] = details.children;
-  updateMinimap = createMinimap(nav.lastElementChild, buildings, roads, driveMax);
+  updateMinimap = createMinimap(nav.firstElementChild, buildings);
   radar.append(nav);
 
   payment = document.createElement('div');
@@ -31,18 +32,18 @@ export function init (radar, left, right, buildings, roads, driveMax) {
 
   const meters = document.createElement('div');
   meters.className = 'vk-meters';
-  meters.innerHTML = '<div class="vk-meter vk-nitro"><div class="vk-meter-caption" aria-hidden="true">' + nitroIcon + '<span></span><b></b></div><div class="vk-meter-track" aria-hidden="true"><i></i></div></div>'
-    + '<div class="vk-meter vk-pizza" hidden><span class="vk-meter-caption"></span><div class="vk-heat-track" aria-hidden="true"><i></i><i></i><i></i></div></div>';
+  meters.innerHTML = '<div class="vk-meter vk-nitro"><span class="vk-meter-track" aria-hidden="true"><i></i></span>' + nitroIcon + '<b aria-hidden="true"></b></div>'
+    + '<div class="vk-meter vk-pizza" hidden><span class="vk-meter-track" aria-hidden="true"><i></i></span><span class="vk-pizza-icon" aria-hidden="true">🍕</span><b aria-hidden="true"></b></div>';
   [nitro, pizza] = meters.children;
-  const nitroLabel = t('Запас нитро');
-  nitro.setAttribute('role', 'meter');
-  nitro.setAttribute('aria-label', nitroLabel);
-  nitro.setAttribute('aria-valuemin', '0');
-  nitro.setAttribute('aria-valuemax', '100');
-  nitro.querySelector('.vk-meter-caption span').textContent = nitroLabel;
+  for (const [meter, label] of [[nitro, t('Запас нитро')], [pizza, t('пицца')]]) {
+    meter.setAttribute('role', 'meter');
+    meter.setAttribute('aria-label', label);
+    meter.setAttribute('aria-valuemin', '0');
+    meter.setAttribute('aria-valuemax', '100');
+    meter.title = label;
+  }
   charge = nitro.querySelector('b');
-  heat = pizza.firstElementChild;
-  pizza.title = t('Пицца остывает, если машина повреждена');
+  pizza.querySelector('b').textContent = t('пицца');
   right.prepend(meters);
 }
 
@@ -57,13 +58,12 @@ function timeLabel (seconds) {
   return t('Осталось {m} мин {s} с', { m: Math.floor(seconds / 60), s: String(seconds % 60).padStart(2, '0') });
 }
 
-export function routeStep (car, playing, target, route, address, recipient, time) {
+export function routeStep (car, playing, target, route, recipient, time) {
+  nav.hidden = !playing;
   updateMinimap(playing, car, target, route);
   details.hidden = !target || (!recipient && time === null);
   name.hidden = !recipient;
   deadline.hidden = time === null;
-  destination.classList.toggle('active', !!target);
-  setText(destination, target ? address : t('карта района'));
   if (!target) return;
   setText(name, recipient);
   if (time !== shownTime) {
@@ -73,21 +73,30 @@ export function routeStep (car, playing, target, route, address, recipient, time
   }
 }
 
+function setLevel (meter, percent) {
+  const value = String(percent);
+  if (meter.getAttribute('aria-valuenow') === value) return;
+  meter.setAttribute('aria-valuenow', value);
+  meter.style.setProperty('--vk-level', value + '%');
+}
+
 export function fuel (value) {
-  const percent = String(Math.round(value * 100));
-  if (nitro.getAttribute('aria-valuenow') === percent) return;
-  nitro.setAttribute('aria-valuenow', percent);
-  nitro.style.setProperty('--vk-level', percent + '%');
+  const percent = Math.round(value * 100);
+  setLevel(nitro, percent);
   setText(charge, percent + '%');
 }
 
-export function cooling (carried, value, cold) {
+export function cooling (carried, value, coldAt) {
   pizza.hidden = !carried;
   if (!carried) return;
-  const state = cold ? 'cold' : value > 0 ? 'warm' : 'hot';
-  if (pizza.dataset.heat === state) return;
-  pizza.dataset.heat = state;
-  setText(heat, cold ? t('Пицца: холодная') : state === 'warm' ? t('Пицца: тёплая') : t('Пицца: горячая'));
+  // Нижняя треть термометра соответствует холодной пицце по правилам заказа.
+  const cold = value >= coldAt;
+  const percent = cold ? 30 * (1 - value) / (1 - coldAt) : 100 - 70 * value / coldAt;
+  setLevel(pizza, Math.round(percent));
+  const label = cold ? t('Пицца: холодная') : value > 0 ? t('Пицца: тёплая') : t('Пицца: горячая');
+  if (pizza.getAttribute('aria-valuetext') === label) return;
+  pizza.setAttribute('aria-valuetext', label);
+  pizza.title = label;
 }
 
 export function delivery (amount, total) {

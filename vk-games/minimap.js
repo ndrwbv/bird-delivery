@@ -1,8 +1,8 @@
-/* Наклонный вид квартала по реальным контурам домов и дорожному графу. */
-const WIDTH = 272, HEIGHT = 148, DRIVER_Y = 102;
-const FOCAL = 235, CAMERA_DISTANCE = 165, PITCH = Math.PI / 4;
+/* Проекция ближайшего пути с низкой камеры. Контуры домов служат ориентирами. */
+const WIDTH = 144, HEIGHT = 64;
+const FOCAL = 82, CAMERA_BACK = 16, CAMERA_HEIGHT = 5.5, PITCH = 7 * Math.PI / 180;
 const SIN_PITCH = Math.sin(PITCH), COS_PITCH = Math.cos(PITCH);
-const RANGE = 150, FRAME_MS = 40;
+const NEAR = -7, RANGE = 92, FRAME_MS = 40;
 
 function buildingShape ({ p, lv, k }) {
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity, area = 0;
@@ -14,20 +14,35 @@ function buildingShape ({ p, lv, k }) {
   }
   const size = Math.abs(area) / 2;
   const levels = lv || (size > 1200 ? 5 : size > 600 ? 4 : size > 220 ? 2 : 1);
-  const height = k === 'gar' ? 2.7 : Math.min(27, levels * 3.15 + 1.1);
+  const height = k === 'gar' ? 2.7 : Math.min(17, levels * 3.15 + 1.1);
   return { p, x0, z0, x1, z1, winding: Math.sign(area), height };
 }
 
-function polygon (ctx, points) {
+function pointOnNearPlane (a, b) {
+  const t = (NEAR - a.depth) / (b.depth - a.depth);
+  return { side: a.side + (b.side - a.side) * t, depth: NEAR, height: a.height + (b.height - a.height) * t };
+}
+
+function drawFace (ctx, points, project) {
+  const clipped = [];
+  let prev = points[points.length - 1];
+  for (const point of points) {
+    if ((prev.depth >= NEAR) !== (point.depth >= NEAR)) clipped.push(pointOnNearPlane(prev, point));
+    if (point.depth >= NEAR) clipped.push(point);
+    prev = point;
+  }
+  if (clipped.length < 3) return;
   ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+  for (let i = 0; i < clipped.length; i++) {
+    const { x, y } = project(clipped[i]);
+    if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+  }
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 }
 
-export function createMinimap (canvas, buildings, segments, driveMax) {
+export function createMinimap (canvas, buildings) {
   canvas.width = WIDTH * 2;
   canvas.height = HEIGHT * 2;
   const ctx = canvas.getContext('2d');
@@ -38,91 +53,88 @@ export function createMinimap (canvas, buildings, segments, driveMax) {
   function draw (car, target, route) {
     const sin = Math.sin(car.h), cos = Math.cos(car.h);
     const forward = (x, z) => (x - car.x) * sin + (z - car.z) * cos;
-    const project = (x, z, height = 0) => {
-      const depth = forward(x, z);
-      // Как у игрового радара: +Z — вперёд при курсе 0, −X — вправо.
-      const right = (z - car.z) * sin - (x - car.x) * cos;
-      const scale = FOCAL / Math.max(40, CAMERA_DISTANCE + depth * COS_PITCH - height * SIN_PITCH);
-      return { x: WIDTH / 2 + right * scale, y: DRIVER_Y - (depth * SIN_PITCH + height * COS_PITCH) * scale };
+    const orient = (x, z, height = 0) => ({
+      // Как у штатного радара: при нулевом курсе +Z — вперёд, −X — вправо.
+      side: (z - car.z) * sin - (x - car.x) * cos,
+      depth: forward(x, z),
+      height,
+    });
+    const project = ({ side, depth, height }) => {
+      const away = depth + CAMERA_BACK, up = height - CAMERA_HEIGHT;
+      const scale = FOCAL / (away * COS_PITCH - up * SIN_PITCH);
+      return { x: WIDTH / 2 + side * scale, y: 34 - (up * COS_PITCH + away * SIN_PITCH) * scale };
     };
-    const nearby = (x0, z0, x1, z1) => x0 <= car.x + RANGE && x1 >= car.x - RANGE && z0 <= car.z + RANGE && z1 >= car.z - RANGE;
-    const visibleRoads = segments.filter(r => r.c <= driveMax
-      && nearby(Math.min(r.x1, r.x2), Math.min(r.z1, r.z2), Math.max(r.x1, r.x2), Math.max(r.z1, r.z2)));
-    const visibleHouses = houses.filter(b => nearby(b.x0, b.z0, b.x1, b.z1));
-    visibleHouses.sort((a, b) => forward((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2)
-      - forward((a.x0 + a.x1) / 2, (a.z0 + a.z1) / 2));
 
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    for (const major of [true, false]) {
-      ctx.beginPath();
-      for (const r of visibleRoads) {
-        if ((r.w >= 10) !== major) continue;
-        const a = project(r.x1, r.z1), b = project(r.x2, r.z2);
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-      }
-      ctx.lineWidth = major ? 8 : 4;
-      ctx.strokeStyle = '#182738c7';
-      ctx.stroke();
-      ctx.lineWidth -= 2;
-      ctx.strokeStyle = major ? '#b0bbbdc9' : '#909fa5bb';
-      ctx.stroke();
-    }
-    if (target) {
-      for (const [points, dashed] of [[route, false], [route.offroadStart, true], [route.offroad, true]]) {
-        if (!points || points.length < 2) continue;
-        ctx.setLineDash(dashed ? [5, 4] : []);
-        ctx.beginPath();
-        for (let i = 0; i < points.length; i++) {
-          const pt = project(points[i][0], points[i][1]);
-          if (i) ctx.lineTo(pt.x, pt.y); else ctx.moveTo(pt.x, pt.y);
-        }
-        ctx.lineWidth = 6;
-        ctx.strokeStyle = '#123449';
-        ctx.stroke();
-        ctx.lineWidth = 3.5;
-        ctx.strokeStyle = '#83ebff';
-        ctx.stroke();
-      }
-      ctx.setLineDash([]);
-    }
-
-    const eyeX = car.x - sin * CAMERA_DISTANCE * COS_PITCH;
-    const eyeZ = car.z - cos * CAMERA_DISTANCE * COS_PITCH;
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = '#192d3dda';
+    const visibleHouses = houses.filter(b => b.x0 <= car.x + RANGE && b.x1 >= car.x - RANGE &&
+      b.z0 <= car.z + RANGE && b.z1 >= car.z - RANGE);
+    visibleHouses.sort((a, b) => forward((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2)
+      - forward((a.x0 + a.x1) / 2, (a.z0 + a.z1) / 2));
+    const eyeX = car.x - sin * CAMERA_BACK, eyeZ = car.z - cos * CAMERA_BACK;
+    ctx.lineWidth = 0.8;
+    ctx.strokeStyle = '#d1edf335';
     for (const house of visibleHouses) {
-      const ground = house.p.map(([x, z]) => project(x, z));
-      const roof = house.p.map(([x, z]) => project(x, z, house.height));
+      const ground = house.p.map(([x, z]) => orient(x, z));
+      if (ground.every(p => p.depth < NEAR) || ground.every(p => p.depth > RANGE)) continue;
+      const roof = ground.map(p => ({ ...p, height: house.height }));
+      ctx.fillStyle = '#a3bdca12';
       for (let i = 0; i < house.p.length; i++) {
         const j = (i + 1) % house.p.length;
         const [x, z] = house.p[i], [nx, nz] = house.p[j];
         if (house.winding * ((eyeX - x) * (nz - z) - (eyeZ - z) * (nx - x)) <= 0) continue;
-        ctx.fillStyle = (nx - x) * cos - (nz - z) * sin > 0 ? '#475b69eb' : '#627885eb';
-        polygon(ctx, [ground[i], ground[j], roof[j], roof[i]]);
+        drawFace(ctx, [ground[i], ground[j], roof[j], roof[i]], project);
       }
-      ctx.fillStyle = '#9cabb3eb';
-      polygon(ctx, roof);
+      ctx.fillStyle = '#c1dbe421';
+      drawFace(ctx, roof, project);
     }
 
     if (target) {
-      const pin = project(target.x, target.z);
-      const dx = pin.x - WIDTH / 2, dy = pin.y - DRIVER_Y;
-      const fit = Math.min(1, (WIDTH / 2 - 17) / Math.max(1, Math.abs(dx)),
-        dy > 0 ? (HEIGHT - DRIVER_Y - 16) / dy : (DRIVER_Y - 16) / Math.max(1, -dy));
-      const x = WIDTH / 2 + dx * fit, y = DRIVER_Y + dy * fit;
-      ctx.fillStyle = '#ffda81';
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = '#2d2b38';
-      polygon(ctx, [{ x, y: y - 6 }, { x: x + 5, y }, { x, y: y + 6 }, { x: x - 5, y }]);
+      for (const [points, dashed] of [[route, false], [route.offroadStart, true], [route.offroad, true]]) {
+        if (!points || points.length < 2 || Math.hypot(points[0][0] - car.x, points[0][1] - car.z) >= RANGE) continue;
+        ctx.setLineDash(dashed ? [3, 3] : []);
+        ctx.beginPath();
+        let remaining = RANGE, penDown = false;
+        let a = orient(points[0][0], points[0][1]);
+        for (let i = 1; i < points.length && remaining > 0; i++) {
+          let b = orient(points[i][0], points[i][1]);
+          const length = Math.hypot(b.side - a.side, b.depth - a.depth);
+          if (length > remaining) {
+            const fraction = remaining / length;
+            b = { side: a.side + (b.side - a.side) * fraction, depth: a.depth + (b.depth - a.depth) * fraction, height: 0 };
+          }
+          remaining -= length;
+          if (a.depth >= NEAR || b.depth >= NEAR) {
+            const start = project(a.depth < NEAR ? pointOnNearPlane(a, b) : a);
+            const end = project(b.depth < NEAR ? pointOnNearPlane(b, a) : b);
+            if (!penDown) ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+          }
+          penDown = b.depth >= NEAR;
+          a = b;
+        }
+        ctx.lineWidth = 4.8;
+        ctx.strokeStyle = '#103449';
+        ctx.stroke();
+        ctx.lineWidth = 2.8;
+        ctx.strokeStyle = '#8bf1ff';
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
     }
-    const x = WIDTH / 2, y = DRIVER_Y;
+    const { x, y } = project({ side: 0, depth: 0, height: 0 });
+    ctx.beginPath();
+    ctx.moveTo(x, y - 5);
+    ctx.lineTo(x + 4, y + 3);
+    ctx.lineTo(x, y + 1);
+    ctx.lineTo(x - 4, y + 3);
+    ctx.closePath();
     ctx.fillStyle = '#fff';
     ctx.strokeStyle = '#193447';
-    ctx.lineWidth = 2;
-    polygon(ctx, [{ x, y: y - 8 }, { x: x + 5, y: y + 5 }, { x, y: y + 2 }, { x: x - 5, y: y + 5 }]);
+    ctx.lineWidth = 1.5;
+    ctx.fill();
+    ctx.stroke();
   }
 
   return (show, car, target, route) => {
