@@ -25,7 +25,10 @@ try {
   copyFileSync(join(edition, 'package.json'), join(stage, 'package.json'));
   copyFileSync(join(edition, 'vite.config.mjs'), join(stage, 'vite.config.mjs'));
   symlinkSync(join(edition, 'node_modules'), join(stage, 'node_modules'), 'junction');
-  run('git', ['apply', '--whitespace=nowarn', join(edition, 'game.patch')], stage);
+  for (const file of ['game.patch', 'menu.patch']) {
+    run('git', ['apply', '--whitespace=nowarn', join(edition, file)], stage);
+  }
+  copyFileSync(join(edition, 'menu.js'), join(stage, 'src', 'game', 'menu.js'));
   copyFileSync(join(edition, 'platform.js'), join(stage, 'src', 'platform', 'vk.js'));
   copyFileSync(join(edition, 'shift-reward.js'), join(stage, 'src', 'game', 'vk-shift-reward.js'));
   for (const ext of ['js', 'css']) copyFileSync(join(edition, 'hud.' + ext), join(stage, 'src', 'game', 'vk-hud.' + ext));
@@ -38,7 +41,7 @@ try {
   const licenses = join(assets, 'licenses');
   mkdirSync(licenses, { recursive: true });
   copyFileSync(join(edition, 'node_modules', '@vkontakte', 'vk-bridge', 'LICENSE'), join(licenses, 'vk-bridge.txt'));
-  for (const name of ['models', 'privacy.html', 'manifest.webmanifest', 'music', 'sfx']) {
+  for (const name of ['models', 'privacy.html', 'manifest.webmanifest', 'music', 'sfx', 'concepts/dock']) {
     rmSync(join(assets, name), { recursive: true, force: true });
   }
   for (const name of ['music', 'sfx']) {

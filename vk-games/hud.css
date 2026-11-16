@@ -10,6 +10,24 @@ body {
   --vk-ink: #fff6e3;
 }
 
+#cr-menu .vk-start-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding-block-end: clamp(12px, 4vh, 44px);
+}
+.vk-start-actions .crm-card {
+  width: min(100%, clamp(185px, 23vw, 290px));
+  height: clamp(64px, 14vh, 104px);
+}
+.vk-start-actions .crm-cb { flex-direction: row; gap: 12px; }
+.vk-start-actions .crm-cb:is(:focus-visible, .padsel) {
+  outline: 3px solid var(--pp-yellow);
+  outline-offset: 3px;
+}
+.vk-start-garage { min-height: 36px; }
+
 html[data-map] body #radar {
   --vk-nav-width: min(23rem, max(12rem, calc(var(--vk-center-width) - 228px)));
   top: var(--vk-top);
