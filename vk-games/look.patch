@@ -1,13 +1,21 @@
 --- a/index.html
 +++ b/index.html
-@@ -26,4 +26,6 @@
+@@ -6,5 +6,5 @@
+        PWA (на экран «Домой»): во весь экран, строка статуса — прозрачная поверх игры, без чёрной полосы сверху;
+        телефон — только боком (manifest orientation, orient.js) -->
+-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
++  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+   <meta name="theme-color" content="#3d0d01">
+   <meta name="mobile-web-app-capable" content="yes">
+@@ -26,4 +26,7 @@
      @font-face { font-family: "Press Start 2P"; src: url("./fonts/PressStart2P-Regular.ttf") format("truetype"); font-display: swap; }
      html, body { margin: 0; background: #3d0d01; }
-+    /* Быстрые тапы не увеличивают страницу. Карта, руль и педали задают свои жесты. */
-+    :where(*) { touch-action: manipulation; }
++    /* Разрешаем прокрутку меню; масштаб окна фиксирован. */
++    :where(*) { touch-action: pan-x pan-y; }
++    #game :where(button, a, [role="button"]) { touch-action: none; }
      #boot { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
              background: radial-gradient(circle at 50% 42%, #4d1205, #3d0d01 55%, #2a0800); transition: opacity .5s ease;
-@@ -93,4 +95,10 @@
+@@ -93,4 +96,10 @@
      <div id="dist"></div>
      <div id="speed"></div>
 +    <button id="cambtn" type="button" data-i18n-aria="камера">
@@ -18,7 +26,7 @@
 +    </button>
      <!-- щит и бист-мод: сколько секунд осталось -->
      <div id="fxs" class="msk-only"></div>
-@@ -145,5 +153,4 @@
+@@ -145,5 +154,4 @@
    <div id="ctrls">
      <button id="sfx" type="button" data-i18n>звук вкл</button>
 -    <button id="cambtn" type="button" aria-label="камера" data-i18n-title="камера"><i class="cam-ico" aria-hidden="true"></i></button>

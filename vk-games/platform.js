@@ -55,6 +55,36 @@ function deadline (promise, ms) {
     .finally(() => clearTimeout(timer));
 }
 
+function lockPageZoom () {
+  const capture = { capture: true, passive: false };
+  const preventZoom = event => event.preventDefault();
+  // Safari и встроенный WebView могут обрабатывать щипок поверх страницы.
+  for (const type of ['gesturestart', 'gesturechange']) {
+    document.addEventListener(type, preventZoom, capture);
+  }
+  document.addEventListener('wheel', event => {
+    if (event.ctrlKey || event.metaKey) event.preventDefault();
+  }, capture);
+
+  // Старый WebKit может увеличивать статичные участки даже с touch-action.
+  let lastTap = null;
+  document.addEventListener('touchend', event => {
+    const target = event.target;
+    if (event.touches.length || event.changedTouches.length !== 1 ||
+        target?.closest?.('button, a, input, select, textarea, [role="button"], [role="slider"], [contenteditable]')) {
+      lastTap = null;
+      return;
+    }
+    const { clientX: x, clientY: y } = event.changedTouches[0], time = event.timeStamp;
+    if (lastTap && time - lastTap.time < 300 && Math.hypot(x - lastTap.x, y - lastTap.y) < 24) {
+      event.preventDefault();
+      lastTap = null;
+      return;
+    }
+    lastTap = { x, y, time };
+  }, capture);
+}
+
 let adPending = false;
 const reward = { ad_format: 'reward' };
 const Platform = {
@@ -69,6 +99,7 @@ const Platform = {
 
   async init () {
     hardenPage();
+    lockPageZoom();
     hub.watchVisibility();
     if (!bridge.isEmbedded() && !bridge.isWebView()) return;
 
