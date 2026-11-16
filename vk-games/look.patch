@@ -985,14 +985,6 @@
 +];
  
  /* Общие чаевые сохраняются для механики поручений следующих встреч. */
---- a/src/game/pausecz.css
-+++ b/src/game/pausecz.css
-@@ -98,4 +98,5 @@
-   .pz-top { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 14px; padding: 6px 4px 10px; }
-   .pz-sheet { flex: 0 1 auto !important; max-height: 50%; }
-+  .pz-sheet:has(> #pm-order) { order: -1; }
-   .pz-hint { display: none; }
- }
 --- a/src/game/renderresolution.js
 +++ b/src/game/renderresolution.js
 @@ -2,5 +2,5 @@
@@ -1447,7 +1439,7 @@
 +.lg-sig { background: #3fd15e; border-radius: 50%; } .lg-nos { background: #72caff; } .lg-car { background: #5b6b80; }
  /* маршрут и пробка — полоской; бандиты — красный круг; районы — рамка и штриховка; гараж, КПП */
  /* маршрут: к клиенту — оранжевый, в пиццерию — зелёный */
-@@ -689,11 +689,11 @@
+@@ -689,91 +689,13 @@
  html[data-map="moscow"] #radar {
    padding: 7px; border: 2px solid #33210c; box-sizing: border-box;
 -  background: conic-gradient(#6fd3ff calc(var(--nos, .5) * 360deg), #1d2440 0);
@@ -1458,11 +1450,156 @@
  html[data-map="moscow"] #radar.burn {
 -  background: conic-gradient(#e6f7ff calc(var(--nos, .5) * 360deg), #1d2440 0);
 -  box-shadow: 0 0 16px #6fd3ff, 0 6px 18px rgba(0, 0, 0, .35);
+-}
+-/* ── пауза: без общей рамки, всё «лежит на столе» рядом ──
+-   слева — заголовок, большие кнопки (главное) и чек смены, посередине — накладная текущего
+-   заказа (как карточка заказа), справа — записка с управлением. Размеры — от экрана:
+-   --u ≈ 1/100 ширины (на Деке 1280×800 — 12.8px, на 1920×1080 — 17px), текст не мельче 12px. */
+-#pausem {
+-  position: absolute; inset: 0; z-index: 28; overflow-y: auto; overflow-x: hidden;
+-  display: flex; --u: clamp(8px, min(1vw, 1.6vh), 20px);
+-  background: radial-gradient(ellipse at 50% 45%, rgba(29, 36, 64, .55), rgba(12, 18, 40, .82)); backdrop-filter: blur(4px);
+-}
+-#pausem[hidden] { display: none; }
+-.pm-desk {
+-  margin: auto; box-sizing: border-box; width: min(100%, calc(var(--u) * 100)); padding: calc(var(--u) * 2.2) max(16px, calc(var(--u) * 1.6));
+-  display: grid; grid-template-columns: minmax(0, 26fr) minmax(0, 37fr) minmax(0, 29fr); gap: calc(var(--u) * 2);
+-  align-items: center; color: #33210c;
+-}
+-.pm-l { display: flex; flex-direction: column; gap: calc(var(--u) * 1.8); }
+-.pm-t { font-size: max(28px, calc(var(--u) * 4.2)); line-height: 1.1; color: #ffd85e; text-align: center; letter-spacing: .04em;
+-        text-shadow: calc(var(--u) * .35) calc(var(--u) * .35) 0 #33210c, 0 0 calc(var(--u) * 2) rgba(0, 0, 0, .4); transform: rotate(-2deg); }
+-/* кнопки — крупные, «продолжить» больше всех */
+-.pm-btns { display: flex; flex-direction: column; gap: calc(var(--u) * 1.1); }
+-.pm-btns button {
+-  position: relative; font: inherit; font-size: max(14px, calc(var(--u) * 1.45)); line-height: 1.3; cursor: pointer; color: #33210c;
+-  padding: max(14px, calc(var(--u) * 1.25)) calc(var(--u) * 1); background: #ffd85e;
+-  border: max(3px, calc(var(--u) * .28)) solid #33210c; border-radius: calc(var(--u) * .6);
+-  box-shadow: 0 max(4px, calc(var(--u) * .5)) 0 #33210c, 0 calc(var(--u) * .9) calc(var(--u) * 1.4) rgba(0, 0, 0, .35);
+-}
+-.pm-btns button:active { transform: translateY(max(3px, calc(var(--u) * .35))); box-shadow: 0 1px 0 #33210c; }
+-#pm-go { font-size: max(20px, calc(var(--u) * 1.95)); white-space: nowrap; padding: max(18px, calc(var(--u) * 1.7)) calc(var(--u) * 1);
+-         background: #f0522a; color: #fff3d6; text-shadow: 2px 2px 0 #33210c; letter-spacing: .04em; }
+-/* «продолжить» — с треугольником ▶ перед словом */
+-#pm-go::before { content: ''; display: inline-block; vertical-align: -.08em; margin-right: .55em;
+-                 border-left: .8em solid currentColor; border-top: .5em solid transparent; border-bottom: .5em solid transparent;
+-                 filter: drop-shadow(2px 2px 0 #33210c); }
+-#pm-menu { background: #fff3d6; }
+-/* выбранная геймпадом кнопка — светлой рамкой: жёлтая на жёлтой кнопке не видна */
+-#pausem .pm-btns button.padsel { outline-color: #fff3d6 !important; }
+-/* чек смены: узкая бумажная лента, внизу зубчатый отрыв, строки «что ...... сколько» */
+-#pm-stats { position: relative; margin: 0 calc(var(--u) * 1.4) calc(var(--u) * 1); padding: calc(var(--u) * 1.3) calc(var(--u) * 1.5) calc(var(--u) * .9);
+-            background: #fff3d6; transform: rotate(1.2deg); filter: drop-shadow(0 calc(var(--u) * .5) 0 rgba(20, 16, 30, .45));
+-            font-size: max(12px, calc(var(--u) * 1.05)); line-height: 1.5; }
+-#pm-stats::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: calc(var(--u) * .8);
+-                   background: conic-gradient(from -45deg at 50% 100%, #fff3d6 90deg, transparent 0) 0 0 / calc(var(--u) * 1.6) 100% repeat-x; }
+-.pm-rc-t { text-align: center; color: #8a3b22; text-transform: uppercase; letter-spacing: .12em; padding-bottom: calc(var(--u) * .7);
+-           margin-bottom: calc(var(--u) * .5); border-bottom: 2px dashed #8a6b4e; }
+-.pm-rc-r { display: flex; align-items: baseline; gap: calc(var(--u) * .5); padding: calc(var(--u) * .3) 0; }
+-.pm-rc-r span { color: #5a4026; }
+-.pm-rc-r i { flex: 1; min-width: calc(var(--u) * 1); border-bottom: 2px dotted #b39678; transform: translateY(-.3em); }
+-.pm-rc-r b { font-weight: normal; color: #33210c; white-space: nowrap; }
+-/* рейтинг смены в паузе (ревью 23.10): подзаголовок бурым по пунктиру, ник — в одну строку с многоточием, твоя строка — маркером */
+-.pm-rc-h { margin-top: calc(var(--u) * .5); padding: calc(var(--u) * .45) 0 calc(var(--u) * .2); border-top: 2px dashed #8a6b4e; color: #8a3b22;
+-           font-size: .85em; text-transform: uppercase; letter-spacing: .08em; }
+-.pm-rc-r.pm-rk span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+-.pm-rc-r.pm-me span { color: #33210c; background: linear-gradient(transparent 45%, rgba(255, 216, 94, .75) 45%); }
+-.pm-rc-r.pm-rk + .pm-rc-r:not(.pm-rk) { margin-top: calc(var(--u) * .5); padding-top: calc(var(--u) * .45); border-top: 2px dashed #8a6b4e; }
+-.pm-rc-r:nth-child(3) b { color: #d9342c; }
+-/* накладная: тот же лист, что у карточки заказа (.oc-*), крупно, чуть наискосок */
+-#pm-order { position: relative; padding: calc(var(--u) * .4) calc(var(--u) * 1.8) calc(var(--u) * 1.8); background: #fff3d6; color: #33210c;
+-            border: max(3px, calc(var(--u) * .25)) solid #33210c; border-radius: 4px; transform: rotate(-1.2deg);
+-            box-shadow: 0 calc(var(--u) * .5) 0 #33210c, 0 calc(var(--u) * 1.2) calc(var(--u) * 2.4) rgba(0, 0, 0, .4); }
+-#pm-order::before, #pm-order::after { content: ''; position: absolute; left: 10px; right: 10px; height: 8px; pointer-events: none;
+-            background: radial-gradient(circle at 6px 4px, rgba(20, 16, 30, .85) 3px, transparent 3.5px) 0 0 / 16px 8px repeat-x; }
+-#pm-order::before { top: -6px; } #pm-order::after { bottom: -6px; }
+-.pm-inv-top { display: flex; justify-content: space-between; gap: 10px; padding: calc(var(--u) * 1.3) 0 calc(var(--u) * .8); margin-bottom: calc(var(--u) * .4);
+-              border-bottom: 2px dashed #8a6b4e; font-size: max(12px, calc(var(--u) * 1.05)); color: #8a3b22; text-transform: uppercase; letter-spacing: .06em; }
+-.pm-inv-top span + span { flex: none; color: #33210c; }
+-#pm-order .oc-sheet { gap: calc(var(--u) * 1.2); }
+-#pm-order .oc-inv { font-size: max(12px, calc(var(--u) * 1.1)); line-height: 1.5; }
+-#pm-order .oc-inv th { width: 1%; white-space: nowrap; font-size: max(11px, calc(var(--u) * .88)); padding: calc(var(--u) * .7) calc(var(--u) * .8) calc(var(--u) * .7) 0; }
+-#pm-order .oc-inv td { padding: calc(var(--u) * .7) 0; }
+-#pm-order .oc-inv td b { font-size: max(13px, calc(var(--u) * 1.35)); line-height: 1.35; }
+-#pm-order .oc-inv td small { font-size: max(11px, calc(var(--u) * .88)); }
+-#pm-order .oc-photos { padding-top: calc(var(--u) * 1.2); }
+-#pm-order .oc-photos .oc-p img { width: calc(var(--u) * 8); height: calc(var(--u) * 8); border-width: calc(var(--u) * .45); border-bottom-width: calc(var(--u) * 1.3); }
+-#pm-order .oc-photos.small .oc-p img { width: calc(var(--u) * 5.6); height: calc(var(--u) * 5.6); border-width: calc(var(--u) * .35); border-bottom-width: calc(var(--u) * .9); }
+-#pm-order .oc-clip { left: 30%; width: calc(var(--u) * 1.2); height: calc(var(--u) * 3.2); }
+-/* записка с управлением: жёлтый листок, «клавиша — что делает» в две колонки */
+-#pm-keys { position: relative; padding: calc(var(--u) * 2.2) calc(var(--u) * 1.8) calc(var(--u) * 1.8); background: #ffd85e; color: #33210c;
+-           transform: rotate(1.8deg); box-shadow: 0 calc(var(--u) * .5) 0 #b8892a, 0 calc(var(--u) * 1.2) calc(var(--u) * 2.4) rgba(0, 0, 0, .4);
+-           background-image: linear-gradient(180deg, rgba(255, 255, 255, .25), transparent 30%); }
 +  background: conic-gradient(#c9eeff calc(var(--nos, .5) * 360deg), #1d2440 0);
 +  box-shadow: 0 0 16px #72caff, 0 6px 18px rgba(0, 0, 0, .35);
++}
++/* Клавиши во вкладке управления. */
+ .pm-keys-t { font-size: max(13px, calc(var(--u) * 1.3)); color: #8a3b22; margin-bottom: calc(var(--u) * 1.2); text-transform: uppercase; letter-spacing: .08em; }
+ .pm-keys-g { display: grid; grid-template-columns: auto 1fr; gap: calc(var(--u) * .75) calc(var(--u) * .9); align-items: center;
+@@ -783,22 +705,4 @@
+ .pm-keys-g kbd { flex: none; font: inherit; padding: calc(var(--u) * .3) calc(var(--u) * .5); min-width: 1em; text-align: center; color: #33210c;
+                  background: #fff3d6; border: 2px solid #33210c; border-radius: 4px; box-shadow: 0 3px 0 #33210c; }
+-/* средний экран: две колонки — кнопки и чек слева, накладная и записка справа */
+-@media (max-width: 999px) {
+-  .pm-desk { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); grid-template-areas: "l inv" "l keys"; gap: calc(var(--u) * 3) calc(var(--u) * 3); }
+-  .pm-l { grid-area: l; align-self: center; }
+-  #pm-order { grid-area: inv; }
+-  #pm-keys { grid-area: keys; }
+-}
+-/* телефон: всё столбиком, кнопки сверху, листается */
+-@media (max-width: 620px) {
+-  .pm-desk { grid-template-columns: minmax(0, 1fr); grid-template-areas: none; gap: 28px; padding: 20px 16px 28px; }
+-  .pm-l, #pm-order, #pm-keys { grid-area: auto; }
+-  .pm-btns { margin: 0 8px; }
+-  #pm-stats { margin: 0 20px 10px; }
+-  #pm-order { transform: rotate(-.6deg); }
+-  #pm-keys { transform: rotate(.8deg); }
+-  #pm-order .oc-photos { width: max-content; margin: 0 auto; }
+-}
+-
+ /* карточка выбора: просьба клиента — сбоку сверху, игра идёт; обед — по центру, на паузе */
+ #choice { position: absolute; z-index: 27; top: 44px; left: 50%; transform: translateX(-50%); width: min(460px, calc(100% - 24px)); pointer-events: auto; }
+@@ -950,33 +854,15 @@
+            border-bottom: 2px dashed rgba(255, 243, 214, .15); }
+ .set-row button { font: inherit; font-size: 9px; cursor: pointer; padding: 8px 12px; color: #33210c; background: #ffd85e; border: 3px solid #33210c; border-radius: 6px; }
+-/* Настройки, язык и «стереть прогресс?» — окно почти во всю ширину, крупно: на Деке и телевизоре
+-   читается с дивана, кнопки — под палец и геймпад. --u — базовый размер шрифта: растёт с экраном
+-   (и по высоте, чтобы влезло на 1280×800), на телефоне — 12px */
+-#panel[data-kind="settings"], #panel[data-kind="lang"], #panel[data-kind="reset"] { --u: clamp(12px, min(1.7vw, 2.5vh), 26px); }
+-:is(#panel[data-kind="settings"], #panel[data-kind="lang"], #panel[data-kind="reset"]) .pn-box {
++/* Выбор языка и сброс прогресса используют общий диалог. */
++#panel[data-kind="lang"], #panel[data-kind="reset"] { --u: clamp(12px, min(1.7vw, 2.5vh), 26px); }
++:is(#panel[data-kind="lang"], #panel[data-kind="reset"]) .pn-box {
+   width: min(1600px, 90vw, calc(100% - 24px)); max-height: calc(100% - 24px);
+   padding: calc(var(--u) * 1.6) calc(var(--u) * 1.8) calc(var(--u) * 1.4); border-width: 5px; border-radius: 16px;
  }
- /* ── пауза: без общей рамки, всё «лежит на столе» рядом ──
-@@ -1156,8 +1156,8 @@
+-:is(#panel[data-kind="settings"], #panel[data-kind="lang"], #panel[data-kind="reset"]) #pn-close {
++:is(#panel[data-kind="lang"], #panel[data-kind="reset"]) #pn-close {
+   font-size: calc(var(--u) * 1.5); right: calc(var(--u) * .6); top: calc(var(--u) * .4); padding: 6px 10px; min-width: 48px; min-height: 48px;
+ }
+-:is(#panel[data-kind="settings"], #panel[data-kind="lang"], #panel[data-kind="reset"]) .pn-t { font-size: calc(var(--u) * 1.35); margin: 0 48px calc(var(--u) * 1.2) 0; line-height: 1.4; }
+-:is(#panel[data-kind="settings"], #panel[data-kind="reset"]) .pn-n { font-size: max(9px, calc(var(--u) * .62)); margin-top: calc(var(--u) * 1); }
+-#panel[data-kind="settings"] .set-cred { margin-top: calc(var(--u) * 1.3); text-align: center; }
+-#panel[data-kind="settings"] .set-row {
+-  flex-wrap: wrap; gap: calc(var(--u) * .6) var(--u); padding: calc(var(--u) * .55) 0; font-size: var(--u); line-height: 1.4;
+-  border-bottom-width: 3px;
+-}
+-/* подпись сжимается и переносится сама (сообщение про обновление), кнопка — на той же строке;
+-   на телефоне, где обе не влезают, кнопка уходит строкой ниже */
+-#panel[data-kind="settings"] .set-row > span { flex: 1 1 0; min-width: min(100%, 9em); }
+-#panel[data-kind="settings"] .set-row button {
+-  margin-left: auto; min-width: min(100%, calc(var(--u) * 11)); max-width: 100%; min-height: 48px; box-sizing: border-box;
+-  font-size: var(--u); padding: calc(var(--u) * .7) calc(var(--u) * 1); border-radius: 10px; box-shadow: 0 4px 0 #33210c;
+-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+-}
+-#panel[data-kind="settings"] .set-row button:hover { background: #ffe38a; }
+-#panel[data-kind="settings"] .set-row button:active { transform: translateY(3px); box-shadow: 0 1px 0 #33210c; }
+-#panel[data-kind="settings"] #set-name { max-width: min(100%, 60vw); }
++:is(#panel[data-kind="lang"], #panel[data-kind="reset"]) .pn-t { font-size: calc(var(--u) * 1.35); margin: 0 48px calc(var(--u) * 1.2) 0; line-height: 1.4; }
++#panel[data-kind="reset"] .pn-n { font-size: max(9px, calc(var(--u) * .62)); margin-top: calc(var(--u) * 1); }
+ .set-tag { font-weight: normal; color: #ffd85e; margin-left: .4em; }
+ .set-msg { display: block; margin-top: .5em; font-size: .7em; line-height: 1.6; color: #9fe3a8; }
+@@ -1156,8 +1042,8 @@
                      /* синяя кнопка, по краю — кольцо: сколько нитро осталось (--nos ставит игра) */
                      background: conic-gradient(#8fe3ff calc(var(--nos, .5) * 360deg), rgba(20, 16, 30, .6) 0); }
 -.tp-right .tp-nos::before { content: ''; position: absolute; inset: 5px; z-index: -1; border-radius: 50%; background: #2b6fe0; }

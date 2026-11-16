@@ -36,20 +36,6 @@
 +    @media (prefers-reduced-motion: reduce) { #boot .boot-say span { animation-timing-function: steps(1, end); } }
      body.booting #game { opacity: 0; }
      #game { transition: opacity .5s ease; }
---- a/src/game/pausecz.js
-+++ b/src/game/pausecz.js
-@@ -18,5 +18,4 @@
- import { carousel } from './carousel.js';
- import { keyHTML, onInput, inputKind } from '../input/glyphs.js';
--import { mountPause } from './menudock.js';
- 
- let root = null, CZ = null, A = null;
-@@ -78,5 +77,4 @@
-   CZ.set(cards, 0);
-   if (desk) desk.hidden = true;
--  mountPause(el);
-   label();
- }
 --- a/src/game/desktopapp.js
 +++ b/src/game/desktopapp.js
 @@ -1,35 +1,3 @@

@@ -1,12 +1,23 @@
 html[data-map] #pausem,
 html[data-map] #panel[data-kind="settings"] {
-  align-items: center;
-  justify-content: center;
+  box-sizing: border-box;
   padding: var(--vk-top) var(--vk-right) var(--vk-bottom) var(--vk-left);
   background: #20150fee;
   backdrop-filter: none;
   color: var(--vk-ink);
   font: 500 13px/1.4 system-ui, sans-serif;
+}
+html[data-map] #pausem {
+  position: absolute;
+  inset: 0;
+  z-index: 28;
+  overflow: hidden;
+}
+html[data-map] #pausem:not([hidden]),
+html[data-map] #panel[data-kind="settings"]:not([hidden]) {
+  display: grid;
+  grid: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
 }
 
 .vk-pause-sheet,
@@ -14,6 +25,7 @@ html[data-map] #panel[data-kind="settings"] {
   display: flex;
   flex-direction: column;
   width: min(800px, 100%);
+  min-width: 0;
   max-height: 100%;
   min-height: 0;
   gap: 10px;
@@ -48,14 +60,16 @@ html[data-map] #panel[data-kind="settings"] {
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  align-content: start;
   align-items: start;
   gap: 9px;
-  overflow: auto;
+  overflow: hidden auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
 .vk-pause-content:has(#pm-stats[hidden]) { grid-template-columns: minmax(0, 1fr); }
 #pausem :is(#pm-order, #pm-stats) {
+  grid-area: auto;
   min-width: 0;
   padding: 10px;
   margin: 0;
@@ -112,6 +126,7 @@ html[data-map] #panel[data-kind="settings"] {
 #pausem .vk-pause-actions #pm-go {
   background: #ffad6c;
   color: #241810;
+  white-space: nowrap;
   border-color: #ffad6c;
   letter-spacing: normal;
 }
@@ -132,12 +147,12 @@ html[data-map] #panel[data-kind="settings"] {
 #panel[data-kind="settings"] #pn-close { display: none; }
 #panel[data-kind="settings"] #pn-body { display: flex; flex: 1; flex-direction: column; gap: 7px; min-height: 0; }
 #panel[data-kind="settings"] .set-tabs { display: flex; flex: none; gap: 5px; margin: 0; }
-#panel[data-kind="settings"] .set-tab { flex: 1 1 0; white-space: nowrap; padding-inline: 5px; }
+#panel[data-kind="settings"] .set-tab { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; padding-inline: 5px; }
 #panel[data-kind="settings"] .set-tab.on { background: #6b432a; border-color: #dc9965; }
 #panel[data-kind="settings"] .set-pane {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
@@ -155,9 +170,15 @@ html[data-map] #panel[data-kind="settings"] {
   line-height: 1.25;
 }
 #panel[data-kind="settings"] .set-row > :is(span, label) { min-width: 0; }
-#panel[data-kind="settings"] .set-list .set-row :is(button, select) { max-width: min(30vw, 220px); margin: 0; white-space: normal; }
+#panel[data-kind="settings"] .set-list .set-row :is(button, select) {
+  min-width: 0;
+  max-width: min(38vw, 220px);
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
 #panel[data-kind="settings"] .set-list .set-row option { color: #241810; background: #faeadc; }
-#panel[data-kind="settings"] .set-vol { grid-template-columns: minmax(0, 1fr) minmax(0, 56%); }
+#panel[data-kind="settings"] .set-list .set-row.set-vol { grid-template-columns: minmax(0, 1fr) minmax(0, 56%); }
 #panel[data-kind="settings"] .set-sl { display: flex; align-items: center; min-width: 0; gap: 7px; }
 #panel[data-kind="settings"] .set-sl input { flex: 1 1 auto; min-width: 0; height: 24px; margin: 0; accent-color: var(--vk-orange); }
 #panel[data-kind="settings"] .set-sl b { flex: none; width: 4ch; color: var(--vk-muted); text-align: right; font-weight: 550; }
@@ -178,7 +199,12 @@ html[data-map] #panel[data-kind="settings"] {
 }
 @media (max-width: 530px) {
   .vk-pause-content { grid-template-columns: minmax(0, 1fr); }
+  .vk-pause-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #pausem .vk-pause-actions button { min-width: 0; }
   #pausem #pm-menu { margin-left: 0; }
+}
+@media (max-width: 365px) {
+  #panel[data-kind="settings"] .set-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-height: 430px) {
   .vk-pause-sheet, #panel[data-kind="settings"] .pn-box { gap: 7px; padding: 8px; }
