@@ -4,8 +4,9 @@ import './vk-hud.css';
 
 const nitroIcon = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m11 1-7 10h5l-1 8 8-11h-5z" fill="currentColor"/></svg>';
 const coldIcon = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v16M3 6l14 8M3 14l14-8M7.5 3.5 10 6l2.5-2.5m-5 13L10 14l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+const timerIcon = '<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="10" cy="11" r="6.5"/><path d="M8 1.5h4M10 1.5v3M14.7 6.3l1.6-1.6M10 7.8V11l2 1.3"/></svg>';
 
-let nav, updateMinimap, clock, clockLabel, digits, payment, gain, shift, nitro, pizza;
+let nav, updateMinimap, clock, digits, payment, gain, shift, nitro, pizza;
 let shownTime;
 let payTimer;
 
@@ -36,9 +37,9 @@ export function init (radar, left, right, buildings) {
   clock.className = 'vk-countdown';
   clock.hidden = true;
   clock.setAttribute('role', 'timer');
-  clock.innerHTML = '<span></span><strong></strong>';
-  [clockLabel, digits] = clock.children;
-  radar.append(nav, clock);
+  clock.innerHTML = timerIcon + '<strong aria-hidden="true"></strong>';
+  digits = clock.lastElementChild;
+  radar.append(clock, nav);
 
   payment = document.createElement('div');
   payment.className = 'vk-payment';
@@ -67,8 +68,9 @@ export function routeStep (car, playing, target, route, time) {
   if (clock.hidden || time === shownTime) return;
   const minutes = String(Math.floor(time / 60)).padStart(2, '0');
   const seconds = String(time % 60).padStart(2, '0');
-  setText(digits, minutes + ':' + seconds);
-  setText(clockLabel, time === 0 ? t('Время вышло') : t('Осталось'));
+  const display = minutes + ':' + seconds;
+  setText(digits, display);
+  clock.setAttribute('aria-label', time === 0 ? t('Время вышло') : t('Осталось') + ' ' + display);
   clock.classList.toggle('urgent', time <= 10);
   shownTime = time;
 }

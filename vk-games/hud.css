@@ -5,7 +5,7 @@ body {
   --vk-bottom: max(8px, var(--sa-b, env(safe-area-inset-bottom)));
   --vk-center-width: calc(100vw - 2 * max(var(--vk-left), var(--vk-right)) - 12px);
   --vk-note-width: min(42rem, var(--vk-center-width));
-  --vk-note-gap: 80px;
+  --vk-note-gap: 86px;
   --vk-panel: rgba(26, 26, 31, .9);
   --vk-ink: #fff6e3;
 }
@@ -94,26 +94,29 @@ html[data-map] body #radar .vk-minimap {
   mask-image: radial-gradient(ellipse 68% 75%, #000 70%, transparent 100%);
   transition: opacity .2s ease;
 }
-body:has(#toast[style*="opacity: 1"], #hint.on, #dlg-live.on, #ach-toast.on, #bonus.on, #chat .cm.fresh, #choice:not([hidden])) .vk-minimap {
+body:has(#toast[style*="opacity: 1"], #hint.on, #dlg-live.on, #bonus.on, #chat .cm.fresh, #choice:not([hidden])) .vk-minimap {
   opacity: .35;
 }
 .vk-countdown {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: center;
   gap: 5px;
-  margin-inline: auto;
-  color: #e7f2f8;
-  font: 600 10px/1.2 system-ui, sans-serif;
+  margin: 0 auto 3px;
+  color: #effcff;
   text-shadow: 0 1px 2px #101f2f, 0 0 5px #101f2f;
   white-space: nowrap;
 }
+.vk-countdown svg {
+  width: 16px;
+  height: 16px;
+  filter: drop-shadow(0 1px 2px #101f2f);
+}
 .vk-countdown strong {
-  color: #effcff;
   font: 700 15px/1 ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
 }
-.vk-countdown.urgent strong { color: #ffd38a; }
+.vk-countdown.urgent { color: #ffd38a; }
 
 html[data-map] body #hud-left { top: var(--vk-top); left: var(--vk-left); max-width: min(28vw, 11rem); }
 html[data-map] body #hud-right {
@@ -179,12 +182,12 @@ html[data-map] body #touchpad .tp-right { margin-inline-start: auto; }
 html[data-map] body #touchpad .tp-nos { background: #295aaa; border: 2px solid #90cbff; }
 html[data-map] body #touchpad .tp-nos:is(.on, .burn) { background: #539aff; }
 
-html[data-map] body :is(#toast, #hint, #dlg-live, #ach-toast, #bonus, #payfx) {
+html[data-map] body :is(#toast, #hint, #dlg-live, #bonus, #payfx) {
   box-sizing: border-box;
   max-width: var(--vk-note-width);
   overflow-wrap: anywhere;
 }
-html[data-map] body :is(#toast, #hint, #dlg-live, #ach-toast) {
+html[data-map] body :is(#toast, #hint, #dlg-live) {
   top: calc(var(--vk-top) + var(--vk-note-gap));
   bottom: auto;
   width: max-content;
@@ -200,9 +203,6 @@ html[data-map] body #toast {
   white-space: normal;
 }
 html[data-map] body #hint { padding: 6px 10px; line-height: 1.55; }
-html[data-map] body #ach-toast { left: 50%; right: auto; transform: translate(-50%, -8px); }
-html[data-map] body #ach-toast.on { transform: translate(-50%, 0); }
-html[data-map] body:has(#over:not([hidden])) #ach-toast { top: var(--vk-top); }
 html[data-map] body #dlg-live .dll-b { min-width: 0; }
 html[data-map] body #dlg-live .dll-b b { white-space: normal; }
 body.dlg-open #touchpad { visibility: hidden; }
@@ -217,7 +217,7 @@ html[data-map] body #radio {
   overflow-wrap: anywhere;
 }
 html[data-map] body #radio .rd-h { flex-wrap: wrap; white-space: normal; }
-body:has(#toast[style*="opacity: 1"], #hint.on, #dlg-live.on, #ach-toast.on, #dlg.on) #radio {
+body:has(#toast[style*="opacity: 1"], #hint.on, #dlg-live.on, #dlg.on) #radio {
   visibility: hidden;
 }
 

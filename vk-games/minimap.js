@@ -90,7 +90,16 @@ export function createMinimap (canvas, buildings) {
       drawFace(ctx, roof, project);
     }
 
+    const player = project({ side: 0, depth: 0, height: 0 });
     if (target) {
+      const far = project({ side: 0, depth: RANGE, height: 0 });
+      const outline = ctx.createLinearGradient(0, player.y, 0, far.y);
+      outline.addColorStop(0, '#10344982');
+      outline.addColorStop(1, '#10344900');
+      const path = ctx.createLinearGradient(0, player.y, 0, far.y);
+      path.addColorStop(0, '#8bf1ffad');
+      path.addColorStop(0.6, '#8bf1ff60');
+      path.addColorStop(1, '#8bf1ff00');
       for (const [points, dashed] of [[route, false], [route.offroadStart, true], [route.offroad, true]]) {
         if (!points || points.length < 2 || Math.hypot(points[0][0] - car.x, points[0][1] - car.z) >= RANGE) continue;
         ctx.setLineDash(dashed ? [3, 3] : []);
@@ -114,16 +123,16 @@ export function createMinimap (canvas, buildings) {
           penDown = b.depth >= NEAR;
           a = b;
         }
-        ctx.lineWidth = 4.8;
-        ctx.strokeStyle = '#103449';
+        ctx.lineWidth = 3.8;
+        ctx.strokeStyle = outline;
         ctx.stroke();
-        ctx.lineWidth = 2.8;
-        ctx.strokeStyle = '#8bf1ff';
+        ctx.lineWidth = 2.2;
+        ctx.strokeStyle = path;
         ctx.stroke();
       }
       ctx.setLineDash([]);
     }
-    const { x, y } = project({ side: 0, depth: 0, height: 0 });
+    const { x, y } = player;
     ctx.beginPath();
     ctx.moveTo(x, y - 5);
     ctx.lineTo(x + 4, y + 3);

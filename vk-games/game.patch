@@ -1459,3 +1459,37 @@
 +      : touch ? t('следуй за линией в навигаторе · нажми на него, чтобы открыть карту')
 +        : t('следуй за линией в навигаторе · {key} — карта района', { key: k('Tab') }) };
      case 'brake': return { text: A.S.order?.ord?.story
+--- a/src/game/achievements.js
++++ b/src/game/achievements.js
+@@ -31,2 +31,3 @@
+ 
++const ENABLED = Platform.id !== 'vk';
+ export const KEY = 'dlv-ach';
+@@ -170,2 +171,3 @@
+ function grant (a) {
++  if (!ENABLED) return false;
+   const d = load();
+@@ -187,2 +189,3 @@
+ export function add (stat, n = 1) {
++  if (!ENABLED) return;
+   if (!(n > 0)) return;
+@@ -195,2 +198,3 @@
+ export function setMax (stat, v) {
++  if (!ENABLED) return;
+   const d = load();
+@@ -209,2 +213,3 @@
+ export function init (api = {}) {
++  if (!ENABLED) return;
+   A = { ...A, ...api };
+@@ -224,2 +229,3 @@
+ export function deliver (o = {}) {
++  if (!ENABLED) return;
+   const n = Math.max(1, o.n | 0);
+@@ -244,2 +250,3 @@
+ export function shiftEnd (e = {}) {
++  if (!ENABLED) return;
+   add('shifts');
+@@ -289,2 +296,3 @@
+ export function step (dt) {
++  if (!ENABLED) return;
+   // заглохла в яме — по фронту «заглохла»
