@@ -3,7 +3,7 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   base: './',
   define: {
-    __BUILD__: JSON.stringify('VK · 0.24'),
+    __BUILD__: JSON.stringify('VK · 0.25'),
     __RELEASE__: 'true',
   },
   build: {

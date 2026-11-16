@@ -32,6 +32,7 @@ try {
   copyFileSync(join(edition, 'platform.js'), join(stage, 'src', 'platform', 'vk.js'));
   copyFileSync(join(edition, 'shift-reward.js'), join(stage, 'src', 'game', 'vk-shift-reward.js'));
   for (const ext of ['js', 'css']) copyFileSync(join(edition, 'hud.' + ext), join(stage, 'src', 'game', 'vk-hud.' + ext));
+  copyFileSync(join(edition, 'pause.css'), join(stage, 'src', 'game', 'vk-pause.css'));
   copyFileSync(join(edition, 'minimap.js'), join(stage, 'src', 'game', 'vk-minimap.js'));
   copyFileSync(join(edition, 'look.js'), join(stage, 'src', 'game', 'vk-look.js'));
   const city = join(stage, 'src', 'maps', 'seversk');

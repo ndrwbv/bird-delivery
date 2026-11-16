@@ -40,12 +40,57 @@
 +      </div>
        <div class="fm-view"><canvas id="fullmapc"></canvas></div>
        <div class="fm-leg">
-@@ -145,5 +161,4 @@
+@@ -144,6 +160,4 @@
+   <!-- ── звук и пауза: не все догадаются про клавиши ── -->
    <div id="ctrls">
-     <button id="sfx" type="button" data-i18n>звук вкл</button>
+-    <button id="sfx" type="button" data-i18n>звук вкл</button>
 -    <button id="cambtn" type="button" aria-label="камера" data-i18n-title="камера"><i class="cam-ico" aria-hidden="true"></i></button>
      <button id="mapbtn" class="msk-only" type="button" data-i18n>карта</button>
      <button id="nos" class="msk-only" type="button" data-i18n>нитро</button>
+@@ -161,26 +175,23 @@
+   <!-- ── Москва: меню паузы — всё, что не нужно на экране во время езды ── -->
+   <div id="pausem" class="msk-only" hidden>
+-    <div class="pm-ver" aria-hidden="true"></div>
+     <!-- журнал ошибок не пуст (src/platform/crashlog.js, docs/CRASHES.md) — показать и скопировать -->
+     <button id="pm-crash" type="button" hidden data-i18n>отчёт об ошибке</button>
+-    <!-- без общей рамки: на «столе» рядом лежат кнопки (главное), накладная текущего заказа,
+-         записка с управлением и чек смены -->
+-    <div class="pm-desk">
+-      <div class="pm-l">
+-        <div class="pm-t" data-i18n>пауза</div>
+-        <div class="pm-btns">
+-          <button id="pm-go" type="button" data-i18n>продолжить</button>
+-          <button id="pm-map" type="button" data-i18n>карта района</button>
+-          <button id="pm-sfx" type="button" data-i18n>звук вкл</button>
+-          <button id="pm-menu" type="button" data-i18n>в главное меню</button>
+-        </div>
+-        <!-- чек смены: сколько развёз, заработал, сбил -->
+-        <div id="pm-stats"></div>
+-      </div>
+-      <!-- текущий заказ накладной, как на карточке заказа -->
+-      <div id="pm-order"></div>
+-      <!-- записка: какие кнопки за что — геймпад, клавиатура или палец, смотря чем играют -->
+-      <div id="pm-keys"></div>
+-    </div>
++    <section class="vk-pause-sheet" aria-labelledby="vk-pause-title">
++      <header class="vk-pause-head">
++        <h2 id="vk-pause-title" data-i18n>Пауза</h2>
++        <span id="pm-time"></span>
++      </header>
++      <div class="vk-pause-content">
++        <section id="pm-order"></section>
++        <section id="pm-stats"></section>
++      </div>
++      <div class="vk-pause-actions">
++        <button id="pm-go" type="button" data-main data-i18n>Продолжить</button>
++        <button id="pm-map" type="button" data-i18n>Карта района</button>
++        <button id="pm-set" type="button" data-i18n>Настройки</button>
++        <button id="pm-replay" type="button" data-i18n hidden>повтор последних 10 с</button>
++        <button id="pm-menu" type="button" data-i18n>в главное меню</button>
++      </div>
++    </section>
+   </div>
+ 
 --- a/src/game/camview.js
 +++ b/src/game/camview.js
 @@ -40,6 +40,6 @@
@@ -76,7 +121,7 @@
    const speedo = gauge(dx + 0.072, 'speed'), tacho = gauge(dx - 0.072, 'tacho');
    const lamp = (hex, x) => { const m = box(0.016, 0.012, 0.004, mat(hex, true), x, dialY - 0.035, dialZ - 0.004); m.visible = false; return m; };
 -  const lampHp = lamp('#ff3b2a', dx + 0.008), lampNos = lamp('#6fd3ff', dx - 0.012);
-+  const lampHp = lamp('#ff3b2a', dx + 0.008), lampNos = lamp('#ff994d', dx - 0.012);
++  const lampHp = lamp('#ff3b2a', dx + 0.008), lampNos = lamp('#72caff', dx - 0.012);
    // руль: колонка, обод, три спицы, руки курьера (рукава — оранжевая куртка)
    const wz = ez + 0.31, wy = gb - 0.05, wr = 0.165, tilt = 0.44;
 --- a/src/game/carglass.js
@@ -295,28 +340,41 @@
 +import { MAP_INK, drawDriver, strokeRoute } from './vk-minimap.js';
  import * as HANDOFF from './handover.js';
  import * as PAYVIS from './payfx.js';
-@@ -214,5 +215,5 @@
+@@ -176,5 +177,4 @@
+ import { mountApp, clearApp } from './desktopapp.js';
+ import * as SET from './settings.js';           // настройки — карусель карточек, одна и та же из меню и из паузы (settings.js)
+-import * as PAUSE from './pausecz.js';             // пауза — карусель карточек: продолжить, чек, накладная, карта, настройки, управление, закончить смену
+ import * as PIX from './pixfx.js';              // пиксельные частицы одним мешем: дымок из-под колёс, осколки стёкол (pixfx.js)
+ import * as FXP from './fxpool.js';             // частицы эффектов из общего запаса: искры, дым, пламя, кровь, обломки — вид = одна отрисовка (fxpool.js)
+@@ -214,5 +214,5 @@
  import * as SHIFTIN from './shiftcheckin.js';
  import * as PCOLD from './pizzacold.js';         // одна реакция холодного клиента на адрес
 -import { PHONE_MAP, phoneBuildingColor } from './maptheme2gis.js';
 +import { PHONE_MAP } from './maptheme2gis.js';
  import * as CREWC from './crewcast.js';        // свои люди в каждой пиццерии: состав, характеры, машины с наклейками (crewcast.js)
  import * as CREWR from './crewrank.js';        // рейтинг смены: вспышка и стрелка «место N из M» на хаде, коллеги и Толик пишут в чат, кто кого обогнал (crewrank.js)
-@@ -546,5 +547,5 @@
+@@ -437,6 +437,4 @@
+       g.linearRampToValueAtTime(on && !this.hard ? 0.45 : 0, now + 0.05);
+     }
+-    const b = document.getElementById('sfx');
+-    if (b) b.textContent = on ? $t('звук вкл') : $t('звук выкл');
+     Store.set('dlv-sound', on ? '1' : '0');
+   },
+@@ -546,5 +544,5 @@
  scene.add(new THREE.HemisphereLight(0xeaf7ff, 0xb6c8a6, 1.7));
  const sun = new THREE.DirectionalLight(0xfff6e4, 1.45);
 -sun.position.set(120, 180, 90);
 +sun.position.set(105, 108, 132);
  scene.add(sun);
  scene.add(new THREE.AmbientLight(0xdfeaff, 0.5));
-@@ -983,5 +984,5 @@
+@@ -983,5 +981,5 @@
     улица, тихая, пешеходка, проезд во двор */
  const ROAD_W = [20, 16, 13.5, 11, 9, 7, 5, 5.5];
 -const ROAD_HEX = ['#9aa0ab', '#9aa0ab', '#9ea4af', '#a2a8b2', '#a4aab4', '#a7adb6', '#cdc6bb', '#aab0b8'];
 +const ROAD_HEX = ['#85808b', '#85808b', '#8c8490', '#908a95', '#968c96', '#9b9299', '#dfbaa0', '#a99b98'];
  const DRIVE_MAX = 5;                           // выше по классу — пешеходка, туда не едем
  /* ширину полотна считает выгрузка: по числу полос из карты, а во дворах
-@@ -2013,10 +2014,10 @@
+@@ -2013,10 +2011,10 @@
     10.10.2026 («трава слишком зелёная») */
  const GREEN_HEX = {
 -  park: '#9ed07f', green: '#a2cf86', pitch: '#8dcd93',
@@ -329,35 +387,35 @@
 +const GROUND_LOW = new THREE.Color('#92bf50'), GROUND_HIGH = new THREE.Color('#b2ca64');
  const GROUND_BED = '#c9c08f', GC = new THREE.Color();
  // высоты в карте — с шагом в десять сантиметров, разных значений немного: цвет по высоте — в памяти
-@@ -2770,5 +2771,5 @@
+@@ -2770,5 +2768,5 @@
  
  /* ─── дома, деревья, фонари ─── */
 -const WALLS = ['#e9bcc8', '#c7d9ef', '#f0dcae', '#c2e0cd', '#d9c8ea', '#eecfb4', '#e6d3c0'];
 +const WALLS = ['#ecd796', '#ecc69c', '#f4e1ad', '#d4b287', '#dfc5ac', '#e7b78c', '#e9d7b3'];
  
  /* пятно под кружок вступления: ни деревьев, ни фонарей, ни лавочек —
-@@ -3731,5 +3732,5 @@
+@@ -3731,5 +3729,5 @@
  const ROOFS = ['#c3b6bc', '#bcafb8', '#b4b0bd', '#c7bdb0'];
  const KIND_WALL = { ind: '#cfc7bb', pub: '#e6dfd2', church: '#f0e7d6', shop: '#e9e1d3' };
 -const OFFICE_WALLS = ['#b7c4cf', '#c9d0d6', '#aebccb', '#d2d6da'];
 +const OFFICE_WALLS = ['#dfc7a4', '#e9d6b3', '#d6bd9d', '#f0dfbf'];
  const GLASS = ['#7fa7c6', '#86aecb', '#789fbf', '#8fb6d2'];
  const PITCH = ['#9a6b5e', '#7d6a80', '#6f8a72', '#8a7a5e', '#8b5f55'];
-@@ -6921,5 +6922,5 @@
+@@ -6921,5 +6919,5 @@
  function nosFlame (x, y, z, bx, bz) {
    for (let i = 0; i < 2; i++) {
 -    const hex = chance(0.5) ? 0x6fd3ff : 0xe6f7ff;
-+    const hex = chance(0.5) ? 0xff8b32 : 0xffd68b;
++    const hex = chance(0.5) ? 0x58bdff : 0xc9eeff;
      const px = x + rand(-0.15, 0.15), py = y + rand(-0.1, 0.1), pz = z + rand(-0.15, 0.15);
      fxPart('puff', px, py, pz, hex, rand(0.25, 0.45), 0.85, { vx: bx * rand(8, 14) + V.vx * 0.6, vy: rand(0, 0.6), vz: bz * rand(8, 14) + V.vz * 0.6,
-@@ -7236,5 +7237,5 @@
+@@ -7236,5 +7234,5 @@
    // подробная копия чужой машины (opts.dent, foewreck.js): тот же салон со стёклами, водитель в своей одежде — своим мешем (вышел — прячется)
    const drvL = [], drvAdd = opts.dent ? (geo, hex, x, y, z) => put(drvL, geo, hex, x, y + dy, z) : null;
 -  const cg = (opts.see || opts.dent) && !open ? CG.cabin(g, add, { S, W, top, cy, gh, frame, tint: !!opts.tint, dy, rb: opts.rake ? opts.rake.b : 0, drv: opts.drv, drvAdd }) : null;
 +  const cg = (opts.see || opts.dent) && !open ? CG.cabin(g, add, { S, W, top, cy, gh, frame, tint: !!opts.tint, dy, rb: opts.rake ? opts.rake.b : 0, rf: opts.vkClassic ? opts.rake.f : 0, classic: opts.vkClassic, drv: opts.drv, drvAdd }) : null;
    if (open) FLYC.openCabin(add, { S, W, top, GLASS, frame, body: bodyHex });
    // машины потока (без своей морды): салон-трапеция — наклонные стёкла и стойки (carbody.js)
-@@ -7242,8 +7243,8 @@
+@@ -7242,8 +7240,8 @@
    // машины гаража со своей мордой — салон как был, только у классических седанов наклонное заднее стекло (LOOK.rake)
    const rake = opts.dress ? opts.rake : BODYM.RAKE[model];
 -  const TR = !cg && !open && rake ? BODYM.cabin(add, { S, W, top, frame, GLASS, rake, four, tuck: opts.dress ? 0 : undefined, doorTop: top - 0.1 + (S.h + 0.08) / 2, sil: opts.dress || opts.see || opts.dent || opts.nosil ? null : BODYM.SIL.HEX }) : null;
@@ -368,7 +426,7 @@
 +  if (!open) add(bev(TR ? TR.roofW - 0.02 : cg?.roofW ?? W - 0.24, 0.12, roofLen - 0.05, { t: BB.ROOF }), frame, 0, top + S.ch + 0.04, roofZ, 'roof');
    // двери: шов, ручки, молдинг — в меше двери (мнутся и двигаются с ней)
    for (const s of [-1, 1]) {
-@@ -7258,10 +7259,18 @@
+@@ -7258,10 +7256,18 @@
      add(new THREE.BoxGeometry(0.1, gh * 0.84, S.cab - 0.3), GLASS, W / 2 - 0.05, cy + 0.03, S.cz);
    }
 -  // бамперы: у седана хромированные, у остальных пластик
@@ -393,55 +451,55 @@
 +  REARM.dressPanel(bumperF, CHR, frontParts, { put, mergeGeos });
    // решётка, фары, фонари
    add(new THREE.BoxGeometry(W * 0.6, 0.2, 0.1), '#2b2530', 0, top - 0.08, hl - 0.02);
-@@ -7270,5 +7279,5 @@
+@@ -7270,5 +7276,5 @@
    if (!opts.see) BODYM.trim(add, { S, W, top, y0, hl, cf: TR ? TR.cf : S.cz + S.cab / 2, bodyHex,
      shade: '#' + new THREE.Color(bodyHex).multiplyScalar(0.62).getHexString(), grille: !opts.dress && model !== 'cn' });
 -  if (opts.dress) opts.dress(g, add, { S, W, L, hl, top, y0, bodyHex, CHR, GLASS, dy, see: !!opts.see, rb: opts.rake ? Math.min(opts.rake.b, S.cab * 0.3) : 0 });   // своя морда и фары (cars.js)
 +  if (opts.dress) opts.dress(g, add, { S, W, L, hl, top, y0, bodyHex, CHR, GLASS, dy, roofZ, see: !!opts.see, rb: opts.rake ? Math.min(opts.rake.b, S.cab * 0.3) : 0 });   // своя морда и фары (cars.js)
    else if (model === 'cn') RL.cnCar(g, add, { S, W, L, hl, top, y0, bodyHex });   // узкие LED во всю ширину — вместо фар
    else for (const s of [-1, 1]) {
-@@ -7292,5 +7301,5 @@
+@@ -7292,5 +7298,5 @@
    }
    // своя машина: зад подробно — труба, бампер с номером, крышка с замком и наклейкой, брызговики (carrear.js)
 -  if (RK) REARM.rear(g, add, Object.assign(RK, { top, CHR, dy, put, mergeGeos, bumper: bumperR, trunk, brand: OWN.pizza(), logo: birdLogo,
 +  if (RK) REARM.rear(g, add, Object.assign(RK, { top, CHR, dy, put, mergeGeos, bumper: bumperR, classicBumper, trunk, brand: OWN.pizza(), logo: birdLogo,
      dual: !!opts.dual, spare: opts.spare || model === 'suv' }));
  
-@@ -7347,5 +7356,5 @@
+@@ -7347,5 +7353,5 @@
      wheels.push(wm); if (front) steer.push(pv);
    }
 -  g.userData = { wheels, steer, panels, glass: cg || open ? [] : [wsF, wsB], cg, dmg: 0, smokeT: 0, bodyHex, hazard, hl, model, trunk,
 +  g.userData = { wheels, steer, panels, reverseLens: g.userData.reverseLens, glass: cg || open ? [] : [wsF, wsB], cg, dmg: 0, smokeT: 0, bodyHex, hazard, hl, model, trunk,
      pipe: RK ? RK.pipe : null, cargo: RK ? RK.cargo : null, rdoor: RK ? RK.rdoor || null : null,   // труба, коробки в багажнике, задняя дверь хэтчбека своей машины (carrear.js)
      see: !!opts.see, W, y0: y0 + dy, mirrors, armor: opts.armor || 0,   // своя машина: мнётся формой, теряет детали (cardent.js)
-@@ -11538,5 +11547,5 @@
+@@ -11538,5 +11544,5 @@
        nosRespawn: 25, bonusRespawn: 45, spawn: [5, 9], spawnCap: 18, heal: null };
  const NOS_RESPAWN = PK.nosRespawn, BONUS_RESPAWN = PK.bonusRespawn;
 -const PICK_HEX = { nos: '#6fd3ff', shield: '#8f9bff', heal: '#ff4d6d', beast: '#ff8a1c', life: '#ffc93c' };
-+const PICK_HEX = { nos: '#ffad6c', shield: '#8f9bff', heal: '#ff4d6d', beast: '#ff8a1c', life: '#ffc93c' };
++const PICK_HEX = { nos: '#72caff', shield: '#8f9bff', heal: '#ff4d6d', beast: '#ff8a1c', life: '#ffc93c' };
  
  const PICK_MAT = (() => {
-@@ -11544,5 +11553,5 @@
+@@ -11544,5 +11550,5 @@
    const ring = hex => new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false });
    return {
 -    cup: m(0x1f5bff), sleeve: m(0x0c2f9e), lid: m(0xc9d3e0), logo: m(0xffffff), bolt: m(0xffd91a),
-+    cup: m(0xe56f2e), sleeve: m(0x933517), lid: m(0xebe0cd), logo: m(0xffffff), bolt: m(0xffd91a),
++    cup: m(0x217bee), sleeve: m(0x174499), lid: m(0xc7dae8), logo: m(0xffffff), bolt: m(0x8ed9ff),
      shield: new THREE.MeshBasicMaterial({ color: 0x8f9bff, transparent: true, opacity: 0.55, depthWrite: false }),
      star: m(0xe8ecff), heal: m(0xff4d6d), white: m(0xffffff), beast: m(0xff8a1c), horn: m(0xf3e3c2), dark: m(0x2a1d1a),
-@@ -14167,5 +14176,5 @@
+@@ -14167,5 +14173,5 @@
  const FM = { base: null, s: 1, pad: 40, open: false, fromPause: false, bw: 0, bh: 0, bb: new Map(), named: [],
    z: 1, zt: 1, cx: 0, cy: 0, ax: 0, ay: 0, t: 0, vw: 0, vh: 0, dpr: 1,
 -  keys: Object.create(null), padX: 0, padY: 0, padZ: 0, ptr: new Map(), moved: 0, tiles: new Map(), tick: 0 };
 +  keys: Object.create(null), padX: 0, padY: 0, padZ: 0, ptr: new Map(), tiles: new Map(), tick: 0 };
  const fmX = x => (x - BOUNDS.x0 + FM.pad) * FM.s, fmZ = z => (z - BOUNDS.z0 + FM.pad) * FM.s;
  
-@@ -14211,5 +14220,4 @@
+@@ -14211,5 +14217,4 @@
     x уже со своим масштабом в координатах подложки, B — видимая рамка [x0, y0, x1, y1]. */
  function paintBase (x, px, B) {
 -  const phoneMap = false;
    const vis = o => { const b = FM.bb.get(o); return !b || !(b[2] < B[0] || b[0] > B[2] || b[3] < B[1] || b[1] > B[3]); };
    const poly = (p, fill) => {
-@@ -14223,7 +14231,7 @@
+@@ -14223,7 +14228,7 @@
      x.lineWidth = w * FM.s; x.strokeStyle = col; x.lineCap = 'round'; x.lineJoin = 'round'; x.stroke();
    };
 -  { const a = Math.max(0, B[0]), b = Math.max(0, B[1]); x.fillStyle = phoneMap ? PHONE_MAP.land : '#a6d189'; x.fillRect(a, b, Math.min(FM.bw, B[2]) - a, Math.min(FM.bh, B[3]) - b); }
@@ -451,7 +509,7 @@
 +  x.fillStyle = '#3a322e';
    const wx = v => v / FM.s - FM.pad + BOUNDS.x0, wz = v => v / FM.s - FM.pad + BOUNDS.z0;
    const i0 = Math.max(0, Math.floor((wx(B[0]) - TX0) / TG)), i1 = Math.min(TNX - 1, Math.ceil((wx(B[2]) - TX0) / TG) + 1);
-@@ -14234,10 +14242,10 @@
+@@ -14234,10 +14239,10 @@
        x.fillRect(fmX(TX0 + i * TG - TG / 2), fmZ(TZ0 + j * TG - TG / 2), TG * FM.s + px, TG * FM.s + px);
      }
 -  for (const l of CITY.lots) if (vis(l)) poly(l.p, phoneMap ? (l.k === 'park' ? PHONE_MAP.parkLot : PHONE_MAP.lot) : (l.k === 'park' ? '#a6abb3' : '#c6c5b8'));
@@ -468,7 +526,7 @@
 +  x.fillStyle = '#907563';
    for (const zb of ZEBRAS) {
      const zx = fmX(zb.x), zz = fmZ(zb.z), m = 12 * FM.s;
-@@ -14249,6 +14257,6 @@
+@@ -14249,6 +14254,6 @@
    for (const b of CITY.buildings) {
      if (!vis(b)) continue;
 -    poly(b.p, phoneMap ? phoneBuildingColor(b.k) : KIND_WALL[b.k] || '#e7b9a6');
@@ -477,7 +535,7 @@
 +    x.lineWidth = 0.85 * px; x.strokeStyle = MAP_INK.houseEdge; x.stroke();
    }
    // подписи улиц: на целом городе — в метрах (мелкий город), при зуме — экранного размера,
-@@ -14261,6 +14269,6 @@
+@@ -14261,6 +14266,6 @@
        if (n.x + hw < B[0] || n.x - hw > B[2] || n.y + hw < B[1] || n.y - hw > B[3]) continue;
        x.save(); x.translate(n.x, n.y); x.rotate(n.ang);
 -      x.lineWidth = fs / 3; x.strokeStyle = phoneMap ? PHONE_MAP.streetHalo : 'rgba(255,255,255,0.8)'; x.strokeText(n.t, 0, 0);
@@ -486,7 +544,7 @@
 +      x.fillStyle = '#cbb29d'; x.fillText(n.t, 0, 0);
        x.restore();
      }
-@@ -14270,7 +14278,7 @@
+@@ -14270,7 +14275,7 @@
      if (!vis(r)) continue;
      x.beginPath(); r.p.forEach(([a, b], i) => (i ? x.lineTo(fmX(a), fmZ(b)) : x.moveTo(fmX(a), fmZ(b))));
 -    x.lineWidth = Math.max(2 * px, 2.4 * FM.s); x.strokeStyle = '#5e5660'; x.setLineDash([]); x.stroke();
@@ -496,7 +554,7 @@
 +    x.lineWidth = Math.max(px, 1.2 * FM.s); x.strokeStyle = '#aa8b73'; x.setLineDash([dl, dl]); x.stroke();
      x.setLineDash([]);
    }
-@@ -14281,6 +14289,6 @@
+@@ -14281,6 +14286,6 @@
      BORDER.forEach(([bx, bz], i) => (i ? x.lineTo(fmX(bx), fmZ(bz)) : x.moveTo(fmX(bx), fmZ(bz))));
      x.closePath();
 -    x.fillStyle = 'rgba(45, 38, 58, 0.5)'; x.fill('evenodd');
@@ -505,35 +563,35 @@
 +    x.lineWidth = Math.max(2 * px, 2 * FM.s); x.strokeStyle = '#83695a'; x.stroke();
      x.restore();
      for (const k of CITY.kpp || []) { x.fillStyle = '#1f4f9a'; x.fillRect(fmX(k.p[0]) - 5 * px, fmZ(k.p[1]) - 5 * px, 10 * px, 10 * px); }
-@@ -14288,5 +14296,5 @@
+@@ -14288,5 +14293,5 @@
    // за рамкой не проехать — затемняем
    const pd = FM.pad * FM.s;
 -  x.fillStyle = 'rgba(45, 38, 58, 0.45)';
 +  x.fillStyle = '#21171188';
    x.fillRect(0, 0, FM.bw, pd); x.fillRect(0, FM.bh - pd, FM.bw, pd);
    x.fillRect(0, pd, pd, FM.bh - pd * 2); x.fillRect(FM.bw - pd, pd, pd, FM.bh - pd * 2);
-@@ -14588,5 +14596,5 @@
+@@ -14588,5 +14593,5 @@
    if (DISTRICTS && !FM.dist) { FM.dist = districtLayer(); FM.tiles.clear(); }
    x.setTransform(1, 0, 0, 1, 0, 0);
 -  x.fillStyle = '#2d263a'; x.fillRect(0, 0, fullC.width, fullC.height);
 +  x.clearRect(0, 0, fullC.width, fullC.height);
    const ox = fullC.width / 2 - FM.cx * K, oy = fullC.height / 2 - FM.cy * K;
    const B = [FM.cx - FM.vw / 2 * u, FM.cy - FM.vh / 2 * u, FM.cx + FM.vw / 2 * u, FM.cy + FM.vh / 2 * u];
-@@ -14601,5 +14609,5 @@
+@@ -14601,5 +14606,5 @@
      x.beginPath();
      routePts.forEach((p, i) => (i ? x.lineTo(fmX(p[0]), fmZ(p[1])) : x.moveTo(fmX(p[0]), fmZ(p[1]))));
 -    x.lineWidth = clamp(4 * s, 3.5 * u, 7 * u); x.strokeStyle = routeHex(); x.lineJoin = 'round'; x.lineCap = 'round'; x.stroke();
 +    strokeRoute(x, MAP_INK.route, 2.5 * u, 1.5 * u);
    }
    for (const walk of [routePts.offroadStart, routePts.offroad]) if (walk && walk.length > 1) {
-@@ -14607,5 +14615,5 @@
+@@ -14607,5 +14612,5 @@
      x.beginPath();
      walk.forEach((p, i) => (i ? x.lineTo(fmX(p[0]), fmZ(p[1])) : x.moveTo(fmX(p[0]), fmZ(p[1]))));
 -    x.lineWidth = clamp(3.5 * s, 3 * u, 6 * u); x.strokeStyle = routeHex(); x.lineJoin = 'round'; x.lineCap = 'round'; x.stroke();
 +    strokeRoute(x, MAP_INK.route, 2 * u, 1.3 * u);
      x.setLineDash([]);
    }
-@@ -14631,22 +14639,20 @@
+@@ -14631,22 +14636,20 @@
    if (DISTRICTS) FM.dist.labels(x, 12 * u);         // районы: названия и «сколько смен до открытия»
    if (PIZZA) {
 -    houseIcon(x, fmX(PIZZA.x), fmZ(PIZZA.z), 6.5 * u, '#f0522a', '#fff', '#fff3d6');   // пиццерия — домиком
@@ -568,7 +626,7 @@
 +  drawDriver(x, fmX(V.x), fmZ(V.z), -V.h + Math.PI, 1.7 * u);
  }
  
-@@ -14664,10 +14670,7 @@
+@@ -14664,10 +14667,7 @@
    FM.open = on;
    elFull.hidden = !on;
 -  if (on && fromPause && CAREER && !TOUCH) {
@@ -580,7 +638,7 @@
 +  FM.padX = FM.padY = FM.padZ = 0; FM.ptr.clear();
    if (on) {
      for (const k in IN) IN[k] = 0; touches.clear(); Snd.engine(0);
-@@ -14675,6 +14678,6 @@
+@@ -14675,6 +14675,6 @@
      const hint = elFull.querySelector('.fm-top span');
      if (hint) hint.textContent = document.body.classList.contains('pad') ? $t('L2/R2 — зум · стик — двигать · Y или B — закрыть').replace('L2/R2', /054c|playstation|dualsense|dualshock|sony/i.test(PAD.id || '') ? 'L2/R2' : 'LT/RT')
 -      : document.body.classList.contains('touch') ? $t('щипок — зум · тяни — двигать · тап — закрыть')
@@ -589,13 +647,13 @@
 +      : $t('Колесо — масштаб · тяни карту');
      // открывается вокруг тебя, не целиком: по короткой стороне окна — FM_OPEN_M метров
      fmSize();
-@@ -14687,5 +14690,4 @@
+@@ -14687,5 +14687,4 @@
  }
  $('radar').addEventListener('click', () => setFullMap(true));
 -{ const t = document.querySelector('.fm-top b'); if (t) { t.removeAttribute('data-i18n'); t.textContent = $t(MAP.title); } }
  // легенда: строки только для того, что в этом режиме вообще бывает на карте
  for (const el of elFull.querySelectorAll('[data-fm]')) {
-@@ -14694,6 +14696,6 @@
+@@ -14694,6 +14693,6 @@
  }
  $('mapbtn').addEventListener('click', () => setFullMap(!FM.open));
 -// клик без сдвига закрывает карту, как раньше; после перетаскивания — нет
@@ -604,59 +662,244 @@
 +elFull.addEventListener('click', e => { if (e.target === elFull) setFullMap(false); });
  /* мышь и пальцы: тянуть — двигать, колесо и щипок — зум к точке под курсором / между пальцами */
  {
-@@ -14709,5 +14711,4 @@
+@@ -14709,5 +14708,4 @@
    view.addEventListener('pointerdown', e => {
      if (!FM.open) return;
 -    if (!FM.ptr.size) FM.moved = 0;
      FM.ptr.set(e.pointerId, [e.clientX, e.clientY]);
      try { view.setPointerCapture(e.pointerId); } catch (_) {}
-@@ -14719,5 +14720,5 @@
+@@ -14719,5 +14717,5 @@
      if (FM.ptr.size === 1) {
        const dx = e.clientX - p[0], dy = e.clientY - p[1];
 -      FM.cx -= dx / FM.z; FM.cy -= dy / FM.z; FM.moved += Math.abs(dx) + Math.abs(dy);
 +      FM.cx -= dx / FM.z; FM.cy -= dy / FM.z;
      } else if (FM.ptr.size === 2) {
        const [a, b] = [...FM.ptr.values()];
-@@ -14727,5 +14728,5 @@
+@@ -14727,5 +14725,5 @@
        const wx = FM.cx + m0[0] / FM.z, wy = FM.cy + m0[1] / FM.z;
        FM.z = FM.zt = fmClampZ(FM.z * (d0 > 4 ? d1 / d0 : 1));
 -      FM.cx = wx - m1[0] / FM.z; FM.cy = wy - m1[1] / FM.z; FM.moved += 99;
 +      FM.cx = wx - m1[0] / FM.z; FM.cy = wy - m1[1] / FM.z;
      }
      p[0] = e.clientX; p[1] = e.clientY;
-@@ -15239,5 +15240,5 @@
+@@ -15239,5 +15237,5 @@
  
  const elFx = $('fxs');
 -VKHUD.init($('radar'), $('hud-left'), $('hud-right'), CITY.buildings);
 +VKHUD.init($('radar'), $('hud-left'), $('hud-right'), CITY.buildings, () => setPause(true));
  const TOUCH_NOS = document.querySelector('#touchpad .tp-nos');
  let toastT = 0;
-@@ -16555,4 +16556,5 @@
+@@ -16555,4 +16553,5 @@
     дорога тоже была там (а не за перекрытием, districtLocks) */
  function errandZoneOk (x, z) {
 +  if (!inBorder(x, z)) return false;
    if (!DISTRICTS) return true;
    const ok = i => (DIST.city() ? DIST.isOpen(i) : i === DIST.cur());
-@@ -17228,4 +17230,5 @@
- /* текущий заказ — накладной, как на карточке заказа: шапка с номером, таблица, фото на скрепке.
-    Только кому, куда, что, оплата и пометка по делу (О4, 09.10.2026: убраны «до точки» и «сейчас» — время и сезон) */
-+const PAUSE_ORDER_KEYS = { group: 'групповой заказ', chain: 'последовательный заказ', bundle: 'сборный заказ', solo: 'заказ' };
+@@ -17200,7 +17199,4 @@
+ 
+ 
+-/* звук и пауза кнопками: не все догадаются про M и P */
+-$('sfx').textContent = Snd.on ? $t('звук вкл') : $t('звук выкл');
+-$('sfx').addEventListener('click', e => { Snd.set(!Snd.on); e.currentTarget.blur(); });
+ 
+ 
+@@ -17224,41 +17220,41 @@
+   padMenu.clear();
+   if (CAREER) CAREERM.kbClear();
+-  elPause.querySelector('.pz-card.on [data-main]')?.focus({ preventScroll: true });
+-}
+-/* текущий заказ — накладной, как на карточке заказа: шапка с номером, таблица, фото на скрепке.
+-   Только кому, куда, что, оплата и пометка по делу (О4, 09.10.2026: убраны «до точки» и «сейчас» — время и сезон) */
++  $('pm-go').focus({ preventScroll: true });
++}
++const PAUSE_ORDER_KEYS = { group: 'групповой заказ', chain: 'последовательный заказ', bundle: 'сборный заказ' };
  function orderInfo () {
-   const rows = [];
-@@ -17240,5 +17243,5 @@
-     // сборный (orders.js): все получатели со своими адресами, отданные (st.done) — с галочкой и зачёркнуты
-     const o = S.order;
+-  const rows = [];
+-  let persons = [], head = $t('накладная');
+-  if (S.ride) rows.push([$t('заказ'), '<b>' + $t('просто катаешься') + '</b><small>' + $t('без заказов и рекордов') + '</small>']);
+-  else if (S.state === 'side' && S.side) {
+-    persons = [S.side.person];
+-    rows.push([$t('поручение'), '<b>' + S.addr + '</b>'], [$t('куда'), S.addrLine]);
+-  } else if (S.state === 'back') {
+-    rows.push([$t('куда'), '<b>' + $t('в пиццерию') + '</b>' + (PIZZA ? '<small>' + PIZZA.name + '</small>' : '')]);
+-  } else if (S.target && S.order && S.order.ord && S.order.ord.bundle) {
+-    // сборный (orders.js): все получатели со своими адресами, отданные (st.done) — с галочкой и зачёркнуты
+-    const o = S.order;
 -    head = $t('накладная') + ' · ' + KIND_LABEL.bundle;
-+    head = $t('накладная') + ' · ' + $t(PAUSE_ORDER_KEYS.bundle);
-     persons = o.stops.filter(st => !st.done).flatMap(st => st.persons);
-     rows.push([$t('получатель'), o.stops.map(st => {
-@@ -17249,5 +17252,5 @@
-   } else if (S.target && S.order) {
-     const o = S.order, st = o.stops[Math.min(o.idx, o.stops.length - 1)];
+-    persons = o.stops.filter(st => !st.done).flatMap(st => st.persons);
+-    rows.push([$t('получатель'), o.stops.map(st => {
+-      const nm = st.persons.map(p => NICK.label(p, $t('клиент'))).join(', ');   // ник из приложения (nicks.js)
+-      return st.done ? '<b><s>✓ ' + nm + '</s></b>' : '<b>' + nm + '</b><small>' + st.addr + (OS.flatText(st, $t) ? ', ' + OS.flatText(st, $t) : '') + '</small>';
+-    }).join('')], [$t('заказ'), o.items]);
+-    if (S.fee > 0) rows.push([$t('оплата'), money(S.fee)]);
+-  } else if (S.target && S.order) {
+-    const o = S.order, st = o.stops[Math.min(o.idx, o.stops.length - 1)];
 -    head = $t('накладная') + ' · ' + (KIND_LABEL[o.kind] || $t('заказ'));
-+    head = $t('накладная') + ' · ' + $t(PAUSE_ORDER_KEYS[o.kind] || PAUSE_ORDER_KEYS.solo);
-     persons = st.persons;
-     rows.push([$t('получатель'), persons.map(p => '<b>' + NICK.label(p, $t('клиент')) + '</b>').join('')],
+-    persons = st.persons;
+-    rows.push([$t('получатель'), persons.map(p => '<b>' + NICK.label(p, $t('клиент')) + '</b>').join('')],
+-      [$t('адрес'), S.addrLine + (OS.flatText(st, $t) ? ', ' + OS.flatText(st, $t) : '') + (o.stops.length > 1 ? '<small>' + $t('{i} из {n}', { i: o.idx + 1, n: o.stops.length }) + '</small>' : '')],
+-      [$t('заказ'), o.items]);
+-    if (S.fee > 0) rows.push([$t('оплата'), money(S.fee)]);
+-  } else rows.push([$t('заказ'), '<b>' + $t('заказа пока нет') + '</b>']);
+-  // «пометки» нет и тут (автор, 10.10.2026: пометки и комментарии курьеров — из интерфейса вообще)
+-  const faces = persons.filter(Boolean).slice(0, 2).map(p => '<div class="oc-p"><img src="' + NICK.avatar(p) + '" alt=""></div>').join('');
+-  return '<div class="pm-inv-top"><span>' + head + '</span><span>№ ' + String(S.orders).padStart(4, '0') + '</span></div>' +
+-    '<div class="oc-sheet"><table class="oc-inv">' + rows.map(([k, v]) => '<tr><th>' + k + '</th><td>' + v + '</td></tr>').join('') + '</table>' +
+-    (faces ? '<div class="oc-photos' + (persons.length > 1 ? ' small' : '') + '"><i class="oc-clip"></i>' + faces + '</div>' : '') + '</div>';
++  const o = S.order, rows = [];
++  const invoice = (title, number = '') => '<header class="vk-pause-title"><h3>' + title + '</h3>' +
++    (number ? '<span>№ ' + number + '</span>' : '') + '</header>' +
++    '<dl class="vk-invoice">' + rows.map(([name, value, accent]) => '<dt>' + name + '</dt><dd' +
++      (accent ? ' class="vk-invoice-price"' : '') + '>' + value + '</dd>').join('') + '</dl>';
++  if (S.side) {
++    rows.push([$t('получатель'), escHtml(NICK.label(S.side.person, $t('клиент')))],
++      [$t('куда'), escHtml(S.addrLine)], [$t('заказ'), escHtml(S.side.it.what)]);
++    if (S.side.it.pay) rows.push([$t('оплата'), money(S.side.it.pay), true]);
++    return invoice($t('Поручение'));
++  }
++  if (!o?.stops?.length || S.state === 'back') {
++    const status = S.ride ? $t('просто катаешься') : S.state === 'back'
++      ? $t('в пиццерию') : $t('заказа пока нет');
++    return '<header class="vk-pause-title"><h3>' + $t('Накладная') + '</h3></header><div class="vk-pause-muted">' + status + '</div>';
++  }
++
++  const names = stop => (stop.persons || []).map(p => escHtml(NICK.label(p, $t('клиент')))).join(', ') || $t('клиент');
++  const address = stop => escHtml(stop.addr || S.addrLine) + (OS.flatText(stop, $t) ? ', ' + OS.flatText(stop, $t) : '');
++  if (o.stops.length === 1) rows.push([$t('получатель'), '<b>' + names(o.stops[0]) + '</b>'], [$t('адрес'), address(o.stops[0])]);
++  else rows.push([$t('Адреса'), '<ol class="vk-invoice-stops">' + o.stops.map((stop, i) => {
++    const done = stop.done || (!o.ord?.bundle && i < o.idx);
++    const marker = done ? ' class="delivered"' : i === o.idx ? ' class="current" aria-current="step"' : '';
++    return '<li' + marker + '><b>' + (done ? '✓ ' : '') + names(stop) + '</b><small>' + address(stop) + '</small></li>';
++  }).join('') + '</ol>']);
++  rows.push([$t('заказ'), escHtml(o.items)]);
++  if (S.fee > 0) rows.push([$t('оплата'), money(S.fee), true]);
++  if (S.state === 'drive' && !S.free && S.timeMax > 0 && Number.isFinite(S.time)) {
++    const left = Math.max(0, Math.ceil(S.time));
++    rows.push([$t('Осталось'), Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0')]);
++  }
++  const kind = PAUSE_ORDER_KEYS[o.kind];
++  return invoice($t('Накладная') + (kind ? ' · ' + $t(kind) : ''), String(S.orders).padStart(4, '0'));
+ }
+ /* какие кнопки за что — тем, чем сейчас играют: геймпад, палец или клавиатура */
+@@ -17274,5 +17270,5 @@
+   ] : touch ? [
+     [k($t('руль')), $t('слева: палец на руль и вбок — поворот')], [k($t('газ')), $t('газ')], [k($t('тормоз')), $t('тормоз, назад')],
+-    [k('(P)'), $t('ручник')], [k($t('нитро')), $t('держать — ускорение')], [k($t('радар')), $t('карта района')], [k($t('камера')), $t('вид камеры')],
++    [k('(P)'), $t('ручник')], [k($t('нитро')), $t('держать — ускорение')], [k($t('радар')), $t('карта района')], [k($t('камера')), $t('вид камеры')], [k($t('Пауза')), $t('меню паузы')],
+     [k($t('палец')), $t('провести по экрану — осмотреться')],
+   ] : [
+@@ -17283,38 +17279,28 @@
+     [k('B'), $t('музыка вкл / выкл')],
+   ];
+-  return '<div class="pm-keys-t">' + (pad ? $t('геймпад') : touch ? $t('управление') : $t('клавиатура')) + '</div>' +
++  return '<div class="pm-keys-t">' + (pad ? $t('геймпад') : touch ? $t('сенсорный экран') : $t('клавиатура')) + '</div>' +
+     '<div class="pm-keys-g">' + rows.map(([a, b]) => '<span>' + a + '</span><em>' + b + '</em>').join('') + '</div>';
+ }
+ function renderPause () {
+-  $('pm-order').innerHTML = orderInfo() + (canCancelPausedOrder()
+-    ? '<button id="pm-cancel-order" type="button">' + escHtml($t('Отменить заказ')) + '</button>' : '');
+-  $('pm-keys').innerHTML = keysInfo();
+-  // Чек паузы без внутреннего респекта и званий.
+-  const rows = [[$t('доставлено'), S.delivered], [$t('заработано'), money(S.money)]];
+-  // «сбито» — в конце; нули на низком экране (телефон боком) спрятаны (pausecz.css .pm-zero, Р23-14)
+-  const chaos = (k, n) => [k, n, 'pm-chaos' + (n ? '' : ' pm-zero')];
+-  rows.push(chaos($t('прохожих сбито'), S.people), chaos($t('самокатчиков'), S.scoots), chaos($t('машин всмятку'), S.wrecks));
+-  if (S.stops) rows.push([$t('остановок снесено'), S.stops, 'pm-chaos']);
+-  // все курьеры смены — здесь; в езде на хаде только твоё место (UI-REVIEW № 31, rivalsStep)
+-  // у коллеги — портрет и машинка-значок его цвета (crewcast.js), характер — подсказкой на портрете
+-  // место — по доставкам (11п): справа — доставок, потом деньги; у тебя — ник (0я)
+-  // рейтинг — своим заголовком сразу под деньгами (ревью 23.10, Р23-5/6: строки «1. Вася…» терялись среди «сбито» и на телефоне
+-  // уходили под обрез листа); твоя строка подсвечена маркером, длинный ник — с многоточием, «0 зак. · 0 ₽» не рвётся
+-  if (RIVALS.length) rows.splice(2, 0, { h: $t('рейтинг смены') }, ...rivalBoard().map((r, i) => [(i + 1) + '. ' + (r.me ? escHtml(r.n) : (r.R && r.R.mem ? CREWC.badge(r.R.mem) : '') + r.n), $t('{n} зак.', { n: r.d || 0 }) + ' · ' + money(r.m), r.me ? 'pm-rk pm-me' : 'pm-rk']));
+-  // До конца смены — только в паузе.
++  const cancel = canCancelPausedOrder() ? '<button id="pm-cancel-order" type="button">' + escHtml($t('Отменить заказ')) + '</button>' : '';
++  $('pm-order').innerHTML = orderInfo() + cancel;
++  const board = $('pm-stats');
++  board.hidden = S.ride;
++  if (!S.ride) {
++    const headers = ['', $t('Курьер'), $t('Заказы'), $t('Заработано')];
++    board.innerHTML = '<header class="vk-pause-title"><h3>' + $t('Рейтинг смены') +
++      '</h3></header><table class="vk-board"><thead><tr>' + headers.map(value => '<th scope="col">' + value + '</th>').join('') +
++      '</tr></thead><tbody>' + rivalBoard().map((r, i) => '<tr' + (r.me ? ' class="me"' : '') + '><td>' + (i + 1) +
++        '</td><th scope="row">' + escHtml(r.n) + '</th><td>' + (r.d || 0) + '</td><td>' + money(r.m) + '</td></tr>').join('') +
++      '</tbody></table>';
++  }
++  let shiftTime = '';
+   if (CAREER && !S.ride && CAREERM.shiftOn()) {
+-    const sl = Math.max(0, Math.ceil(CAREERM.shiftLeft()));
+-    // после полуночи (развоз смены, дорога назад) «до конца смены 0:00» стояло на месте — там идут часы мира (0э)
+-    if (CAREERM.phase() === 'late') rows.unshift([$t('сейчас'), CAREERM.clockText()]);
+-    else rows.unshift([$t('до конца смены'), Math.floor(sl / 60) + ':' + String(sl % 60).padStart(2, '0')]);
+-  }
+-  // чек смены: строка — «что ........ сколько»
+-  $('pm-stats').innerHTML = '<div class="pm-rc-t">' + $t('за смену') + '</div>' +
+-    rows.map(r => (r.h ? '<div class="pm-rc-h">' + r.h + '</div>' : '<div class="pm-rc-r' + (r[2] ? ' ' + r[2] : '') + '"><span>' + r[0] + '</span><i></i><b>' + r[1] + '</b></div>')).join('');
+-  if (CAREER) DAILY.pauseSheet($('pm-order'));        // задания на день — запиской с галочками под накладной (daily.js)
+-  $('pm-sfx').textContent = Snd.on ? $t('звук: вкл') : $t('звук: выкл');
++    const left = Math.max(0, Math.ceil(CAREERM.shiftLeft()));
++    shiftTime = CAREERM.phase() === 'late' ? CAREERM.clockText()
++      : $t('до конца смены') + ' · ' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
++  }
++  $('pm-time').textContent = shiftTime;
+   $('pm-menu').textContent = S.ride ? $t('в главное меню') : $t('закончить смену');
+-  PAUSE.label();
+-  PAUSE.more();                                        // не влез лист — «ещё ▼» внизу (pausecz.js, Р23-14)
+ }
+ function setPause (on) {
+@@ -17328,5 +17314,12 @@
+   if (on) Platform.gameplayStop(); else if (isPlaying()) Platform.gameplayStart();
+   if (elPause) elPause.hidden = !on;
+-  if (on) { Snd.engine(0); PAUSE.reset(); renderPause(); for (const k in IN) IN[k] = 0; joyReset(); CL.refreshButton(true); }
++  if (on) {
++    Snd.engine(0);
++    renderPause();
++    elPause?.querySelector('#pm-go')?.focus({ preventScroll: true });
++    for (const k in IN) IN[k] = 0;
++    joyReset();
++    CL.refreshButton(true);
++  }
+   touchReset();                                   // пауза (и снята) — пальцы отпущены: зажатое до паузы не тянется дальше (0п44)
+ }
+@@ -17352,8 +17345,13 @@
+   $('pm-map').addEventListener('click', () => { setPause(false); setFullMap(true, true); });
+   $('pm-order').addEventListener('click', event => { if (event.target.closest('#pm-cancel-order')) cancelPausedOrder(); });
+-  $('pm-sfx').addEventListener('click', () => { Snd.set(!Snd.on); renderPause(); });
+   $('pm-menu').addEventListener('click', endShift);
+-  // пауза — карусель (pausecz.js); «настройки» — те же, что в главном меню, поверх паузы
+-  PAUSE.init(elPause, { music: () => { MUS.cycle(); PAUSE.label(); }, musicLabel: () => MUS.label(), replay: REPLAY.ENABLED ? () => REPLAY.open('pause') : null, settings: tab => { elPanel.hidden = false; SET.render(undefined, tab); }, navReset: () => { padMenu.clear(); if (CAREER) CAREERM.kbClear(); } });
++  $('pm-set').addEventListener('click', () => {
++    elPanel.hidden = false;
++    SET.render();
++    padMenu.clear();
++    if (CAREER) CAREERM.kbClear();
++  });
++  $('pm-replay').hidden = !REPLAY.ENABLED;
++  $('pm-replay').addEventListener('click', () => REPLAY.open('pause'));
+ }
+ 
+@@ -17406,5 +17404,5 @@
+   if (matchKey('radio', e) && !e.repeat && RADIO.RAD.HIDDEN && !typing) MUS.next();   // F — следующий трек музыки, пока радио скрыто (music.js)
+   else if (matchKey('radio', e) && !e.repeat && !S.paused && isPlaying()) RADIO.next();   // F — следующая станция радио (radio.js)
+-  if (matchKey('music', e) && !e.repeat && !typing) { MUS.toggle(); if (S.paused) renderPause(); }   // B — музыка вкл / выкл (music.js)
++  if (matchKey('music', e) && !e.repeat && !typing) MUS.toggle();   // B — музыка вкл / выкл (music.js)
+   if (e.code === 'KeyG' && !e.repeat && !S.paused && isPlaying()) toast(GRITM.toggle() ? $t('город с глубиной') : $t('город гладкий'));   // G — глубина города вкл/выкл (проба, grit.js)
+   if (e.code === 'KeyV' && !e.repeat && !S.paused && isPlaying()) CV.cycle(true);   // V — вид камеры: высоко → близко → из-за руля (camview.js)
+@@ -18786,5 +18784,5 @@
+   if (p.sound) Snd.set(!Snd.on);
+   if (p.dDown && !screen && !S.paused && !FM.open && isPlaying()) { if (RADIO.RAD.HIDDEN) MUS.next(); else RADIO.next(); }   // ↓ — следующий трек (пока радио скрыто) или станция
+-  if (p.music) { MUS.toggle(); if (S.paused) renderPause(); }   // L3 — музыка вкл / выкл (music.js)
++  if (p.music) MUS.toggle();   // L3 — музыка вкл / выкл (music.js)
+   // на ходу — крестовина ◀ ▲ ▶ (двух вариантов: ▶ — второй); на паузе (обед) — A, X, Y: первый, второй, третий (ниже)
+   if (CH.opts.length && !CH.pause && !CH.full) { if (p.choice1) pickChoice(0); else if (p.choice2) pickChoice(1); else if (p.choice3) pickChoice(CH.opts.length === 2 ? 1 : 2); }
+@@ -18798,8 +18796,4 @@
+     const pg = (p.pageR || p.trigR ? 1 : 0) - (p.pageL || p.trigL ? 1 : 0), d = (p.menuRight ? 1 : 0) - (p.menuLeft ? 1 : 0);
+     if (pg) { SET.flip(pg, true); p.menuLeft = p.menuRight = false; } else if (d && SET.flip(d)) p.menuLeft = p.menuRight = false;
+-  } else if (screen === elPause && PAUSE.on()) {   // пауза — полоса кнопок внизу (pausecz.js): ←→, LB/RB — листать
+-    const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
+-    if (d) PAUSE.flip(d);
+-    p.menuLeft = p.menuRight = false;
+   }
+   if (screen) {
 --- a/src/game/gfx.js
 +++ b/src/game/gfx.js
 @@ -71,5 +71,5 @@
@@ -666,47 +909,52 @@
 +  low: { fps: MOBILE ? 2 : 3, range: 0, menu: 0, px: MOBILE ? 1 : 0, win: 0, fx: 0, far: 2, aa: 0, edge: 1, shadow: 0 },
    mid: { fps: MOBILE ? 2 : 3, range: 1, menu: 0, px: 1, win: 0, fx: 0, far: 2, aa: 0, edge: 1, shadow: 0 },
    high: { fps: MOBILE ? 2 : 3, range: 2, menu: 0, px: 2, win: 0, fx: 0, far: 2, aa: 0, edge: 1, shadow: 0 },
+@@ -368,13 +368,9 @@
+     (i === O.px ? ' selected' : '') + '>' + itemText(resolution,i) + '</option>').join('') + '</select></div>';
+   const row = (label, id, txt, main) => '<div class="set-row"><span>' + label + '</span>' + btn(id, txt, main) + '</div>';
+-  const visibleItems = ITEMS.filter(it => it.id !== 'shadow');
++  const visibleItems = ITEMS.filter(it => ['fps', 'range', 'px', 'edge'].includes(it.id));
+   body.innerHTML = (card ? '' : '<div class="pn-t">' + t('графика') + '</div>') +
+     row('<b>' + t('качество') + '</b>', 'gfx-p', presetName(), true) +
+     '<div class="set-rows">' + visibleItems.map(it => it.id === 'px' ? resolutionRow : row(t(it.label), 'gfx-' + it.id, itemText(it, O[it.id]))).join('') +
+-    row(t('тяжёлый кадр'), 'gfx-dyn', DYN ? t('мыло вместо рывка') : t('рывок вместо мыла')) +
+-    '<div class="pn-n">' + t('меньше разрешение — выше скорость; интерфейс остаётся чётким. «Тяжёлый кадр» может временно снижать разрешение ещё сильнее') + '</div>' +
+-    // «сглаживание» и «мягкие края» рядом — непонятно, чем отличаются (ревью 23.10, Р23-7)
+-    '<div class="pn-n set-aa-n">' + t('сглаживание — ровные края домов и машин, грузит видеокарту; мягкие края — лёгкое сглаживание всего кадра, почти даром') + '</div></div>' +
+-    '<div class="pn-n">' + t('графика не меняет игру: машины и люди рядом, клиенты и физика — одинаковые на любой') + '</div>';
++    row(t('Динамическое разрешение'), 'gfx-dyn', DYN ? t('вкл') : t('выкл')) + '</div>';
+   const again = id => panel(body, id, card);
+   body.querySelector('#gfx-p').onclick = () => {
 --- a/src/game/hudpaper.css
 +++ b/src/game/hudpaper.css
-@@ -36,5 +36,5 @@
- html body #hud-right #dist { font-size: 11px; border-right-color: #d9342c; rotate: -.6deg; }
- html body #hud-right #speed:empty, html body #hud-right #dist:empty { display: none; }
--html body #hud-right #nitro { display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 11px; color: #33210c; border-right-color: #3a9fd6; rotate: .5deg; }
-+html body #hud-right #nitro { display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 11px; color: #33210c; border-right-color: #dc6327; rotate: .5deg; }
- html body #hud-right #nitro b { width: 70px; background: #33210c; border-color: #33210c; }
- html body #hud-right #fxs:not(:empty) { font-size: 10px; color: #8a3b22; border-right-color: #b0651c; }
-@@ -46,9 +46,9 @@
- /* Кофе на телефоне — бумажная кнопка, кольцо показывает оставшийся запас. */
- html body #touchpad .tp-nos { color: #33210c; border: 2px solid #33210c;
--  background: conic-gradient(#3a9fd6 calc(var(--nos, .5) * 360deg), #d8c9a8 0);
-+  background: conic-gradient(#dc6327 calc(var(--nos, .5) * 360deg), #d8c9a8 0);
-   box-shadow: 2px 3px 0 rgba(51, 33, 12, .85); }
+@@ -50,5 +50,5 @@
  html body #touchpad .tp-nos::before { background: #fff3d6; }
  html body #touchpad .tp-nos.burn, html body #touchpad .tp-nos.on {
 -  background: conic-gradient(#6fd3ff calc(var(--nos, .5) * 360deg), #d8c9a8 0);
-+  background: conic-gradient(#ffad6c calc(var(--nos, .5) * 360deg), #d8c9a8 0);
++  background: conic-gradient(#72caff calc(var(--nos, .5) * 360deg), #d8c9a8 0);
    box-shadow: 1px 1px 0 rgba(51, 33, 12, .85); }
  html body #touchpad .tp-nos.burn::before, html body #touchpad .tp-nos.on::before { background: #ffe9a8; }
 --- a/src/game/lunchicons.js
 +++ b/src/game/lunchicons.js
-@@ -1,12 +1,12 @@
--/* Иконки вещей из игры — для окон выбора (обед, 11бр) и подсказок: банка нитро (синяя, с молнией, как на дороге),
-+/* Иконки вещей из игры — для окон выбора (обед, 11бр) и подсказок: банка нитро (оранжевая, с молнией, как на дороге),
-    сердце, деньги. Рисованные от руки, тёмная обводка, как накладная. Строки SVG — вставляются в innerHTML. */
+@@ -3,12 +3,12 @@
  const INK = '#33210c';
  
 -/* синяя банка с белой окантовкой и жёлтой молнией — такая же лежит на дороге (game.js PICK_ONE.nos) */
-+/* оранжевая банка с белой окантовкой и жёлтой молнией — такая же лежит на дороге (game.js PICK_ONE.nos) */
++/* синяя банка с белой окантовкой и голубой молнией — такая же лежит на дороге (game.js PICK_ONE.nos) */
  export const NITRO_ICON =
    '<svg viewBox="0 0 64 80" aria-hidden="true">' +
 -  '<rect x="14" y="10" width="36" height="62" rx="6" fill="#1f5bff" stroke="' + INK + '" stroke-width="3"/>' +
 -  '<rect x="14" y="10" width="36" height="8" rx="3" fill="#0c2f9e"/><rect x="14" y="64" width="36" height="8" rx="3" fill="#0c2f9e"/>' +
 -  '<rect x="17" y="3" width="30" height="9" rx="3" fill="#c9d3e0" stroke="' + INK + '" stroke-width="3"/>' +
-+  '<rect x="14" y="10" width="36" height="62" rx="6" fill="#d86120" stroke="' + INK + '" stroke-width="3"/>' +
-+  '<rect x="14" y="10" width="36" height="8" rx="3" fill="#933517"/><rect x="14" y="64" width="36" height="8" rx="3" fill="#933517"/>' +
-+  '<rect x="17" y="3" width="30" height="9" rx="3" fill="#ebe0cd" stroke="' + INK + '" stroke-width="3"/>' +
-   '<polygon points="37,21 21,45 30,45 26,64 43,37 33,37" fill="#ffd91a" stroke="#fff" stroke-width="4" stroke-linejoin="round" paint-order="stroke"/>' +
-   '<polygon points="37,21 21,45 30,45 26,64 43,37 33,37" fill="#ffd91a" stroke="' + INK + '" stroke-width="1.5" stroke-linejoin="round"/>' +
+-  '<polygon points="37,21 21,45 30,45 26,64 43,37 33,37" fill="#ffd91a" stroke="#fff" stroke-width="4" stroke-linejoin="round" paint-order="stroke"/>' +
+-  '<polygon points="37,21 21,45 30,45 26,64 43,37 33,37" fill="#ffd91a" stroke="' + INK + '" stroke-width="1.5" stroke-linejoin="round"/>' +
++  '<rect x="14" y="10" width="36" height="62" rx="6" fill="#217bee" stroke="' + INK + '" stroke-width="3"/>' +
++  '<rect x="14" y="10" width="36" height="8" rx="3" fill="#174499"/><rect x="14" y="64" width="36" height="8" rx="3" fill="#174499"/>' +
++  '<rect x="17" y="3" width="30" height="9" rx="3" fill="#c7dae8" stroke="' + INK + '" stroke-width="3"/>' +
++  '<polygon points="37,21 21,45 30,45 26,64 43,37 33,37" fill="#8ed9ff" stroke="#fff" stroke-width="4" stroke-linejoin="round" paint-order="stroke"/>' +
++  '<polygon points="37,21 21,45 30,45 26,64 43,37 33,37" fill="#8ed9ff" stroke="' + INK + '" stroke-width="1.5" stroke-linejoin="round"/>' +
+   '</svg>';
+ 
 --- a/src/game/mealchat.js
 +++ b/src/game/mealchat.js
 @@ -18,5 +18,5 @@
@@ -754,6 +1002,186 @@
 +export const RESOLUTION_PRESETS = {pc:[3,3,5],deck:[0,1,2]};
  export function migrateResolution(index,device) {
    const levels=RESOLUTION_PRESETS[device];
+--- a/src/game/settings.js
++++ b/src/game/settings.js
+@@ -21,9 +21,8 @@
+                          подсветка на строке табов или её нет (←→); true — переключили
+      SET.on()          — настройки на экране */
+-import './settings.css';
++import './vk-pause.css';
+ import { t } from '../i18n/index.js';
+ import { heroName } from './playername.js';
+ import * as UPD from './update.js';
+-import { keyHTML } from '../input/glyphs.js';
+ import * as TEL from './telemetry.js';          // «анонимная статистика: вкл / выкл» — только взрослая версия (telemetry.js, docs/ANALYTICS.md)
+ import * as PV from './privacy.js';             // «что собираем ▸» — лист с текстом политики (privacytext.js), офлайн
+@@ -32,5 +31,5 @@
+ let A = null, TAB = 'game', TABS = [];
+ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
+-const TAB_NAMES = { game: 'игра', gfx: 'графика', snd: 'звук', ctrl: 'управление', lang: 'язык' };
++const TAB_NAMES = { game: 'Игра', gfx: 'Графика', snd: 'Звук', ctrl: 'Управление' };
+ 
+ export function init (api) {
+@@ -62,5 +61,5 @@
+ const focusId = () => { const e = A.selected && A.selected(); return (e && e.id) || undefined; };
+ /* какая кнопка в каком табе */
+-const tabOf = id => !id ? null : id === 'set-snd' || id.startsWith('set-vol-') || id.startsWith('set-radio') || id.startsWith('set-mus') ? 'snd' : id.startsWith('gfx-') ? 'gfx' : id.startsWith('set-l-') ? 'lang' : id.startsWith('set-tab-') ? id.slice(8) : 'game';
++const tabOf = id => !id ? null : id === 'set-snd' || id.startsWith('set-vol-') || id.startsWith('set-radio') || id.startsWith('set-mus') ? 'snd' : id.startsWith('gfx-') ? 'gfx' : id.startsWith('set-tab-') ? id.slice(8) : 'game';
+ 
+ /** соседний таб; force — LB/RB, LT/RT, Q/E (всегда), без него — ←→ (только со строки табов) */
+@@ -85,14 +84,12 @@
+ const note = s => '<div class="pn-n">' + s + '</div>';
+ /* ползунок громкости — линейка анкеты: ←→ геймпада и клавиш, мышь, палец; шаг 10 % */
+-const slider = (k, label, v, focus, extra = '') => {
++const slider = (k, label, v, focus) => {
+   v = Math.max(0, Math.min(100, v == null ? 100 : +v));
+   const id = 'set-vol-' + k;
+-  return '<div class="set-row set-vol"><span>' + label + extra + '</span><label class="set-sl" style="--v:' + v + '%">' +
++  return '<div class="set-row set-vol"><span>' + label + '</span><label class="set-sl" style="--v:' + v + '%">' +
+     '<input type="range" id="' + id + '" data-vol="' + k + '" min="0" max="100" step="10" value="' + v + '" aria-label="' + esc(label) + '"' +
+     (id === focus ? ' autofocus' : '') + '><b>' + v + ' %</b></label></div>';
+ };
+-const head = s => '<div class="set-h">' + s + '</div>';
+ /* без кнопок (управление, «меняется в главном меню»): геймпад встаёт на него сам (data-pad), A — ничего */
+-const still = html => '<div class="set-still" data-pad tabindex="-1">' + html + '</div>';
+ 
+ export function render (focus, tab) {
+@@ -103,71 +100,45 @@
+   P.dataset.kind = 'settings'; P.dataset.back = ''; P.dataset.sub = '';
+   const menu = A.inMenu();                          // из главного меню (не посреди смены)
+-  const onlyMenu = t('меняется в главном меню');
+-  TABS = ['game', 'gfx', 'snd', 'ctrl', 'lang'];
++  TABS = Object.keys(TAB_NAMES);
+   if (tab && TABS.includes(tab)) TAB = tab;
+   else if (tabOf(focus)) TAB = tabOf(focus);
+   if (!TABS.includes(TAB)) TAB = TABS[0];
+ 
+-  const tabsHtml = '<div class="set-tabs" role="tablist"><i class="set-tk" data-d="-1" aria-hidden="true">' + keyHTML('lb') + '</i>' +
+-    TABS.map(k => '<button type="button" role="tab" class="set-tab' + (k === TAB ? ' on' : '') + '" id="set-tab-' + k + '" data-tab="' + k + '"' +
+-      (k === TAB ? ' aria-selected="true"' + (focus === 'set-tab-' + k || !focus ? ' autofocus' : '') : ' aria-selected="false" data-pad-skip') + '>' + esc(t(TAB_NAMES[k])) + '</button>').join('') +
+-    '<i class="set-tk" data-d="1" aria-hidden="true">' + keyHTML('rb') + '</i></div>';
+-  // анкета сотрудника (UI-REVIEW № 45): шапка капсом, табы — ярлычки папки, внизу — пометка «[B] готово»
+-  body.innerHTML = '<header class="pn-t set-head"><span>' + t('анкета сотрудника') + '</span><b>' + t('настройки') + '</b></header>' + tabsHtml +
+-    '<div class="set-pane" data-tab="' + TAB + '"><div class="set-list"></div></div>' +
+-    '<div class="set-foot"><button type="button" class="pp-note set-close">' + keyHTML('back') + esc(t('готово')) + '</button>' +
+-    // единственная подпись OSM в игре (лицензия ODbL требует) — в самом низу, мелко, но читаемо
+-    '<div class="pn-n set-cred">' + t('карта — © участники OpenStreetMap, лицензия ODbL. Рельеф — SRTM (NASA).') + '</div></div>';
++  const tabsHtml = '<div class="set-tabs" role="tablist">' + TABS.map(k =>
++    '<button type="button" role="tab" class="set-tab' + (k === TAB ? ' on' : '') + '" id="set-tab-' + k + '" data-tab="' + k + '"' +
++    (k === TAB ? ' aria-selected="true"' + (focus === 'set-tab-' + k || !focus ? ' autofocus' : '') : ' aria-selected="false" data-pad-skip') +
++    '>' + esc(t(TAB_NAMES[k])) + '</button>').join('') + '</div>';
++  body.innerHTML = '<header class="set-head"><h2>' + t('Настройки') +
++    '</h2><button type="button" class="set-close">' + esc(t('Готово')) + '</button></header>' + tabsHtml +
++    '<div class="set-pane" role="tabpanel" aria-labelledby="set-tab-' + TAB + '" data-tab="' + TAB + '"><div class="set-list"></div></div>' +
++    '<p class="set-cred">' + t('карта — © участники OpenStreetMap, лицензия ODbL. Рельеф — SRTM (NASA).') + '</p>';
+   const list = body.querySelector('.set-list');
+ 
+   if (TAB === 'snd') {
+-    // вкл / выкл — общий (M, R3), под ним три ползунка громкости: музыка, звуки, мотор (game.js Snd.setVol)
+     const vol = A.Snd.vol || {};
+-    list.innerHTML = row(t('звук'), A.Snd.on ? t('вкл') : t('выкл'), 'set-snd', focus) +
+-      slider('music', t('музыка'), vol.music, focus, A.Snd.music ? '' : ' <small class="set-tag">' + t('скоро') + '</small>') +
+-      slider('sfx', t('звуки'), vol.sfx, focus) +
+-      slider('eng', t('мотор'), vol.eng, focus) +
+-      note(t('M на клавиатуре, R3 на геймпаде — звук вкл / выкл прямо в игре')) +
+-      // своя музыка (music.js, chiptunes.js): вкл / выкл и «трек ▶» — следующий
+-      (A.music ? row(t('музыка в игре'), A.music.on() ? t('вкл') : t('выкл'), 'set-mus', focus) +
+-        (A.music.on() ? row(t('трек'), esc(A.music.name() || '—') + ' ▶', 'set-mus-next', focus) : '') +
+-        note(A.music.radioKey ? t('B на клавиатуре, L3 на геймпаде — музыка вкл / выкл; F или ↓ на крестовине — следующий трек')
+-          : t('B на клавиатуре, L3 на геймпаде — музыка вкл / выкл')) : '') +
+-      // радио в машине (radio.js): вкл — в смене играет станция, выкл — музыка игры; «станция» — для телефона, где нет клавиш
++    list.innerHTML = row(t('Звук'), A.Snd.on ? t('вкл') : t('выкл'), 'set-snd', focus) +
++      (A.music ? row(t('Музыка'), A.music.on() ? t('вкл') : t('выкл'), 'set-mus', focus) : '') +
++      slider('sfx', t('Звуки'), vol.sfx, focus) +
++      slider('music', t('Громкость музыки'), vol.music, focus) +
++      slider('eng', t('Мотор'), vol.eng, focus) +
++      (A.music?.on() ? row(t('Следующий трек'), esc(A.music.name() || '—') + ' ▶', 'set-mus-next', focus) : '') +
+       (A.radio ? row(t('радио в машине'), A.radio.on() ? t('вкл') : t('выкл'), 'set-radio', focus) +
+-        (A.radio.on() ? row(t('станция'), esc(A.radio.name()), 'set-radio-st', focus) : '') +
+-        note(t('F на клавиатуре, ↓ на крестовине — следующая станция; в меню и на чеке смены радио нет')) : '');
++        (A.radio.on() ? row(t('станция'), esc(A.radio.name()), 'set-radio-st', focus) : '') : '');
+   } else if (TAB === 'gfx') {
+-    A.GFX.panel(list, focus, true);                 // gfx.js рисует сама: качество и семь пунктов
++    A.GFX.panel(list, focus, true);
+   } else if (TAB === 'ctrl') {
+-    // лист без кнопок: курсор на него не встаёт (UI-REVIEW № 34) — остаётся на строке табов, B закрывает
+-    list.innerHTML = '<div class="set-still"><div class="set-keys">' + A.keys() + '</div></div>';
+-  } else if (TAB === 'lang') {
+-    // смена — перезагрузка, поэтому только в меню
+-    list.innerHTML = menu
+-      ? '<div class="lang-grid">' + A.langs.map(l => '<button type="button" lang="' + l + '" data-l="' + l + '" id="set-l-' + l + '"' +
+-          (l === A.lang() ? ' class="cur"' : '') + ('set-l-' + l === focus ? ' autofocus' : '') + '>' + A.langNames[l] + '</button>').join('') + '</div>'
+-      : still('<b class="set-big">' + esc(A.langNames[A.lang()]) + '</b>' + note(onlyMenu));
++    list.innerHTML = '<div class="set-keys">' + A.keys() + '</div>';
+   } else {
+     let h = '';
+     if (A.career) {
+-      h += head(t('курьер'));
+       h += row(t('карточка курьера'), esc(heroName()), 'set-hero', focus);
+     }
+     // камера (camview.js): сзади, высоко → сзади, близко → из-за руля; меняется и из паузы — сразу
+     if (A.cam) {
+-      h += row(t('камера'), esc(A.cam.label()), 'set-cam', focus) +
+-        note(t('V на клавиатуре, View на геймпаде, значок камеры на телефоне — прямо в езде'));
++      h += row(t('камера'), esc(A.cam.label()), 'set-cam', focus);
+     }
+     // мини-игры у клиента (doorstep.js): домофон у подъезда и разговор у двери; выкл — только езда. Меняется и из паузы — со следующего адреса
+     if (A.door) {
+-      h += row(t('мини-игры у клиента'), A.door.on() ? t('вкл') : t('выкл'), 'set-door', focus) +
+-        note(t('домофон у подъезда и разговоры с клиентами при вручении; выкл — только езда'));
+-    }
+-    // путь на дороге (routeask.js): оранжевая полоса к клиенту, зелёная — в пиццерию; в первой смене горит всегда. Меняется и из паузы — сразу
+-    if (A.route) {
+-      h += row(t('путь на дороге'), A.route.on() ? t('вкл') : t('выкл'), 'set-route', focus) +
+-        note(t('полоса на асфальте до клиента и обратно в пиццерию; в первой смене горит всегда') +
+-          (A.route.first() ? ' · ' + t('сейчас первая смена — горит') : ''));
++      h += row(t('мини-игры у клиента'), A.door.on() ? t('вкл') : t('выкл'), 'set-door', focus);
+     }
+     // анонимная статистика (telemetry.js): только взрослая версия; в детской строки нет. Меняется и из паузы — сразу
+@@ -186,5 +157,5 @@
+         h += row(can ? '<b>' + esc(UPD.line()) + '</b>' : t('обновления с GitHub'), can ? t('обновить до {v}', { v: esc(st.latest) }) : st.st === 'wait' ? t('проверяю…') : t('проверить обновления'),
+           can ? 'set-upd-go' : 'set-upd', focus, { extra: !can && UPD.line() ? '<small class="set-msg">' + esc(UPD.line()) + '</small>' : '' });
+-      } else h += note(A.steam ? t('игру обновляет Стим') : t('в браузере — всегда последняя версия'));
++      }
+     }
+     // титры (credits.js): авторы моделей (CC-BY — подпись обязательна), карта OSM, шрифты, программы
+@@ -197,21 +168,7 @@
+       A.cash.done && A.cash.done() ? t('всё открыто') : t('накинуть {sum} и открыть всё', { sum: esc(A.cash.money(A.cash.to)) }), 'set-cash', focus);
+     if (menu && A.canReset()) h += '<button type="button" id="set-reset" class="set-danger"' + ('set-reset' === focus ? ' autofocus' : '') + '>' + t('сбросить прогресс') + '</button>';
+-    if (!menu) h += note(t('сбросить прогресс — в главном меню'));
+     list.innerHTML = h;
+   }
+-  ticks(list);
+-  // графика перерисовывает свой список сама (gfx.js panel) — галочки ставим заново
+-  new MutationObserver(() => ticks(list)).observe(list, { childList: true });
+   wire(body);
+-}
+-
+-/* галочки анкеты: кнопки «вкл» / «выкл» (звук, графика) — с квадратиком ☑ / ☐ (только вид, gfx.js не трогаем) */
+-function ticks (list) {
+-  const on1 = t('вкл'), off1 = t('выкл');
+-  list.querySelectorAll('.set-row button').forEach(b => {
+-    const v = b.textContent.trim();
+-    b.classList.toggle('set-on', v === on1 || v.startsWith(on1 + ' ·'));
+-    b.classList.toggle('set-off', v === off1 || v.startsWith(off1 + ' ·'));
+-  });
+ }
+ 
+@@ -225,5 +182,4 @@
+     A.navReset();
+   }));
+-  body.querySelectorAll('.set-tk').forEach(b => b.addEventListener('click', () => flip(+b.dataset.d, true)));
+   if ($('set-snd')) $('set-snd').onclick = () => { A.Snd.set(!A.Snd.on); render('set-snd'); };
+   // ползунки: тянешь — громкость сразу, отпустил — короткий пример этого звука
+@@ -237,8 +193,6 @@
+     inp.addEventListener('change', () => { if (A.Snd.preview) try { A.Snd.preview(k); } catch (e) { /* — */ } });
+   });
+-  body.querySelectorAll('[data-l]').forEach(b => b.addEventListener('click', () => A.setLang(b.dataset.l)));
+   if ($('set-hero')) $('set-hero').onclick = () => A.openStats();
+   if ($('set-cam')) $('set-cam').onclick = () => { A.cam.next(); render('set-cam'); };
+-  if ($('set-route')) $('set-route').onclick = () => { A.route.set(!A.route.on()); render('set-route'); };
+   if ($('set-tel')) $('set-tel').onclick = () => { TEL.set(!TEL.on()); render('set-tel'); };
+   if ($('set-privacy')) $('set-privacy').onclick = () => { PV.open(A.panel(), A.body(), () => { render('set-privacy'); A.navReset(); }); A.navReset(); };
 --- a/src/game/sky.js
 +++ b/src/game/sky.js
 @@ -38,6 +38,6 @@
@@ -967,10 +1395,29 @@
 + "Салон": "Cabin",
   "сзади, близко": "chase, close",
   "сзади, высоко": "chase, high",
-@@ -5948,4 +5953,8 @@
+@@ -5948,4 +5953,27 @@
   "Начать смену": "Start shift",
   "Карта района": "District map",
 + "Пауза": "Pause",
++ "Накладная": "Order sheet",
++ "Поручение": "Errand",
++ "Адреса": "Addresses",
++ "Заказы": "Orders",
++ "Продолжить": "Resume",
++ "Настройки": "Settings",
++ "Готово": "Done",
++ "Игра": "Game",
++ "Графика": "Graphics",
++ "Звук": "Sound",
++ "Управление": "Controls",
++ "Музыка": "Music",
++ "Звуки": "Sound effects",
++ "Мотор": "Engine",
++ "Громкость музыки": "Music volume",
++ "Следующий трек": "Next track",
++ "Динамическое разрешение": "Dynamic resolution",
++ "меню паузы": "pause menu",
++ "сенсорный экран": "touchscreen",
 + "Закрыть карту": "Close map",
 + "Щипок — масштаб · тяни карту": "Pinch to zoom · drag to move",
 + "Колесо — масштаб · тяни карту": "Scroll to zoom · drag to move",
@@ -978,33 +1425,41 @@
   "Пиццерия сверху": "From above",
 --- a/src/styles/delivery.css
 +++ b/src/styles/delivery.css
-@@ -390,5 +390,5 @@
+@@ -384,11 +384,11 @@
+ #nitro i { display: block; height: 100%; width: 50%; background: #6fd3ff; }
+ #nitro.burn i { background: #e6f7ff; box-shadow: 0 0 8px #6fd3ff; }
+-/* молния нитро (11бс): жёлтая, с тёмной обводкой — рядом с подписью на хаде и на кнопке телефона */
++/* молния нитро: голубая, с тёмной обводкой — рядом с подписью на хаде и на кнопке телефона */
+ #nitro span::before, .tp-right .tp-nos::after { content: ''; display: inline-block; width: 1.1em; height: 1.4em; vertical-align: -.25em; margin-right: 3px;
+-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 32'%3E%3Cpolygon points='15,1 3,18 11,18 8,31 21,12 13,12' fill='%23ffd91a' stroke='%2333210c' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; }
++  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 32'%3E%3Cpolygon points='15,1 3,18 11,18 8,31 21,12 13,12' fill='%2372caff' stroke='%2333210c' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; }
+ .tp-right .tp-nos::after { display: block; margin: 0 auto 2px; width: 14px; height: 18px; }
  #ctrls button.on { color: #6fd3ff; border-color: #6fd3ff; }
  /* нитро кнопкой — для телефона; на компьютере есть Shift */
 -#nos { color: #6fd3ff; touch-action: none; user-select: none; -webkit-user-select: none; }
-+#nos { color: #ffad6c; touch-action: none; user-select: none; -webkit-user-select: none; }
++#nos { color: #72caff; touch-action: none; user-select: none; -webkit-user-select: none; }
  html[data-map="moscow"] #radar { cursor: zoom-in; pointer-events: auto; }
  
 @@ -439,5 +439,5 @@
                    transform: rotate(-45deg); margin-right: 6px; animation: lg-to-blink 0.9s steps(2) infinite; }
  @keyframes lg-to-blink { 50% { box-shadow: 0 0 0 3px #ffe14d; } }
 -.lg-sig { background: #3fd15e; border-radius: 50%; } .lg-nos { background: #6fd3ff; } .lg-car { background: #5b6b80; }
-+.lg-sig { background: #3fd15e; border-radius: 50%; } .lg-nos { background: #ffad6c; } .lg-car { background: #5b6b80; }
++.lg-sig { background: #3fd15e; border-radius: 50%; } .lg-nos { background: #72caff; } .lg-car { background: #5b6b80; }
  /* маршрут и пробка — полоской; бандиты — красный круг; районы — рамка и штриховка; гараж, КПП */
  /* маршрут: к клиенту — оранжевый, в пиццерию — зелёный */
 @@ -689,11 +689,11 @@
  html[data-map="moscow"] #radar {
    padding: 7px; border: 2px solid #33210c; box-sizing: border-box;
 -  background: conic-gradient(#6fd3ff calc(var(--nos, .5) * 360deg), #1d2440 0);
-+  background: conic-gradient(#ffad6c calc(var(--nos, .5) * 360deg), #1d2440 0);
++  background: conic-gradient(#72caff calc(var(--nos, .5) * 360deg), #1d2440 0);
    transition: box-shadow .15s;
  }
  html[data-map="moscow"] #radar canvas { clip-path: inset(7px round 10px); }   /* рамка-бак вокруг: холст не залезает на неё */
  html[data-map="moscow"] #radar.burn {
 -  background: conic-gradient(#e6f7ff calc(var(--nos, .5) * 360deg), #1d2440 0);
 -  box-shadow: 0 0 16px #6fd3ff, 0 6px 18px rgba(0, 0, 0, .35);
-+  background: conic-gradient(#ffda98 calc(var(--nos, .5) * 360deg), #1d2440 0);
-+  box-shadow: 0 0 16px #ff9c56, 0 6px 18px rgba(0, 0, 0, .35);
++  background: conic-gradient(#c9eeff calc(var(--nos, .5) * 360deg), #1d2440 0);
++  box-shadow: 0 0 16px #72caff, 0 6px 18px rgba(0, 0, 0, .35);
  }
  /* ── пауза: без общей рамки, всё «лежит на столе» рядом ──
 @@ -1156,8 +1156,8 @@
@@ -1014,9 +1469,9 @@
 -.tp-right .tp-nos.burn { background: conic-gradient(#e6f7ff calc(var(--nos, .5) * 360deg), rgba(20, 16, 30, .6) 0); box-shadow: 0 0 14px #6fd3ff, 0 4px 0 rgba(0, 0, 0, .35); }
 -.tp-right .tp-nos.burn::before { background: #4a8cff; }
 -#touchpad .tp-nos.on { background: conic-gradient(#e6f7ff calc(var(--nos, .5) * 360deg), rgba(20, 16, 30, .6) 0); }
-+.tp-right .tp-nos::before { content: ''; position: absolute; inset: 5px; z-index: -1; border-radius: 50%; background: #b74f28; }
-+.tp-right .tp-nos.burn { background: conic-gradient(#ffda98 calc(var(--nos, .5) * 360deg), rgba(20, 16, 30, .6) 0); box-shadow: 0 0 14px #ff9c56, 0 4px 0 rgba(0, 0, 0, .35); }
-+.tp-right .tp-nos.burn::before { background: #d87135; }
-+#touchpad .tp-nos.on { background: conic-gradient(#ffda98 calc(var(--nos, .5) * 360deg), rgba(20, 16, 30, .6) 0); }
++.tp-right .tp-nos::before { content: ''; position: absolute; inset: 5px; z-index: -1; border-radius: 50%; background: #2c71d1; }
++.tp-right .tp-nos.burn { background: conic-gradient(#c9eeff calc(var(--nos, .5) * 360deg), rgba(20, 16, 30, .6) 0); box-shadow: 0 0 14px #72caff, 0 4px 0 rgba(0, 0, 0, .35); }
++.tp-right .tp-nos.burn::before { background: #4d96f2; }
++#touchpad .tp-nos.on { background: conic-gradient(#c9eeff calc(var(--nos, .5) * 360deg), rgba(20, 16, 30, .6) 0); }
  .tp-right .tp-hand { width: 60px; height: 60px; font-size: 7px; justify-self: center; }
  @media (max-height: 460px) {                                    /* телефон боком */

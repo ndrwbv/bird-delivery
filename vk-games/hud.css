@@ -15,6 +15,7 @@ body {
   --vk-ink: #fff0e2;
   --vk-muted: #cfbaa8;
   --vk-orange: #ffad6c;
+  --vk-nitro: #72caff;
   --vk-danger: #ff7785;
 }
 
@@ -159,7 +160,7 @@ html[data-map] body #hud-right #speed {
   font: 600 10px/1.2 system-ui, sans-serif;
   rotate: none;
 }
-html[data-map] body #hud-right #cambtn {
+html[data-map] body #hud-right :is(#cambtn, .vk-pause) {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -177,10 +178,10 @@ html[data-map] body #hud-right #cambtn {
   touch-action: none;
   cursor: pointer;
 }
-#cambtn .vk-camera-icon { width: 16px; height: 16px; color: var(--vk-orange); }
-#cambtn:focus-visible { outline: 1px solid var(--vk-orange); outline-offset: 1px; }
-#cambtn:hover .vk-camera-mode { color: var(--vk-orange); }
-.vk-pause, #vk-map-close {
+:is(#cambtn, .vk-pause) svg { width: 16px; height: 16px; color: var(--vk-orange); }
+:is(#cambtn, .vk-pause):focus-visible { outline: 1px solid var(--vk-orange); outline-offset: 1px; }
+:is(#cambtn, .vk-pause):hover span { color: var(--vk-orange); }
+#vk-map-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -196,9 +197,9 @@ html[data-map] body #hud-right #cambtn {
   touch-action: none;
   cursor: pointer;
 }
-.vk-pause[hidden] { display: none; }
-.vk-pause .vk-icon, #vk-map-close svg { width: 16px; height: 16px; color: var(--vk-orange); }
-:is(.vk-pause, #vk-map-close):focus-visible { outline: 2px solid var(--vk-orange); outline-offset: 2px; }
+html[data-map] body #hud-right .vk-pause[hidden] { display: none; }
+#vk-map-close svg { width: 16px; height: 16px; color: var(--vk-orange); }
+#vk-map-close:focus-visible { outline: 2px solid var(--vk-orange); outline-offset: 2px; }
 html[data-map] body #fullmap {
   align-items: center;
   justify-content: center;
@@ -267,6 +268,7 @@ html[data-map] body #fullmap {
 .vk-nitro .vk-meter-track i {
   mask-image: repeating-linear-gradient(to top, #000 0 5px, transparent 5px 6px);
 }
+.vk-nitro { color: var(--vk-nitro); }
 .vk-pizza { color: #ffcb72; }
 .vk-pizza.warm { color: #f9da9b; }
 .vk-pizza.cold { color: #c1bdb6; }
@@ -307,12 +309,16 @@ html[data-map] body #touchpad .tp-right button {
 }
 html[data-map] body #touchpad .tp-gas { --vk-pedal-ink: #ffd7b0; }
 html[data-map] body #touchpad .tp-brake { --vk-pedal-ink: #f7b29e; }
-html[data-map] body #touchpad .tp-nos { --vk-pedal-ink: var(--vk-orange); }
+html[data-map] body #touchpad .tp-nos { --vk-pedal-ink: var(--vk-nitro); }
 html[data-map] body #touchpad .tp-nos::before,
 html[data-map] body #touchpad .tp-nos::after { content: none; }
 html[data-map] body #touchpad .tp-right button:is(.on, .burn) {
   background: var(--vk-control-active);
   border-color: var(--vk-pedal-ink);
+}
+html[data-map] body #touchpad .tp-right .tp-nos:is(.on, .burn) {
+  background: #17384deb;
+  border-color: var(--vk-nitro);
 }
 #touchpad .vk-icon { width: 18px; height: 18px; pointer-events: none; }
 #touchpad .tp-gas .vk-icon { width: 22px; height: 22px; }
