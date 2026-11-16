@@ -34,6 +34,99 @@
 +  b.querySelector('.vk-camera-mode').textContent = modeName;
    const l = t('камера: {v}', { v: label() });
    b.title = l; b.setAttribute('aria-label', l);
+@@ -392,5 +393,5 @@
+   const speedo = gauge(dx + 0.072, 'speed'), tacho = gauge(dx - 0.072, 'tacho');
+   const lamp = (hex, x) => { const m = box(0.016, 0.012, 0.004, mat(hex, true), x, dialY - 0.035, dialZ - 0.004); m.visible = false; return m; };
+-  const lampHp = lamp('#ff3b2a', dx + 0.008), lampNos = lamp('#6fd3ff', dx - 0.012);
++  const lampHp = lamp('#ff3b2a', dx + 0.008), lampNos = lamp('#ff994d', dx - 0.012);
+   // руль: колонка, обод, три спицы, руки курьера (рукава — оранжевая куртка)
+   const wz = ez + 0.31, wy = gb - 0.05, wr = 0.165, tilt = 0.44;
+--- a/src/game/carglass.js
++++ b/src/game/carglass.js
+@@ -43,6 +43,6 @@
+    (10.10.2026: блик «лесенкой» из пикселей с камеры читался как царапины и полосы на заднем стекле) */
+ const TEX = new Map();
+-function tex (tint) {
+-  const k = tint ? 't' : 'c';
++function tex (tint, classic = false) {
++  const k = tint ? 't' : classic ? 'vk' : 'c';
+   if (TEX.has(k)) return TEX.get(k);
+   const c = document.createElement('canvas'); c.width = 192; c.height = 64;
+@@ -50,8 +50,8 @@
+   for (let cell = 0; cell < 3; cell++) {
+     const o = cell * 64;
+-    x.fillStyle = tint ? 'rgba(18, 20, 26, 0.82)' : 'rgba(120, 160, 200, 0.38)'; x.fillRect(o, 0, 64, 64);
++    x.fillStyle = tint ? 'rgba(18, 20, 26, 0.82)' : classic ? 'rgba(37, 58, 77, 0.75)' : 'rgba(120, 160, 200, 0.38)'; x.fillRect(o, 0, 64, 64);
+     // блик: одна широкая мягкая полоса наискось, без лесенки
+     x.save(); x.beginPath(); x.rect(o, 0, 64, 64); x.clip();
+-    x.fillStyle = tint ? 'rgba(90, 100, 120, 0.16)' : 'rgba(230, 245, 255, 0.16)';
++    x.fillStyle = tint ? 'rgba(90, 100, 120, 0.16)' : classic ? 'rgba(172, 204, 228, 0.34)' : 'rgba(230, 245, 255, 0.16)';
+     x.beginPath(); x.moveTo(o + 20, 64); x.lineTo(o + 34, 64); x.lineTo(o + 58, 0); x.lineTo(o + 44, 0); x.closePath(); x.fill();
+     if (cell >= 1) {
+@@ -100,13 +100,22 @@
+   const B = (w, h, d, hex, x, y, z) => add(new THREE.BoxGeometry(w, h, d), hex, x, y, z);
+   // rb — заднее стекло наклонное (классические седаны, cars.js LOOK.rake): верх на rb м ближе к середине (carbody.js, Ж6)
+-  const rb = Math.min(k.rb || 0, S.cab * 0.3), tilt = rb / (gt - gb);
++  const rb = Math.min(k.rb || 0, S.cab * 0.3), rf = k.rf || 0;
++  const rise = gt - gb;
++  const tuck = k.classic ? 0.10 : 0;
++  const roofZ = S.cz + (rb - rf) / 2, roofLen = S.cab - rb - rf;
++  const roofW = k.classic ? W - 0.12 - 2 * tuck : undefined;
+   // рама: низ до стёкол, верх над ними, четыре угловые стойки и средние
+   B(W - 0.12, gb - top, S.cab, frame, 0, (top + gb) / 2, S.cz);
+-  B(W - 0.12, roof - gt, S.cab - rb, frame, 0, (gt + roof) / 2, S.cz + rb / 2);
++  B(roofW ?? W - 0.12, roof - gt, roofLen, frame, 0, (gt + roof) / 2, roofZ);
+   for (const sx of [-1, 1]) {
+-    B(0.12, gt - gb, 0.14, frame, sx * (W / 2 - 0.12), cy + 0.02, cf - 0.07);
+-    if (rb) add(new THREE.BoxGeometry(0.12, Math.hypot(gt - gb, rb), 0.14).rotateX(Math.atan(tilt)), frame, sx * (W / 2 - 0.12), cy + 0.02, cb + 0.07 + rb / 2);
+-    else B(0.12, gt - gb, 0.14, frame, sx * (W / 2 - 0.12), cy + 0.02, cb + 0.07);
+-    if (S.cab > 1.7) B(0.09, gt - gb, 0.1, frame, sx * (W / 2 - 0.1), cy + 0.02, S.cz + S.cab * 0.08);
++    const pillar = (w, d, x, z, slide) => {
++      const geo = new THREE.BoxGeometry(w, Math.hypot(rise, slide, tuck), d);
++      if (slide) geo.rotateX(Math.atan(slide / rise));
++      if (tuck) geo.rotateZ(sx * Math.atan(tuck / rise));
++      add(geo, frame, sx * (x - tuck / 2), cy + 0.02, z + slide / 2);
++    };
++    pillar(0.12, 0.14, W / 2 - 0.12, cf - 0.07, -rf);
++    pillar(0.12, 0.14, W / 2 - 0.12, cb + 0.07, rb);
++    if (S.cab > 1.7) pillar(0.09, 0.1, W / 2 - 0.1, S.cz + S.cab * 0.08, 0);
+   }
+   // пол салона тёмный, торпедо, спинки сидений
+@@ -137,8 +146,8 @@
+   // стёкла: четыре квадрата одним мешем (вершины и UV на стекло — 4 подряд)
+   const panes = [
+-    { k: 'f', w: W - 0.28, h: gh, c: [0, cy + 0.02, cf + 0.01], n: [0, 0, 1] },
++    { k: 'f', w: W - 0.28, h: gh, c: [0, cy + 0.02, cf + 0.01 - rf / 2], n: [0, 0, 1], tz: -rf },
+     { k: 'b', w: W - 0.28, h: gh * 0.9, c: [0, cy + 0.02, cb - 0.01 + rb / 2], n: [0, 0, -1], tz: rb * 0.9 },
+-    { k: 'l', w: S.cab - 0.3, h: gh * 0.84, c: [W / 2 - 0.05, cy + 0.03, S.cz], n: [1, 0, 0], tb: rb * 0.92 },
+-    { k: 'r', w: S.cab - 0.3, h: gh * 0.84, c: [-W / 2 + 0.05, cy + 0.03, S.cz], n: [-1, 0, 0], tb: rb * 0.92 },
++    { k: 'l', w: S.cab - 0.3, h: gh * 0.84, c: [W / 2 - 0.05, cy + 0.03, S.cz], n: [1, 0, 0], tb: rb * 0.92, tf: rf * 0.92 },
++    { k: 'r', w: S.cab - 0.3, h: gh * 0.84, c: [-W / 2 + 0.05, cy + 0.03, S.cz], n: [-1, 0, 0], tb: rb * 0.92, tf: rf * 0.92 },
+   ];
+   const pos = [], uv = [], idx = [];
+@@ -149,6 +158,9 @@
+     const ax = side ? 0 : hw, az = side ? hw : 0;
+     // наклон: tz — верх заднего стекла вперёд (низ — назад), tb — верхний задний угол бокового вперёд
+-    const lo = -(p.tz || 0) / 2, hi = (p.tz || 0) / 2, tb = p.tb || 0;
+-    pos.push(cx - ax, cy2 - hh, cz - az + lo, cx + ax, cy2 - hh, cz + az + lo, cx + ax, cy2 + hh, cz + az + hi, cx - ax, cy2 + hh, cz - az + hi + tb);
++    const lo = -(p.tz || 0) / 2, hi = (p.tz || 0) / 2;
++    const topX = side ? cx - p.n[0] * tuck : cx, topHalfW = side ? 0 : hw - tuck;
++    pos.push(cx - ax, cy2 - hh, cz - az + lo, cx + ax, cy2 - hh, cz + az + lo,
++      topX + topHalfW, cy2 + hh, cz + az + hi - (p.tf || 0),
++      topX - topHalfW, cy2 + hh, cz - az + hi + (p.tb || 0));
+     uv.push(0, 0, CELL, 0, CELL, 1, 0, 1);
+     idx.push(v, v + 1, v + 2, v, v + 2, v + 3);
+@@ -160,8 +172,8 @@
+   geo.setIndex(idx);
+   geo.computeBoundingSphere();
+-  const mesh = new THREE.Mesh(geo, tex(tint));
++  const mesh = new THREE.Mesh(geo, tex(tint, k.classic));
+   mesh.renderOrder = 1;
+   g.add(mesh);                                    // занижение (dy) makeCar добавит сам, как всем детям
+-  return { mesh, panes, dy, S, rb, roofZ: S.cz + rb / 2, roofLen: S.cab - rb };
++  return { mesh, panes, dy, S, rb, roofZ, roofLen, roofW };
+ }
+ 
 --- a/src/game/carlights.js
 +++ b/src/game/carlights.js
 @@ -231,5 +231,7 @@
@@ -53,26 +146,30 @@
 +import { pizzaRoofSign } from './vk-look.js';
  import { t } from '../i18n/index.js';
  import * as DIST from './districts.js';
-@@ -63,5 +64,7 @@
+@@ -63,6 +64,8 @@
  const LOOK = {
    semerka: {
 -    name: N_('Семёрка'), note: N_('ВАЗ-2107 «белая ночь»: хром, квадратные фары'), hex: '#ebe6d8', roof: '#fff3e2',   // 11бг (автор 24.10.2026): белая «белая ночь», чуть тёплая — на ней видно вмятины и кровь (была оранжевая #f0522a) chrome: '#d4d8dc', model: 'sedan', wheel: 'cap', molding: null, handle: '#c9ccd1', rake: { f: 0, b: 0.3 },
+-    spec: { L: 4.13, W: 1.62, h: 0.44, hood: 1.35, trunk: 1.0, cab: 1.85, cz: -0.2, ch: 0.6, r: 0.37, fz: 1.3, bz: -1.12 },
 +    name: N_('Семёрка'), note: N_('ВАЗ-2107 «белая ночь»: хром, квадратные фары'),
-+    hex: '#efdbb9', roof: '#fff0d3', chrome: '#332e35', model: 'sedan', wheel: 'cap',
-+    molding: null, handle: '#464148', rake: { f: 0, b: 0.3 },
-     spec: { L: 4.13, W: 1.62, h: 0.44, hood: 1.35, trunk: 1.0, cab: 1.85, cz: -0.2, ch: 0.6, r: 0.37, fz: 1.3, bz: -1.12 },
++    hex: '#f1e3cc', roof: '#faf0dc', chrome: '#302d34', model: 'sedan', wheel: 'cap',
++    molding: '#4e4847', handle: '#464148', rake: { f: 0.25, b: 0.33 },
++    spec: { L: 4.13, W: 1.62, h: 0.44, hood: 1.35, trunk: 1.0, cab: 1.90, cz: -0.15, ch: 0.58, r: 0.35, fz: 1.22, bz: -1.19 },
    },
-@@ -343,7 +346,7 @@
+   matiz: {
+@@ -343,8 +346,8 @@
    if (!LOOK[id]) id = START;
    const c = LOOK[id], u = o.up || ups(id);
 -  // шашки доставки на крыше нет ни у одной своей машины (автор 10.10.2026: «семёрка, но без этой херни на крыше»)
 +  // Знак доставки на «Семёрке» добавляет dress(), вместо стандартной шашки.
    const hex = o.hex || hexOf(id);
 -  const g = A.makeCar(hex, !!o.sign, c.model, false, {
+-    spec: c.spec, lift: c.lift || 0, low: c.low, tint: c.tint, chrome: c.chrome || hex, roofHex: c.roof, see: !!o.see,   // see — салон со стёклами и курьером (carglass.js)
 +  const g = A.makeCar(hex, !!o.sign && id !== 'semerka', c.model, false, {
-     spec: c.spec, lift: c.lift || 0, low: c.low, tint: c.tint, chrome: c.chrome || hex, roofHex: c.roof, see: !!o.see,   // see — салон со стёклами и курьером (carglass.js)
++    spec: c.spec, lift: c.lift || 0, low: c.low, tint: c.tint, vkClassic: id === 'semerka', chrome: c.chrome || hex, roofHex: c.roof, see: !!o.see,   // see — салон со стёклами и курьером (carglass.js)
      open: !!c.open,                                 // кабриолет: без крыши и стёкол, курьер и манекен видны всегда (flycar.js openCabin)
-@@ -411,14 +414,22 @@
+     armor: u.armor,                                 // броня — вмятины мельче, кенгурятник держит передний бампер (cardent.js)
+@@ -411,14 +414,23 @@
    switch (id) {
      case 'semerka': {
 -      // широкая хромированная решётка между прямоугольными фарами
@@ -85,6 +182,9 @@
        both(s => { rect(0.3, 0.17, HEAD, s * (W / 2 - 0.25), top - 0.13, fr + 0.03); rect(0.14, 0.06, AMBER, s * (W / 2 - 0.25), top - 0.29, fr + 0.02); });
 -      // большие фонари с поворотником
 -      both(s => { rect(0.3, 0.2, TAIL, s * (W / 2 - 0.3), top - 0.13, bk); rect(0.12, 0.2, AMBER, s * (W / 2 - 0.1), top - 0.13, bk); });
+-      // белая полоса по борту и хромированные молдинги окон
+-      both(s => B(0.02, 0.07, S.L - 0.5, '#fff3e2', s * (W / 2 + 0.075), top - 0.22, 0));
+-      both(s => B(0.035, 0.035, S.cab - rb, CHR, s * (W / 2 - 0.05), roof - 0.02, S.cz + rb / 2));
 +      const lightX = W / 2 - 0.24;
 +      const reverse = { x: lightX - 0.1, y: top - 0.128, z: bk - 0.04, w: 0.184, h: 0.077 };
 +      both(s => {
@@ -94,15 +194,14 @@
 +        rect(reverse.w, reverse.h, HEAD, s * reverse.x, reverse.y, bk);
 +      });
 +      g.userData.reverseLens = reverse;
-+      if (!u.gun) pizzaRoofSign(THREE, add, roof + 0.12, k.roofZ - 0.18);
-       // белая полоса по борту и хромированные молдинги окон
--      both(s => B(0.02, 0.07, S.L - 0.5, '#fff3e2', s * (W / 2 + 0.075), top - 0.22, 0));
--      both(s => B(0.035, 0.035, S.cab - rb, CHR, s * (W / 2 - 0.05), roof - 0.02, S.cz + rb / 2));
-+      both(s => B(0.02, 0.055, S.L - 0.5, '#ebdbbf', s * (W / 2 + 0.075), top - 0.22, 0));
-+      both(s => B(0.035, 0.035, S.cab - rb, trim, s * (W / 2 - 0.05), roof - 0.02, S.cz + rb / 2));
++      if (!u.gun) pizzaRoofSign(THREE, add, roof + 0.117, k.roofZ - 0.10);
++      both(s => {
++        // Нижняя хромированная линия между передним и задним крылом.
++        B(0.022, 0.022, 1.50, '#b5aca5', s * (W / 2 + 0.076), top - 0.275, S.cz);
++      });
        break;
      }
-@@ -661,5 +672,5 @@
+@@ -661,5 +673,5 @@
    // своя машина: задние фонари в нише с рифлёным стеклом и белым стеклом заднего хода (carrear.js)
    // рамка — хромом у хромированных седанов, у остальных — тёмным тоном цвета кузова (ниша, а не чёрный контур)
 -  if (k.see) lampDepth(add, lamp, backs, { minY: y0 + 0.05, frameHex: LOOK[id].chrome && new THREE.Color(CHR).getHSL({}).l > 0.5 ? CHR : '#' + new THREE.Color(bodyHex).multiplyScalar(0.55).getHexString() });
@@ -179,6 +278,31 @@
 +const OFFICE_WALLS = ['#dfc7a4', '#e9d6b3', '#d6bd9d', '#f0dfbf'];
  const GLASS = ['#7fa7c6', '#86aecb', '#789fbf', '#8fb6d2'];
  const PITCH = ['#9a6b5e', '#7d6a80', '#6f8a72', '#8a7a5e', '#8b5f55'];
+@@ -6921,5 +6921,5 @@
+ function nosFlame (x, y, z, bx, bz) {
+   for (let i = 0; i < 2; i++) {
+-    const hex = chance(0.5) ? 0x6fd3ff : 0xe6f7ff;
++    const hex = chance(0.5) ? 0xff8b32 : 0xffd68b;
+     const px = x + rand(-0.15, 0.15), py = y + rand(-0.1, 0.1), pz = z + rand(-0.15, 0.15);
+     fxPart('puff', px, py, pz, hex, rand(0.25, 0.45), 0.85, { vx: bx * rand(8, 14) + V.vx * 0.6, vy: rand(0, 0.6), vz: bz * rand(8, 14) + V.vz * 0.6,
+@@ -7236,5 +7236,5 @@
+   // подробная копия чужой машины (opts.dent, foewreck.js): тот же салон со стёклами, водитель в своей одежде — своим мешем (вышел — прячется)
+   const drvL = [], drvAdd = opts.dent ? (geo, hex, x, y, z) => put(drvL, geo, hex, x, y + dy, z) : null;
+-  const cg = (opts.see || opts.dent) && !open ? CG.cabin(g, add, { S, W, top, cy, gh, frame, tint: !!opts.tint, dy, rb: opts.rake ? opts.rake.b : 0, drv: opts.drv, drvAdd }) : null;
++  const cg = (opts.see || opts.dent) && !open ? CG.cabin(g, add, { S, W, top, cy, gh, frame, tint: !!opts.tint, dy, rb: opts.rake ? opts.rake.b : 0, rf: opts.vkClassic ? opts.rake.f : 0, classic: opts.vkClassic, drv: opts.drv, drvAdd }) : null;
+   if (open) FLYC.openCabin(add, { S, W, top, GLASS, frame, body: bodyHex });
+   // машины потока (без своей морды): салон-трапеция — наклонные стёкла и стойки (carbody.js)
+@@ -7242,8 +7242,8 @@
+   // машины гаража со своей мордой — салон как был, только у классических седанов наклонное заднее стекло (LOOK.rake)
+   const rake = opts.dress ? opts.rake : BODYM.RAKE[model];
+-  const TR = !cg && !open && rake ? BODYM.cabin(add, { S, W, top, frame, GLASS, rake, four, tuck: opts.dress ? 0 : undefined, doorTop: top - 0.1 + (S.h + 0.08) / 2, sil: opts.dress || opts.see || opts.dent || opts.nosil ? null : BODYM.SIL.HEX }) : null;
++  const TR = !cg && !open && rake ? BODYM.cabin(add, { S, W, top, frame, GLASS, rake, four, tuck: opts.vkClassic ? 0.10 : opts.dress ? 0 : undefined, doorTop: top - 0.1 + (S.h + 0.08) / 2, sil: opts.dress || opts.see || opts.dent || opts.nosil ? null : BODYM.SIL.HEX }) : null;
+   if (!cg && !TR && !open) add(new THREE.BoxGeometry(W - 0.12, S.ch, S.cab), frame, 0, cy, S.cz);
+   const roofZ = TR ? TR.roofZ : cg ? cg.roofZ : S.cz, roofLen = TR ? TR.roofLen : cg ? cg.roofLen : S.cab;
+-  if (!open) add(bev(TR ? TR.roofW - 0.02 : W - 0.24, 0.12, roofLen - 0.05, { t: BB.ROOF }), frame, 0, top + S.ch + 0.04, roofZ, 'roof');
++  if (!open) add(bev(TR ? TR.roofW - 0.02 : cg?.roofW ?? W - 0.24, 0.12, roofLen - 0.05, { t: BB.ROOF }), frame, 0, top + S.ch + 0.04, roofZ, 'roof');
+   // двери: шов, ручки, молдинг — в меше двери (мнутся и двигаются с ней)
+   for (const s of [-1, 1]) {
 @@ -7270,5 +7270,5 @@
    if (!opts.see) BODYM.trim(add, { S, W, top, y0, hl, cf: TR ? TR.cf : S.cz + S.cab / 2, bodyHex,
      shade: '#' + new THREE.Color(bodyHex).multiplyScalar(0.62).getHexString(), grille: !opts.dress && model !== 'cn' });
@@ -207,17 +331,75 @@
 +    cup: m(0xe56f2e), sleeve: m(0x933517), lid: m(0xebe0cd), logo: m(0xffffff), bolt: m(0xffd91a),
      shield: new THREE.MeshBasicMaterial({ color: 0x8f9bff, transparent: true, opacity: 0.55, depthWrite: false }),
      star: m(0xe8ecff), heal: m(0xff4d6d), white: m(0xffffff), beast: m(0xff8a1c), horn: m(0xf3e3c2), dark: m(0x2a1d1a),
+@@ -17228,4 +17228,5 @@
+ /* текущий заказ — накладной, как на карточке заказа: шапка с номером, таблица, фото на скрепке.
+    Только кому, куда, что, оплата и пометка по делу (О4, 09.10.2026: убраны «до точки» и «сейчас» — время и сезон) */
++const PAUSE_ORDER_KEYS = { group: 'групповой заказ', chain: 'последовательный заказ', bundle: 'сборный заказ', solo: 'заказ' };
+ function orderInfo () {
+   const rows = [];
+@@ -17240,5 +17241,5 @@
+     // сборный (orders.js): все получатели со своими адресами, отданные (st.done) — с галочкой и зачёркнуты
+     const o = S.order;
+-    head = $t('накладная') + ' · ' + KIND_LABEL.bundle;
++    head = $t('накладная') + ' · ' + $t(PAUSE_ORDER_KEYS.bundle);
+     persons = o.stops.filter(st => !st.done).flatMap(st => st.persons);
+     rows.push([$t('получатель'), o.stops.map(st => {
+@@ -17249,5 +17250,5 @@
+   } else if (S.target && S.order) {
+     const o = S.order, st = o.stops[Math.min(o.idx, o.stops.length - 1)];
+-    head = $t('накладная') + ' · ' + (KIND_LABEL[o.kind] || $t('заказ'));
++    head = $t('накладная') + ' · ' + $t(PAUSE_ORDER_KEYS[o.kind] || PAUSE_ORDER_KEYS.solo);
+     persons = st.persons;
+     rows.push([$t('получатель'), persons.map(p => '<b>' + NICK.label(p, $t('клиент')) + '</b>').join('')],
+--- a/src/game/hudpaper.css
++++ b/src/game/hudpaper.css
+@@ -36,5 +36,5 @@
+ html body #hud-right #dist { font-size: 11px; border-right-color: #d9342c; rotate: -.6deg; }
+ html body #hud-right #speed:empty, html body #hud-right #dist:empty { display: none; }
+-html body #hud-right #nitro { display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 11px; color: #33210c; border-right-color: #3a9fd6; rotate: .5deg; }
++html body #hud-right #nitro { display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 11px; color: #33210c; border-right-color: #dc6327; rotate: .5deg; }
+ html body #hud-right #nitro b { width: 70px; background: #33210c; border-color: #33210c; }
+ html body #hud-right #fxs:not(:empty) { font-size: 10px; color: #8a3b22; border-right-color: #b0651c; }
+@@ -46,9 +46,9 @@
+ /* Кофе на телефоне — бумажная кнопка, кольцо показывает оставшийся запас. */
+ html body #touchpad .tp-nos { color: #33210c; border: 2px solid #33210c;
+-  background: conic-gradient(#3a9fd6 calc(var(--nos, .5) * 360deg), #d8c9a8 0);
++  background: conic-gradient(#dc6327 calc(var(--nos, .5) * 360deg), #d8c9a8 0);
+   box-shadow: 2px 3px 0 rgba(51, 33, 12, .85); }
+ html body #touchpad .tp-nos::before { background: #fff3d6; }
+ html body #touchpad .tp-nos.burn, html body #touchpad .tp-nos.on {
+-  background: conic-gradient(#6fd3ff calc(var(--nos, .5) * 360deg), #d8c9a8 0);
++  background: conic-gradient(#ffad6c calc(var(--nos, .5) * 360deg), #d8c9a8 0);
+   box-shadow: 1px 1px 0 rgba(51, 33, 12, .85); }
+ html body #touchpad .tp-nos.burn::before, html body #touchpad .tp-nos.on::before { background: #ffe9a8; }
 --- a/src/game/lunchicons.js
 +++ b/src/game/lunchicons.js
-@@ -6,6 +6,6 @@
+@@ -1,12 +1,12 @@
+-/* Иконки вещей из игры — для окон выбора (обед, 11бр) и подсказок: банка нитро (синяя, с молнией, как на дороге),
++/* Иконки вещей из игры — для окон выбора (обед, 11бр) и подсказок: банка нитро (оранжевая, с молнией, как на дороге),
+    сердце, деньги. Рисованные от руки, тёмная обводка, как накладная. Строки SVG — вставляются в innerHTML. */
+ const INK = '#33210c';
+ 
+-/* синяя банка с белой окантовкой и жёлтой молнией — такая же лежит на дороге (game.js PICK_ONE.nos) */
++/* оранжевая банка с белой окантовкой и жёлтой молнией — такая же лежит на дороге (game.js PICK_ONE.nos) */
  export const NITRO_ICON =
    '<svg viewBox="0 0 64 80" aria-hidden="true">' +
 -  '<rect x="14" y="10" width="36" height="62" rx="6" fill="#1f5bff" stroke="' + INK + '" stroke-width="3"/>' +
 -  '<rect x="14" y="10" width="36" height="8" rx="3" fill="#0c2f9e"/><rect x="14" y="64" width="36" height="8" rx="3" fill="#0c2f9e"/>' +
+-  '<rect x="17" y="3" width="30" height="9" rx="3" fill="#c9d3e0" stroke="' + INK + '" stroke-width="3"/>' +
 +  '<rect x="14" y="10" width="36" height="62" rx="6" fill="#d86120" stroke="' + INK + '" stroke-width="3"/>' +
 +  '<rect x="14" y="10" width="36" height="8" rx="3" fill="#933517"/><rect x="14" y="64" width="36" height="8" rx="3" fill="#933517"/>' +
-   '<rect x="17" y="3" width="30" height="9" rx="3" fill="#c9d3e0" stroke="' + INK + '" stroke-width="3"/>' +
++  '<rect x="17" y="3" width="30" height="9" rx="3" fill="#ebe0cd" stroke="' + INK + '" stroke-width="3"/>' +
    '<polygon points="37,21 21,45 30,45 26,64 43,37 33,37" fill="#ffd91a" stroke="#fff" stroke-width="4" stroke-linejoin="round" paint-order="stroke"/>' +
+   '<polygon points="37,21 21,45 30,45 26,64 43,37 33,37" fill="#ffd91a" stroke="' + INK + '" stroke-width="1.5" stroke-linejoin="round"/>' +
+--- a/src/game/pausecz.css
++++ b/src/game/pausecz.css
+@@ -98,4 +98,5 @@
+   .pz-top { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 14px; padding: 6px 4px 10px; }
+   .pz-sheet { flex: 0 1 auto !important; max-height: 50%; }
++  .pz-sheet:has(> #pm-order) { order: -1; }
+   .pz-hint { display: none; }
+ }
 --- a/src/game/sky.js
 +++ b/src/game/sky.js
 @@ -38,6 +38,6 @@
@@ -257,7 +439,11 @@
      vec2 q = d.xz / (d.y + 0.12) * 2.6 + uCam.xz / ${(SKY.cloudCell * 0.7).toFixed(1)} + uWind * 1.5;
 --- a/src/game/treeform.js
 +++ b/src/game/treeform.js
-@@ -34,5 +34,5 @@
+@@ -31,8 +31,8 @@
+   },
+   // комков на поверхности кроны (обычное / высокое), по 20 треугольников
+-  N: { birch: [5, 7], lime: [7, 9], maple: [7, 9], poplar: [6, 9] },
++  N: { birch: [7, 9], lime: [9, 11], maple: [9, 12], poplar: [7, 10] },
    // цвета: [тень — холодный тёмный, свет — тёплый светлый]
    COL: {
 -    birch: ['#2c5228', '#acc455'], lime: ['#1d4224', '#729c3e'], maple: ['#183a20', '#66923a'], poplar: ['#1a3a24', '#6c9650'],
@@ -276,6 +462,20 @@
 +  JIT: 0.29,                                         // комок не шар: вершины в стороны ±доля радиуса (4 формы)
  };
  
+@@ -114,5 +114,5 @@
+   const nc = o.ry > o.rx * 1.6 && !o.one ? 2 : 1;
+   for (let i = 0; i < nc; i++) {
+-    const py = o.cy + (nc > 1 ? (i ? 0.35 : -0.3) * o.ry : 0), [px, qy, pz] = at(0, py, 0), k = o.rx * 0.78;
++    const py = o.cy + (nc > 1 ? (i ? 0.32 : -0.3) * o.ry : 0), [px, qy, pz] = at(0, py, 0), k = o.rx * 0.88;
+     P.add(lumpTpl(T, i), px, qy, pz, k, (nc > 1 ? o.ry * 0.5 : o.ry * 0.8), k, 0, r() * 6.283, 0, mixHex(dark, light, 0.12), o.kind, r(), o.pal, 0.5, null, 1, NC);
+   }
+@@ -122,5 +122,5 @@
+     const zz = 1 - 2 * (i + 0.5) / N;
+     if (zz < zmin) continue;
+-    if (made > 2 && r() < (o.skip ?? 0.12)) continue;                 // пустое место — силуэт рваный
++    if (made > 2 && r() < (o.skip ?? 0.04)) continue;                 // пустое место — силуэт рваный
+     made++;
+     const rr = Math.sqrt(1 - zz * zz), a = i * GA + rot, f = 0.66 + r() * 0.24;
 @@ -128,5 +128,5 @@
      const sz = o.rx * (o.lump[0] + r() * (o.lump[1] - o.lump[0])) * (1 - 0.22 * Math.max(0, zz));
      // тон: выше и к солнцу (+z) — светлее; низ и тень — темнее, у каждого комка свой сдвиг
@@ -283,6 +483,42 @@
 +    const t = 0.43 + 0.45 * zz + 0.26 * (lz / o.rx) + (r() - 0.5) * 0.2;
      const [px, qy, pz] = at(lx, ly, lz);
      P.add(lumpTpl(T, i + 1), px, qy, pz, sz, sz * (o.flat ?? 1), sz, 0, r() * 6.283, 0, mixHex(dark, light, t), o.kind, r(), o.pal, 0.5, null, 1, NC);
+@@ -165,8 +165,8 @@
+       }
+     } else c.stick(0, 0, 0, 0, h * 0.8, 0, 0.3, '#ece8de');
+-    egg(c, { cy: 5.7 * sy, rx: 1.95 * sx * 1.12, ry: 3.2 * sy, n: WOOD.N.birch[big ? 1 : 0], lump: [0.42, 0.56], flat: 1.1, zmin: -0.5,
+-      col: WOOD.COL.birch, kind: 1, pal: 0, droop: big ? 3 : 0, skip: 0.14, one: 1 });
++    egg(c, { cy: 5.7 * sy, rx: 2.6 * sx, ry: 3.25 * sy, n: WOOD.N.birch[big ? 1 : 0], lump: [0.43, 0.59], flat: 1.06, zmin: -0.62,
++      col: WOOD.COL.birch, kind: 1, pal: 0, droop: big ? 3 : 1, skip: 0.06, one: 1 });
+     c.leaves(['#e8b830', '#f0c848', '#d8a028'], 4, 2.6 * sx);
+-    return { h, rx: 1.95 * sx };
++    return { h, rx: 2.6 * sx };
+   }
+   if (kind === 'maple' || kind === 'lime') {
+@@ -175,17 +175,17 @@
+     const pal = lime ? (r() < 0.75 ? 0 : 1) : (r() < 0.55 ? 2 : 1);
+     if (c.WM) c.wt(kind, sx, sy, sx); else c.stick(0, 0, 0, 0, h * 0.55, 0, 0.5, '#6e5440');
+-    egg(c, lime ? { cy: 5.3 * sy, rx: 2.6 * sx, ry: 2.5 * sy * 1.04, n: WOOD.N.lime[big ? 1 : 0], lump: [0.38, 0.52], flat: 1.0, zmin: -0.45,
+-      col: WOOD.COL.lime, kind: 1, pal } : { cy: 4.7 * sy, rx: 3.0 * sx, ry: 2.1 * sy * 1.06, n: WOOD.N.maple[big ? 1 : 0], lump: [0.34, 0.48],
+-      flat: 0.85, zmin: -0.4, col: WOOD.COL.maple, kind: 1, pal });
++    egg(c, lime ? { cy: 5.05 * sy, rx: 3.15 * sx, ry: 2.85 * sy, n: WOOD.N.lime[big ? 1 : 0], lump: [0.43, 0.59], flat: 1.0, zmin: -0.65,
++      col: WOOD.COL.lime, kind: 1, pal } : { cy: 4.55 * sy, rx: 3.55 * sx, ry: 2.4 * sy, n: WOOD.N.maple[big ? 1 : 0], lump: [0.43, 0.59],
++      flat: 0.9, zmin: -0.65, col: WOOD.COL.maple, kind: 1, pal });
+     c.leaves(pal === 0 ? ['#e8b830', '#f0c848', '#d8a028'] : pal === 1 ? ['#e8902a', '#d86a22', '#f0a838'] : ['#c84a24', '#d86a22', '#b83a22'], 6, 3.4 * sx);
+-    return { h, rx: (lime ? 2.6 : 3.0) * sx };
++    return { h, rx: (lime ? 3.15 : 3.55) * sx };
+   }
+   if (kind === 'poplar') {
+     const { big, h } = height(c, 'poplar'), sy = h / 11.8, sx = 0.95 + r() * 0.25;
+     if (c.WM) c.wt('poplar', sx, sy, sx); else c.stick(0, 0, 0, 0, h * 0.7, 0, 0.5, '#6a5a48');
+-    egg(c, { cy: 6.6 * sy, rx: 1.5 * sx * 1.12, ry: 5.2 * sy, n: WOOD.N.poplar[big ? 1 : 0], lump: [0.56, 0.72], flat: 1.35, zmin: -0.8,
++    egg(c, { cy: 6.6 * sy, rx: 2.2 * sx, ry: 5.2 * sy, n: WOOD.N.poplar[big ? 1 : 0], lump: [0.56, 0.72], flat: 1.35, zmin: -0.8,
+       col: WOOD.COL.poplar, kind: 1, pal: 3, skip: 0.1 });
+     c.leaves(['#c8b840', '#e0c040'], 3, 2.2);
+-    return { h, rx: 1.5 * sx };
++    return { h, rx: 2.2 * sx };
+   }
+   if (kind === 'pine') {
 --- a/src/game/trees.js
 +++ b/src/game/trees.js
 @@ -325,5 +325,5 @@
@@ -292,34 +528,70 @@
 +    P.add(T.ico, x + ox * s + (VAR ? VAR.wx * oy * s : 0), y + oy * s, z + oz * s + (VAR ? VAR.wz * oy * s : 0), rr * s, rr * s * sy, rr * s, 0, r() * 6.283, 0, tone(hex, Math.round((0.65 + 0.63 * lvl) * 20) / 20), kind, r(), pal, 0.38);
    const leaves = (hexes, n, rad) => {
      for (let i = 0; i < n; i++) {
-@@ -374,5 +374,5 @@
+@@ -374,8 +374,9 @@
      for (let i = 0; i < 3; i++) branch((3.4 + i * 0.9) * H, 1.5 + r() * 0.7, 0.5 + r() * 0.35, i * 2.1 + r(), 0.09, '#d8d2c6');
      for (let i = 0; i < 2; i++) branch(6.2 * H, 1.3 + r() * 0.5, 0.25 + r() * 0.35, i * 2.1 + r(), 0.06, '#6a5248');   // тонкие тёмные прутья наверху — зимой видно
 -    const g = r() < 0.5 ? '#80c05a' : '#8cc862', n = 4 + (r() < 0.5 ? 1 : 0);
-+    const g = r() < 0.5 ? '#9cc149' : '#b2ca45', n = 4 + (r() < 0.5 ? 1 : 0);
++    const g = r() < 0.5 ? '#9cc149' : '#b2ca45', n = 6 + (r() < 0.5 ? 1 : 0);
++    clump(0, 5.0 * H, 0, 1.62, 1.4, g, 0, 0.1);
      for (let i = 0; i < n; i++) {
-       const t = i / (n - 1), a = i * 2.4 + r();
-@@ -387,5 +387,5 @@
+-      const t = i / (n - 1), a = i * 2.4 + r();
+-      clump(Math.sin(a) * 0.75 * (1 - t * 0.6), (3.9 + t * 3.7) * H, Math.cos(a) * 0.75 * (1 - t * 0.6), 1.25 - t * 0.35, 1.3, g, 0, t);
++      const t = i / (n - 1), a = i * 2.4 + r(), reach = 1.52 * (1 - t * 0.68);
++      clump(Math.sin(a) * reach, (3.8 + t * 3.7) * H, Math.cos(a) * reach, 1.4 - t * 0.35, 1.22, g, 0, t);
+     }
+     leaves(YEL, 4, 2.6);
+@@ -387,11 +388,15 @@
      trunk(0.5, 3.0 * H, maple ? '#6e5440' : '#7a5a3c');
      for (let i = 0; i < 3; i++) branch(2.3 * H + r() * 0.4, 2.0 + r() * 0.6, 0.6 + r() * 0.3, i * 2.1 + r() * 0.6, 0.15, '#6a4c32');
 -    const g = pickR(r, maple ? ['#4f9443', '#5aa04a'] : ['#5aa04a', '#62a84f', '#6fb05a']);
+-    const top = maple ? 5.3 : 6.0, rad = maple ? 1.55 : 1.3;
+-    for (let i = 0; i < 4; i++) {
+-      const a = i * 1.57 + r() * 0.5;
+-      clump(Math.sin(a) * rad, (top - 1.0 - r() * 0.4) * H, Math.cos(a) * rad, 1.35 + r() * 0.3, maple ? 0.85 : 1.0, g, pal, 0.25);
+-    }
+-    clump(0, top * H, 0, maple ? 1.65 : 1.45, maple ? 0.85 : 1.15, g, pal, 1);
 +    const g = pickR(r, maple ? ['#619e37', '#74aa36'] : ['#74a93c', '#83b538', '#98be43']);
-     const top = maple ? 5.3 : 6.0, rad = maple ? 1.55 : 1.3;
-     for (let i = 0; i < 4; i++) {
-@@ -403,5 +403,5 @@
++    const top = maple ? 5.7 : 6.4, rad = maple ? 2.0 : 1.78;
++    clump(0, (top - 1.1) * H, 0, 2.05, 1, g, pal, 0.1);
++    for (let i = 0; i < 6; i++) {
++      const a = i * Math.PI / 3 + r() * 0.45, reach = rad * (0.83 + r() * 0.29);
++      const level = i % 2 ? 0.50 : 0.19;
++      clump(Math.sin(a) * reach, (top - 1.8 + level * 1.8 + r() * 0.7) * H,
++        Math.cos(a) * reach, 1.55 + r() * 0.46, maple ? 0.82 : 0.98, g, pal, level);
++    }
++    clump(0.3, top * H, 0, maple ? 1.8 : 1.63, maple ? 0.9 : 1.07, g, pal, 1);
++    clump(-1.05, (top - 0.26) * H, 0.75, 1.34, 1.02, g, pal, 0.74);
+     for (let i = 0; i < 2; i++) branch((top - 1.4) * H, 1.5, 0.3 + r() * 0.3, i * 3.1 + r(), 0.08, '#5e4632');   // макушка: зимой видно, что это дерево, а не рогатка
+     leaves(pal === 0 ? YEL : pal === 1 ? ORA : RED, 6, 3.4);
+@@ -403,5 +408,5 @@
      const sp = weighted(r, AL.MIX);
      const pal = sp === 'maple' ? (r() < 0.55 ? 2 : 1) : sp === 'poplar' ? 3 : r() < 0.8 ? 0 : 1;
 -    const g = pickR(r, sp === 'maple' ? ['#4f9443', '#5aa04a'] : ['#5aa04a', '#62a84f', '#548f44']);
 +    const g = pickR(r, sp === 'maple' ? ['#619e37', '#74aa36'] : ['#74a93c', '#83b538', '#68a044']);
      const bark = sp === 'poplar' ? '#6a5a48' : '#6e5440';
      // М9: у каждого дерева аллеи своя форма — вариант ветвления модели, наклон ствола, ширина и высота, у кроны свои комки (хеш места, не r)
-@@ -444,5 +444,5 @@
+@@ -434,5 +439,5 @@
+       const [t, side, rr] = c;
+       const p = at(t * R, hc(t) + (i === 8 ? 2.1 : 0) + (r() - 0.5) * 0.5, side + (r() - 0.5) * 0.8);
+-      const k = rr * (0.92 + r() * 0.16);
++      const k = rr * (1.05 + r() * 0.19);
+       P.add(T.ico, p[0], p[1], p[2], k, k * 0.74, k, 0, r() * 6.283, 0, tone(g, Math.round((0.84 + 0.3 * (i === 8 ? 1 : t * 0.6)) * 20) / 20), 1, r(), pal, 0.38);
+     });
+@@ -444,8 +449,9 @@
      trunk(0.5, 2.4 * H, '#6a5a48');
      for (let i = 0; i < 4; i++) branch(1.8 * H, (5.2 + r() * 1.2) * H, 0.1 + r() * 0.1, i * 1.57 + r(), 0.13, '#5a4a3a');
 -    const g = r() < 0.5 ? '#4f8f3f' : '#548f44';
+-    for (let i = 0; i < 5; i++) {
+-      const t = i / 4;
+-      clump((r() - 0.5) * 0.5, (3.4 + i * 1.75) * H, (r() - 0.5) * 0.5, 1.5 - t * 0.5, 1.3, g, i < 2 ? 3 : 0, t);
 +    const g = r() < 0.5 ? '#679f3b' : '#78a942';
-     for (let i = 0; i < 5; i++) {
-       const t = i / 4;
++    for (let i = 0; i < 7; i++) {
++      const t = i / 6, a = i * 2.4 + yaw, reach = 1.05 * (1 - t * 0.52);
++      clump(Math.sin(a) * reach, (3.5 + t * 7) * H, Math.cos(a) * reach,
++        1.95 - t * 0.7, 1.32, g, i < 2 ? 3 : 0, t);
+     }
+     leaves(['#c8b840', '#e0c040'], 3, 2.2);
 --- a/src/i18n/en.json
 +++ b/src/i18n/en.json
 @@ -5428,4 +5428,7 @@
@@ -346,3 +618,31 @@
 +.lg-sig { background: #3fd15e; border-radius: 50%; } .lg-nos { background: #ffad6c; } .lg-car { background: #5b6b80; }
  /* маршрут и пробка — полоской; бандиты — красный круг; районы — рамка и штриховка; гараж, КПП */
  /* маршрут: к клиенту — оранжевый, в пиццерию — зелёный */
+@@ -689,11 +689,11 @@
+ html[data-map="moscow"] #radar {
+   padding: 7px; border: 2px solid #33210c; box-sizing: border-box;
+-  background: conic-gradient(#6fd3ff calc(var(--nos, .5) * 360deg), #1d2440 0);
++  background: conic-gradient(#ffad6c calc(var(--nos, .5) * 360deg), #1d2440 0);
+   transition: box-shadow .15s;
+ }
+ html[data-map="moscow"] #radar canvas { clip-path: inset(7px round 10px); }   /* рамка-бак вокруг: холст не залезает на неё */
+ html[data-map="moscow"] #radar.burn {
+-  background: conic-gradient(#e6f7ff calc(var(--nos, .5) * 360deg), #1d2440 0);
+-  box-shadow: 0 0 16px #6fd3ff, 0 6px 18px rgba(0, 0, 0, .35);
++  background: conic-gradient(#ffda98 calc(var(--nos, .5) * 360deg), #1d2440 0);
++  box-shadow: 0 0 16px #ff9c56, 0 6px 18px rgba(0, 0, 0, .35);
+ }
+ /* ── пауза: без общей рамки, всё «лежит на столе» рядом ──
+@@ -1156,8 +1156,8 @@
+                     /* синяя кнопка, по краю — кольцо: сколько нитро осталось (--nos ставит игра) */
+                     background: conic-gradient(#8fe3ff calc(var(--nos, .5) * 360deg), rgba(20, 16, 30, .6) 0); }
+-.tp-right .tp-nos::before { content: ''; position: absolute; inset: 5px; z-index: -1; border-radius: 50%; background: #2b6fe0; }
+-.tp-right .tp-nos.burn { background: conic-gradient(#e6f7ff calc(var(--nos, .5) * 360deg), rgba(20, 16, 30, .6) 0); box-shadow: 0 0 14px #6fd3ff, 0 4px 0 rgba(0, 0, 0, .35); }
+-.tp-right .tp-nos.burn::before { background: #4a8cff; }
+-#touchpad .tp-nos.on { background: conic-gradient(#e6f7ff calc(var(--nos, .5) * 360deg), rgba(20, 16, 30, .6) 0); }
++.tp-right .tp-nos::before { content: ''; position: absolute; inset: 5px; z-index: -1; border-radius: 50%; background: #b74f28; }
++.tp-right .tp-nos.burn { background: conic-gradient(#ffda98 calc(var(--nos, .5) * 360deg), rgba(20, 16, 30, .6) 0); box-shadow: 0 0 14px #ff9c56, 0 4px 0 rgba(0, 0, 0, .35); }
++.tp-right .tp-nos.burn::before { background: #d87135; }
++#touchpad .tp-nos.on { background: conic-gradient(#ffda98 calc(var(--nos, .5) * 360deg), rgba(20, 16, 30, .6) 0); }
+ .tp-right .tp-hand { width: 60px; height: 60px; font-size: 7px; justify-self: center; }
+ @media (max-height: 460px) {                                    /* телефон боком */

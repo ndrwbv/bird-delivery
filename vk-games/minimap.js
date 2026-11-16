@@ -1,6 +1,6 @@
 /* Карта сверху с поворотом по курсу машины. */
 const WIDTH = 144, HEIGHT = 54, DRIVER_Y = 34;
-const SCALE = 0.44, RANGE = 180, FRAME_MS = 40;
+const SCALE = 0.22, RANGE = 370, FRAME_MS = 40;
 
 function buildingShape ({ p }) {
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
