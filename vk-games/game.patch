@@ -1493,3 +1493,29 @@
  export function step (dt) {
 +  if (!ENABLED) return;
    // заглохла в яме — по фронту «заглохла»
+--- a/src/game/touchwheel.js
++++ b/src/game/touchwheel.js
+@@ -26,15 +26,11 @@
+ 
+-/* руль пиксельный: обод с обмоткой, три спицы, ступица с птичкой-меткой, метка «12 часов» */
++/* Руль VK: полупрозрачный обод, тонкая кромка и метка поворота. */
+ const SVG =
+-  '<svg class="tw-svg" viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crispEdges">' +
+-    '<circle cx="32" cy="32" r="28" fill="none" stroke="#33210c" stroke-width="9"/>' +
+-    '<circle cx="32" cy="32" r="28" fill="none" stroke="#5a3a1c" stroke-width="5"/>' +
+-    '<circle cx="32" cy="32" r="28" fill="none" stroke="#7a5230" stroke-width="5" stroke-dasharray="3 3"/>' +
+-    '<rect x="29" y="3" width="6" height="7" fill="#f0522a" stroke="#33210c" stroke-width="1"/>' +
+-    '<path d="M32 32 L6 36 M32 32 L58 36 M32 32 L32 58" stroke="#33210c" stroke-width="7"/>' +
+-    '<path d="M32 32 L6 36 M32 32 L58 36 M32 32 L32 58" stroke="#8c8a94" stroke-width="3"/>' +
+-    '<circle cx="32" cy="32" r="10" fill="#33210c"/>' +
+-    '<circle cx="32" cy="32" r="8" fill="#ffb347"/>' +
+-    '<rect x="28" y="28" width="8" height="8" fill="#f0522a"/>' +
+-    '<rect x="30" y="30" width="2" height="2" fill="#fff3d6"/>' +
++  '<svg class="tw-svg" viewBox="0 0 64 64" aria-hidden="true">' +
++    '<path class="vk-wheel-spokes" d="M9 24l16 5m14 0 16-5M32 40v17"/>' +
++    '<circle class="vk-wheel-grip" cx="32" cy="32" r="27.5"/>' +
++    '<circle class="vk-wheel-edge" cx="32" cy="32" r="29.4"/>' +
++    '<circle class="vk-wheel-edge vk-wheel-inner" cx="32" cy="32" r="24.7"/>' +
++    '<circle class="vk-wheel-hub" cx="32" cy="32" r="8.5"/>' +
++    '<path class="vk-wheel-accent" d="M29.5 4.5h5M29.3 32.4 32 29.7l2.7 2.7"/>' +
+   '</svg>';

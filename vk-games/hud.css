@@ -5,9 +5,15 @@ body {
   --vk-bottom: max(8px, var(--sa-b, env(safe-area-inset-bottom)));
   --vk-center-width: calc(100vw - 2 * max(var(--vk-left), var(--vk-right)) - 12px);
   --vk-note-width: min(42rem, var(--vk-center-width));
-  --vk-note-gap: 86px;
-  --vk-panel: rgba(26, 26, 31, .9);
-  --vk-ink: #fff6e3;
+  --vk-note-gap: clamp(94px, 18vw, 118px);
+  --vk-panel: #142332d9;
+  --vk-control: #182b3bbb;
+  --vk-control-active: #314e60e6;
+  --vk-edge: #a6bfce74;
+  --vk-ink: #e6f0f4;
+  --vk-muted: #bdcbd2;
+  --vk-cyan: #a5e9ff;
+  --vk-danger: #ff7785;
 }
 
 #cr-menu .vk-start-actions {
@@ -57,7 +63,8 @@ html[data-map] body :is(#hud-left #cash, #task, #addr, #dist, #phone, #otags) {
   box-sizing: border-box;
   color: var(--vk-ink);
   background: var(--vk-panel);
-  box-shadow: 0 1px 4px #0005;
+  border: 1px solid var(--vk-edge);
+  box-shadow: 0 2px 6px #07101955;
   text-shadow: none;
   font: 600 13px/1.25 system-ui, sans-serif;
 }
@@ -69,56 +76,65 @@ html[data-map] body :is(#hud-left #cash, #task, #addr, #dist, #phone, #otags) {
   width: max-content;
   max-width: var(--vk-nav-width);
   box-sizing: border-box;
-  padding: 0 4px 2px;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  color: #effcff;
-  font: 650 11px/1.25 system-ui, sans-serif;
-  text-align: center;
-  text-shadow: 0 1px 2px #101f2f, 0 0 5px #101f2f;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--vk-edge);
+  border-radius: 12px;
+  background: #122432a8;
+  box-shadow: 0 2px 7px #06131c55;
   pointer-events: auto;
   cursor: pointer;
+  transition: opacity .2s ease;
 }
-.vk-nav:focus-visible { outline: 2px solid #b5f6ff; outline-offset: 2px; }
+.vk-nav:focus-visible { outline: 2px solid var(--vk-cyan); outline-offset: 2px; }
 .vk-nav[hidden], .vk-countdown[hidden], html[data-map] body #radar .vk-minimap[hidden],
 .vk-payment[hidden], .vk-meter[hidden] { display: none; }
 html[data-map] body #radar .vk-minimap {
   position: static;
-  width: clamp(104px, 19vw, 144px);
+  width: clamp(112px, 21vw, 144px);
   max-width: 100%;
   height: auto;
   margin: 0;
   will-change: auto;
   clip-path: none;
-  mask-image: radial-gradient(ellipse 68% 75%, #000 70%, transparent 100%);
-  transition: opacity .2s ease;
 }
-body:has(#toast[style*="opacity: 1"], #hint.on, #dlg-live.on, #bonus.on, #chat .cm.fresh, #choice:not([hidden])) .vk-minimap {
-  opacity: .35;
+body:has(#toast[style*="opacity: 1"], #hint.on, #dlg-live.on, #bonus.on, #chat .cm.fresh, #choice:not([hidden])) .vk-nav {
+  opacity: .5;
 }
 .vk-countdown {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 5px;
-  margin: 0 auto 3px;
-  color: #effcff;
+  width: max-content;
+  min-height: 16px;
+  gap: 4px;
+  margin-block-start: 3px;
+  color: var(--vk-muted);
   text-shadow: 0 1px 2px #101f2f, 0 0 5px #101f2f;
   white-space: nowrap;
 }
 .vk-countdown svg {
-  width: 16px;
-  height: 16px;
+  width: 13px;
+  height: 13px;
   filter: drop-shadow(0 1px 2px #101f2f);
 }
 .vk-countdown strong {
-  font: 700 15px/1 ui-monospace, monospace;
+  font: 550 12px/1 ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
 }
-.vk-countdown.urgent { color: #ffd38a; }
+.vk-countdown.urgent { color: var(--vk-danger); }
+.vk-countdown.urgent strong { font-weight: 800; }
 
 html[data-map] body #hud-left { top: var(--vk-top); left: var(--vk-left); max-width: min(28vw, 11rem); }
+html[data-map] body #hearts i {
+  --vk-heart: #f398a7;
+  --vk-heart-off: #657786;
+  clip-path: none;
+  filter: none;
+  background: var(--vk-heart);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 18'%3E%3Cpath d='M10 16.7C7.4 14.1 1.5 10.7 1.5 6.3a4.3 4.3 0 0 1 8.5-1 4.3 4.3 0 0 1 8.5 1c0 4.4-5.9 7.8-8.5 10.4Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+html[data-map] body #hearts i.off { background: var(--vk-heart-off); }
+html[data-map] body #hearts i.half { background: linear-gradient(90deg, var(--vk-heart) 50%, var(--vk-heart-off) 50%); }
 html[data-map] body #hud-right {
   top: var(--vk-top);
   right: var(--vk-right);
@@ -126,6 +142,16 @@ html[data-map] body #hud-right {
   grid-auto-flow: row;
   justify-items: end;
   gap: 5px;
+}
+html[data-map] body #hud-right #speed {
+  margin: 0;
+  color: var(--vk-muted);
+  background: var(--vk-panel);
+  border: 1px solid var(--vk-edge);
+  border-radius: 5px;
+  box-shadow: none;
+  font: 600 10px/1.2 system-ui, sans-serif;
+  rotate: none;
 }
 .vk-payment {
   display: grid;
@@ -137,7 +163,7 @@ html[data-map] body #hud-right {
   border-radius: 8px;
   overflow-wrap: anywhere;
 }
-.vk-payment strong { font-size: 13px; color: #ffda73; }
+.vk-payment strong { font-size: 13px; color: var(--vk-cyan); }
 .vk-payment span { font-size: 10px; }
 
 .vk-meters {
@@ -146,13 +172,13 @@ html[data-map] body #hud-right {
   gap: 5px;
   padding: 5px 6px 4px;
 }
-.vk-meter { display: grid; justify-items: center; gap: 3px; color: #8fe3ff; }
+.vk-meter { display: grid; justify-items: center; gap: 3px; color: var(--vk-cyan); }
 .vk-meter svg { width: 12px; height: 12px; }
 .vk-meter-track {
   position: relative;
   width: 7px;
   height: 33px;
-  background: #fff3;
+  background: #a6bfce40;
   border-radius: 3px;
   overflow: hidden;
 }
@@ -179,8 +205,42 @@ html[data-map] body #touchpad .tp-left {
   overflow: hidden;
 }
 html[data-map] body #touchpad .tp-right { margin-inline-start: auto; }
-html[data-map] body #touchpad .tp-nos { background: #295aaa; border: 2px solid #90cbff; }
-html[data-map] body #touchpad .tp-nos:is(.on, .burn) { background: #539aff; }
+html[data-map] body #touchpad .tp-right button {
+  --vk-pedal-ink: var(--vk-muted);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 2px;
+  background: var(--vk-control);
+  border: 1px solid var(--vk-edge);
+  color: var(--vk-pedal-ink);
+  font: 650 10px/1 system-ui, sans-serif;
+  box-shadow: 0 2px 6px #07101980;
+}
+html[data-map] body #touchpad .tp-gas { --vk-pedal-ink: #c5efdf; }
+html[data-map] body #touchpad .tp-brake { --vk-pedal-ink: #f1bdc4; }
+html[data-map] body #touchpad .tp-nos { --vk-pedal-ink: var(--vk-cyan); }
+html[data-map] body #touchpad .tp-nos::before,
+html[data-map] body #touchpad .tp-nos::after { content: none; }
+html[data-map] body #touchpad .tp-right button:is(.on, .burn) {
+  background: var(--vk-control-active);
+  border-color: var(--vk-pedal-ink);
+}
+#touchpad .vk-icon { width: 18px; height: 18px; pointer-events: none; }
+#touchpad .tp-gas .vk-icon { width: 22px; height: 22px; }
+html[data-map] body #touchpad .tw-wheel {
+  opacity: 1;
+  filter: drop-shadow(0 2px 3px #07101999);
+}
+.vk-wheel-grip, .vk-wheel-spokes, .vk-wheel-edge, .vk-wheel-accent { fill: none; }
+.vk-wheel-grip, .vk-wheel-spokes { stroke: var(--vk-control); stroke-width: 6.5; }
+.vk-wheel-spokes { stroke-linecap: round; stroke-width: 5; }
+.vk-wheel-edge, .vk-wheel-hub { stroke: var(--vk-edge); stroke-width: .85; }
+.vk-wheel-inner { opacity: .55; }
+.vk-wheel-hub { fill: var(--vk-control); }
+.vk-wheel-accent { stroke: var(--vk-cyan); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+#touchpad .tp-left.on .vk-wheel-grip { stroke: var(--vk-control-active); }
+#touchpad .tp-left.on .vk-wheel-edge { stroke: var(--vk-cyan); }
 
 html[data-map] body :is(#toast, #hint, #dlg-live, #bonus, #payfx) {
   box-sizing: border-box;
