@@ -469,7 +469,7 @@
 -NFRAME.init([elRadarBox, elFull.querySelector('.fm-view')]);
 -HUDMAP.init(elRadarBox);
 +const elFx = $('fxs');
-+VKHUD.init($('radar'), $('hud-left'), $('hud-right'));
++VKHUD.init($('radar'), $('hud-left'), $('hud-right'), CITY.buildings, RSEG, DRIVE_MAX);
  const TOUCH_NOS = document.querySelector('#touchpad .tp-nos');
 @@ -15367,8 +15290,6 @@
     счётчики) сравниваем числом, без сборки строки; язык сменился — пересобрать (HUDC.lang) */
@@ -536,14 +536,14 @@
 -  } else { hudTxt(elTask, ''); hudTxt(elAddr, ''); hudTxt(elDist, ''); HUDC.key = ''; HUDC.dist = -1; }
 +    VKHUD.cooling(carried, cooling, cooling >= ECON.PRESS.COLD_BAD);
 +  }
-+  const target = isPlaying() && S.target;
++  const playing = isPlaying(), target = playing && S.target;
 +  const back = S.state === 'back';
 +  const recipient = !back && S.order?.stops[S.order.idx]?.persons?.[0];
 +  const name = recipient ? NICK.short(recipient, $t('клиент')) : '';
 +  const address = target && ((back ? target.name : S.addrLine || target.name) || $t('в пиццерию'));
 +  const timed = (S.state === 'drive' || back || S.state === 'side') && (!S.free || S.state === 'side');
 +  const time = timed && S.timeMax > 0 && Number.isFinite(S.time) ? Math.max(0, Math.ceil(S.time)) : null;
-+  VKHUD.routeStep(V, target, routePts, address, name, time);
++  VKHUD.routeStep(V, playing, target, routePts, address, name, time);
  }
 @@ -15480,4 +15378,3 @@
    if (!picked && DISTRICTS && CITYOPEN.beforeShift(() => goRun(true, checkIn))) return;
@@ -1421,10 +1421,12 @@
 +@media (max-height: 460px) { html body #phone, html[data-map] body #phone { max-height: 76vh; } }
 --- a/src/i18n/en.json
 +++ b/src/i18n/en.json
-@@ -2236,2 +2236,8 @@
+@@ -2236,2 +2236,10 @@
   "осталось {n}": "{n} left",
-+ "Осталось {n}": "{n} left",
++ "Осталось {s} с": "{s} sec left",
++ "Осталось {m} мин {s} с": "{m} min {s} sec left",
 + "Время вышло": "Time’s up",
++ "Запас нитро": "Nitro left",
 + "Пицца: горячая": "Pizza: hot",
 + "Пицца: тёплая": "Pizza: warm",
 + "Пицца: холодная": "Pizza: cold",

@@ -46,8 +46,8 @@ html[data-map] body :is(#hud-left #cash, #task, #addr, #dist, #phone, #otags) {
 
 .vk-nav {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 9px;
   min-height: 40px;
   width: max-content;
   max-width: var(--vk-nav-width);
@@ -63,8 +63,9 @@ html[data-map] body :is(#hud-left #cash, #task, #addr, #dist, #phone, #otags) {
   pointer-events: auto;
   cursor: pointer;
 }
+.vk-nav-heading { display: flex; align-items: center; gap: 8px; min-height: 32px; max-width: 100%; }
 .vk-nav:focus-visible { outline: 2px solid #b5f6ff; outline-offset: 2px; }
-.vk-nav [hidden], html[data-map] body #radar .vk-nav-route[hidden],
+.vk-nav [hidden], html[data-map] body #radar .vk-minimap[hidden],
 .vk-payment[hidden], .vk-meter[hidden] { display: none; }
 .vk-nav-map {
   display: grid;
@@ -74,21 +75,19 @@ html[data-map] body :is(#hud-left #cash, #task, #addr, #dist, #phone, #otags) {
   filter: drop-shadow(0 1px 1px #101f2f);
 }
 .vk-nav-map svg { width: 18px; height: 18px; }
-html[data-map] body #radar .vk-nav-route {
-  position: absolute;
-  top: calc(100% - 7px);
-  left: 50%;
-  width: min(240px, 48vw);
+html[data-map] body #radar .vk-minimap {
+  position: static;
+  width: clamp(180px, 35vw, 272px);
+  max-width: 100%;
   height: auto;
   margin: 0;
-  transform: translateX(-50%);
   will-change: auto;
   clip-path: none;
-  pointer-events: none;
+  mask-image: radial-gradient(ellipse 61% 64%, #000 60%, transparent 98%);
   transition: opacity .2s ease;
 }
-body:has(#toast[style*="opacity: 1"], #hint.on, #dlg-live.on, #ach-toast.on, #bonus.on, #chat .cm.fresh, #choice:not([hidden])) .vk-nav-route {
-  opacity: .18;
+body:has(#toast[style*="opacity: 1"], #hint.on, #dlg-live.on, #ach-toast.on, #bonus.on, #chat .cm.fresh, #choice:not([hidden])) .vk-minimap {
+  opacity: .35;
 }
 .vk-nav-copy {
   display: grid;
@@ -216,7 +215,7 @@ body:has(#toast[style*="opacity: 1"], #hint.on, #dlg-live.on, #ach-toast.on, #dl
 
 @media (max-height: 460px), (max-width: 540px) {
   body { --vk-note-width: min(34rem, calc(var(--vk-center-width) - clamp(80px, 24vw, 156px))); }
-  .vk-nav { gap: 6px; }
+  .vk-nav-heading { gap: 6px; }
   html[data-map] body #radio { max-width: min(17rem, 42vw, var(--vk-center-width)); }
   html[data-map] body #chat .cm-b { overflow-wrap: anywhere; }
   html[data-map] body #chat .cm-b p,
