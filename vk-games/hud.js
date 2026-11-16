@@ -3,38 +3,26 @@ import './vk-hud.css';
 
 const mapIcon = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 5.5 7.5 3l5 2.5 5-2.5v11.5l-5 2.5-5-2.5-5 2.5zM7.5 3v11.5m5-9V17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
 const nitroIcon = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m11 1-7 10h5l-1 8 8-11h-5z" fill="currentColor"/></svg>';
-const coldIcon = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v16M3 6l14 8M3 14l14-8M7.5 3.5 10 6l2.5-2.5m-5 13L10 14l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
 
 const PROJECTION = { width: 240, height: 72, range: 64, stride: 3.2 };
-let projection, paint, map, name, eta, payment, gain, shift, nitro, pizza;
-let nextRoute = 0, previousTarget, previousRoute, drawnX, drawnZ, drawnHeading;
+let projection, paint, destination, details, name, deadline, payment, gain, shift, nitro, charge, pizza, heat;
+let shownTime, previousTarget, previousRoute, drawnX, drawnZ, drawnHeading;
 let payTimer;
-
-function meter (root, kind, icon, label) {
-  const el = document.createElement('div');
-  el.className = 'vk-meter vk-' + kind;
-  el.setAttribute('role', 'meter');
-  el.setAttribute('aria-valuemin', '0');
-  el.setAttribute('aria-valuemax', '100');
-  el.setAttribute('aria-label', label);
-  el.title = label;
-  el.innerHTML = '<div class="vk-meter-track"><i></i></div>' + icon;
-  root.append(el);
-  return el;
-}
 
 export function init (radar, left, right) {
   const nav = document.createElement('button');
   nav.className = 'vk-nav';
   nav.type = 'button';
   nav.title = t('карта района');
-  nav.innerHTML = '<span class="vk-nav-map">' + mapIcon + '</span><span class="vk-nav-name"></span><span class="vk-nav-eta" hidden></span><canvas class="vk-nav-route" aria-hidden="true" hidden></canvas>';
-  [map, name, eta, projection] = nav.children;
+  nav.innerHTML = '<span class="vk-nav-map">' + mapIcon + '</span><span class="vk-nav-copy"><strong class="vk-nav-destination"></strong><span class="vk-nav-details" hidden><span class="vk-nav-name"></span><span class="vk-nav-deadline"></span></span></span><canvas class="vk-nav-route" aria-hidden="true" hidden></canvas>';
+  destination = nav.querySelector('.vk-nav-destination');
+  details = nav.querySelector('.vk-nav-details');
+  [name, deadline] = details.children;
+  projection = nav.lastElementChild;
   projection.width = PROJECTION.width * 2;
   projection.height = PROJECTION.height * 2;
   paint = projection.getContext('2d');
   paint.scale(2, 2);
-  eta.title = t('примерное время в пути');
   radar.append(nav);
 
   payment = document.createElement('div');
@@ -47,20 +35,19 @@ export function init (radar, left, right) {
 
   const meters = document.createElement('div');
   meters.className = 'vk-meters';
-  nitro = meter(meters, 'nitro', nitroIcon, t('нитро'));
-  pizza = meter(meters, 'pizza', coldIcon, t('остывание пиццы'));
-  pizza.hidden = true;
+  meters.innerHTML = '<div class="vk-meter vk-nitro"><div class="vk-meter-caption" aria-hidden="true">' + nitroIcon + '<span></span><b></b></div><div class="vk-meter-track" aria-hidden="true"><i></i></div></div>'
+    + '<div class="vk-meter vk-pizza" hidden><span class="vk-meter-caption"></span><div class="vk-heat-track" aria-hidden="true"><i></i><i></i><i></i></div></div>';
+  [nitro, pizza] = meters.children;
+  const nitroLabel = t('Нитро');
+  nitro.setAttribute('role', 'meter');
+  nitro.setAttribute('aria-label', nitroLabel);
+  nitro.setAttribute('aria-valuemin', '0');
+  nitro.setAttribute('aria-valuemax', '100');
+  nitro.querySelector('.vk-meter-caption span').textContent = nitroLabel;
+  charge = nitro.querySelector('b');
+  heat = pizza.firstElementChild;
+  pizza.title = t('Пицца остывает, если машина повреждена');
   right.prepend(meters);
-}
-
-function routeLength (car, target, route) {
-  let x = car.x, z = car.z;
-  let distance = 0;
-  for (const [px, pz] of route) {
-    distance += Math.hypot(px - x, pz - z);
-    x = px; z = pz;
-  }
-  return distance + Math.hypot(target.x - x, target.z - z);
 }
 
 // Snap to the start of the current route as the car moves between route recalculations.
@@ -139,47 +126,48 @@ function setText (el, value) {
   if (el.textContent !== value) el.textContent = value;
 }
 
-export function routeStep (dt, car, target, route, recipient) {
+export function routeStep (car, target, route, address, recipient, time) {
   projection.hidden = !target || route.length < 2;
-  eta.hidden = !target;
-  map.hidden = !!target;
-  setText(name, target ? recipient : t('карта района'));
+  details.hidden = !target || (!recipient && time === null);
+  name.hidden = !recipient;
+  deadline.hidden = time === null;
+  destination.classList.toggle('active', !!target);
+  setText(destination, target ? address : t('карта района'));
   if (!target) {
     previousTarget = null;
     return;
   }
-  nextRoute -= dt;
-  const changed = previousTarget !== target || previousRoute !== route;
-  if (nextRoute <= 0 || changed) {
-    // Estimate with a typical city speed, so the arrival time remains useful at a stop.
-    const seconds = Math.ceil(routeLength(car, target, route) / 12 / 5) * 5;
-    setText(eta, '≈ ' + Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'));
-    previousTarget = target;
-    previousRoute = route;
-    nextRoute = 0.2;
+  setText(name, recipient);
+  if (time !== shownTime) {
+    const clock = time > 0 ? Math.floor(time / 60) + ':' + String(time % 60).padStart(2, '0') : '';
+    setText(deadline, time === null ? '' : time === 0 ? t('Время вышло') : t('Осталось {n}', { n: clock }));
+    deadline.classList.toggle('urgent', time !== null && time <= 10);
+    shownTime = time;
   }
+  const changed = previousTarget !== target || previousRoute !== route;
   if (!projection.hidden && (changed || Math.hypot(car.x - drawnX, car.z - drawnZ) > 0.12 || Math.abs(car.h - drawnHeading) > 0.008)) {
     drawProjection(car, route);
     drawnX = car.x; drawnZ = car.z; drawnHeading = car.h;
   }
-}
-
-function level (el, value) {
-  const percent = String(Math.round(value * 100));
-  if (el.getAttribute('aria-valuenow') === percent) return;
-  el.setAttribute('aria-valuenow', percent);
-  el.style.setProperty('--vk-level', percent + '%');
+  previousTarget = target;
+  previousRoute = route;
 }
 
 export function fuel (value) {
-  level(nitro, value);
+  const percent = String(Math.round(value * 100));
+  if (nitro.getAttribute('aria-valuenow') === percent) return;
+  nitro.setAttribute('aria-valuenow', percent);
+  nitro.style.setProperty('--vk-level', percent + '%');
+  setText(charge, percent + '%');
 }
 
 export function cooling (carried, value, cold) {
   pizza.hidden = !carried;
   if (!carried) return;
-  level(pizza, value);
-  pizza.classList.toggle('cold', cold);
+  const state = cold ? 'cold' : value > 0 ? 'warm' : 'hot';
+  if (pizza.dataset.heat === state) return;
+  pizza.dataset.heat = state;
+  setText(heat, cold ? t('Пицца: холодная') : state === 'warm' ? t('Пицца: тёплая') : t('Пицца: горячая'));
 }
 
 export function delivery (amount, total) {
