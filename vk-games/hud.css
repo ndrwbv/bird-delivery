@@ -29,12 +29,12 @@ html[data-map] body #radar {
   pointer-events: none;
 }
 
-html[data-map] body #radar :is(canvas, .radar-me),
+html[data-map] body #radar :is(#radarc, .radar-me),
 html[data-map] body :is(#hud-left #cash, #task, #addr, #dist, #phone, #otags) {
   display: none;
 }
 
-.vk-nav, .vk-payment, .vk-meters {
+.vk-payment, .vk-meters {
   box-sizing: border-box;
   color: var(--vk-ink);
   background: var(--vk-panel);
@@ -49,33 +49,52 @@ html[data-map] body :is(#hud-left #cash, #task, #addr, #dist, #phone, #otags) {
   gap: 9px;
   min-height: 40px;
   width: max-content;
-  padding: 5px 10px 5px 6px;
-  border: 1px solid #fff4;
-  border-radius: 12px;
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #effcff;
+  font: 650 15px/1.25 system-ui, sans-serif;
   text-align: start;
+  text-shadow: 0 1px 2px #101f2f, 0 0 5px #101f2f;
   pointer-events: auto;
   cursor: pointer;
 }
-.vk-nav:focus-visible { outline: 2px solid #ffe398; outline-offset: 2px; }
-.vk-nav > [hidden], .vk-payment[hidden], .vk-meter[hidden] { display: none; }
-.vk-nav-arrow, .vk-nav-map {
+.vk-nav:focus-visible { outline: 2px solid #b5f6ff; outline-offset: 2px; }
+.vk-nav > [hidden], html[data-map] body #radar .vk-nav-route[hidden],
+.vk-payment[hidden], .vk-meter[hidden] { display: none; }
+.vk-nav-map {
   display: grid;
-  flex: 0 0 27px;
-  height: 27px;
+  flex: 0 0 18px;
   place-items: center;
-  color: #ffda73;
-  background: #fff1;
-  border-radius: 7px;
+  color: #b5f6ff;
+  filter: drop-shadow(0 1px 1px #101f2f);
 }
-.vk-nav-arrow svg, .vk-nav-map svg { width: 20px; height: 20px; }
+.vk-nav-map svg { width: 18px; height: 18px; }
+html[data-map] body #radar .vk-nav-route {
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  width: min(240px, 48vw);
+  height: auto;
+  margin: 0;
+  transform: translateX(-50%);
+  will-change: auto;
+  clip-path: none;
+  pointer-events: none;
+  transition: opacity .2s ease;
+}
+body:has(#toast[style*="opacity: 1"], #hint.on, #dlg-live.on, #ach-toast.on, #bonus.on, #chat .cm.fresh, #choice:not([hidden])) .vk-nav-route {
+  opacity: .18;
+}
 .vk-nav-name {
   flex: none;
-  max-width: calc(var(--vk-nav-width) - 110px);
+  max-width: calc(var(--vk-nav-width) - 66px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.vk-nav-eta { flex: none; color: #ffda73; letter-spacing: .01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vk-nav-eta { flex: none; color: #b5f6ff; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 html[data-map] body #hud-left { top: var(--vk-top); left: var(--vk-left); max-width: min(28vw, 11rem); }
 html[data-map] body #hud-right {
