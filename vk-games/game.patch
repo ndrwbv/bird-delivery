@@ -22,6 +22,44 @@
 -  if (!c || (kind !== 'armor' && kind !== 'engine' && !add)) return { ok: false, why: 'unknown' };
 +  if (!c || (kind !== 'armor' && kind !== 'engine')) return { ok: false, why: 'unknown' };
    if (!ownedIds().includes(id)) return { ok: false, why: 'owned' };
+--- a/src/game/carshadow.js
++++ b/src/game/carshadow.js
+@@ -12,2 +12,3 @@
+ import * as THREE from '../vendor/three.module.min.js';
++import { ON as MOBILE } from './mobile.js';
+ 
+@@ -34,3 +35,3 @@
+ 
+-let M = null;
++let M = null, groundY = 0;
+ function tex () {
+@@ -40,3 +41,3 @@
+   x.fillStyle = '#000';
+-  x.filter = 'blur(7px)';
++  x.filter = MOBILE ? 'blur(10px)' : 'blur(7px)';
+   // прямоугольник со скруглёнными углами, размытый: тень кузова, а не круг. От кузова до края
+@@ -75,4 +76,5 @@
+    pitch, roll — наклон кузова; night 0…1; show — видно ли машину; sx, sz — откуда светит солнце (по земле) */
+-export function step (x, z, h, ground, y, pitch, roll, night, show, sx = 0, sz = 0) {
++export function step (x, z, h, ground, y, pitch, roll, night, show, sx = 0, sz = 0, dt = 0) {
+   if (!M) return;
++  const wasVisible = M.visible;
+   M.visible = !!show;
+@@ -82,5 +84,11 @@
+   const sc = 0.75 + 0.25 * k;
+-  const sl = Math.hypot(sx, sz) || 1, off = SHADOW.SUN * (1 - night) * (1 + air * 0.5);
+-  P.set(x - sx / sl * off, ground + SHADOW.UP, z - sz / sl * off);
+-  Q.setFromEuler(E.set(air > 0.2 ? 0 : pitch, h, air > 0.2 ? 0 : roll));   // порядок — как у кузова (car.rotation)
++  const sl = Math.hypot(sx, sz) || 1, off = MOBILE ? 0 : SHADOW.SUN * (1 - night) * (1 + air * 0.5);
++  if (MOBILE) {
++    // Follow small changes of support continuously, with no trail after a restart or teleport.
++    const m = M.matrix.elements;
++    const moved = Math.hypot(x - m[12], z - m[14]);
++    groundY = !wasVisible || moved > 8 ? ground : groundY + (ground - groundY) * (1 - Math.exp(-14 * dt));
++  }
++  P.set(x - sx / sl * off, (MOBILE ? groundY : ground) + SHADOW.UP, z - sz / sl * off);
++  Q.setFromEuler(E.set(MOBILE || air > 0.2 ? 0 : pitch, h, MOBILE || air > 0.2 ? 0 : roll));   // порядок — как у кузова (car.rotation)
+   S.set(sc, 1, sc);
 --- a/src/game/daily.js
 +++ b/src/game/daily.js
 @@ -109,3 +109,3 @@
@@ -69,6 +107,37 @@
 -  HOUSES: !OFF && !Q.has('nofsh'),
 +  HOUSES: !OFF && !MOBILE && !Q.has('nofsh'),
    BLOBS: !OFF && !Q.has('nofsb'),
+@@ -59,3 +60,3 @@
+   CAP: 320,           // сколько пятен за раз
+-  R: 110,             // ближе стольких м от машины игрока
++  R: MOBILE ? 80 : 110,             // ближе стольких м от машины игрока
+   FADE: 25,           // последние FADE м до R — бледнеет
+@@ -492,2 +493,7 @@
+   const V = E.V, ENV = E.ENV, sun = E.sun;
++  if (MOBILE) {
++    if (FS.BLOBS && BLOB) blobs(E, 0, 0, ENV.night || 0, 0);
++    ST.stepMs += (performance.now() - t0 - ST.stepMs) * 0.05;
++    return;
++  }
+   // солнце: откуда светит (по земле), сила, длина тени
+@@ -542,3 +548,4 @@
+     const q = air > 0.2 ? QY.setFromAxisAngle(UP, t.h) : g.quaternion;
+-    putCar(t.x + dx * off, (air > 0.2 ? gy : g.position.y) + FS.LIFT, t.z + dz * off, q, w * CWK * sc, hl * 2 * CLK * sc, ca * fade(d2) * (0.25 + 0.75 * k));
++    const x = MOBILE ? g.position.x : t.x + dx * off, z = MOBILE ? g.position.z : t.z + dz * off;
++    putCar(x, (air > 0.2 ? gy : g.position.y) + FS.LIFT, z, q, w * CWK * sc, hl * 2 * CLK * sc, ca * fade(d2) * (0.25 + 0.75 * k));
+   };
+--- a/src/game/fxaa.js
++++ b/src/game/fxaa.js
+@@ -22,5 +22,7 @@
+ 
++import { ON as MOBILE } from './mobile.js';
++
+ /* шаги поиска конца «ступеньки» вдоль края, в точках (12 выборок — как FXAA_QUALITY 12 у Лоттса) */
+-const STEPS = [1.0, 1.0, 1.0, 1.0, 1.0, 1.5, 2.0, 2.0, 2.0, 2.0, 4.0, 8.0];
+-export const SUBPIX = 0.35, EDGE_THR = 0.166, EDGE_MIN = 0.0833;
++const STEPS = MOBILE ? [1, 1, 1.5, 2, 4, 8] : [1, 1, 1, 1, 1, 1.5, 2, 2, 2, 2, 4, 8];
++export const SUBPIX = MOBILE ? 0.8 : 0.35, EDGE_THR = MOBILE ? 0.125 : 0.166, EDGE_MIN = MOBILE ? 0.045 : 0.0833;
+ 
 --- a/src/game/game.js
 +++ b/src/game/game.js
 @@ -345,3 +345,3 @@
@@ -107,6 +176,11 @@
 -    WINROAD.bridge({ M: WINM, softM: WINSOFTM, road: r, points: P, width: w });
 +    if (!MOBM.ON) WINROAD.bridge({ M: WINM, softM: WINSOFTM, road: r, points: P, width: w });
      // быки — там, где под настилом есть глубина
+@@ -6041,3 +6041,3 @@
+ const DIRT_ENV = { rain: 0, snowFall: 0, snow: 0, mud: 0, wet: 0 };
+-const DIRT_W = w => { w.rain = SEAS.snowy() ? 0 : ENV.rain; w.snowFall = SEAS.snowFall(); w.snow = SEAS.snowAmt(); w.mud = SEAS.mudAmt(); w.wet = SEAS.wetAmt(); return w; };
++const DIRT_W = w => { w.rain = SEAS.snowy() ? 0 : ENV.rain; w.snowFall = MOBM.ON ? 0 : SEAS.snowFall(); w.snow = MOBM.ON ? 0 : SEAS.snowAmt(); w.mud = SEAS.mudAmt(); w.wet = SEAS.wetAmt(); return w; };
+ const exhApi = () => ({ V, TRAFFIC, ACT: TGRID.TG.ACT, cam, career: CAREER, auto: AUTO, snd: Snd, car: () => car, gas: () => IN.gas, beast: () => FXS.beastT > 0,
 @@ -6174,3 +6174,3 @@
    if (CITY.rails) tm0('rails', () => { BUILD_T.railKm = Math.round(CBITS.buildRails(cityApi(), CITY.rails, CITY.levelx)); });
 -  if (MAPFIX) { BUILD_T.mapfix = Math.round(MAPFIX.ms); BUILD_T.mapfixT = MAPFIX.T; tm0('mapworks', () => MAPW.buildWorks(MAPFIX, mapApi())); }   // тупики: блоки и ремонт
@@ -223,6 +297,15 @@
 -const trafficWant = () => Math.round(ECON.trafficAt(trafficHour()) * (TOUCH || MOBM.ON ? ECON.TRAFFIC.TOUCH_K : 1));   // мобильный режим — как на касаниях
 +const trafficWant = () => Math.round(ECON.trafficAt(trafficHour()) * (MOBM.ON ? 0.55 : TOUCH ? ECON.TRAFFIC.TOUCH_K : 1));
  const isFlow = t => !t.parked && !t.svc && !t.gone && !t.chase && t.model !== 'moped' && !t.bus;   // автобусов своё число (buses.js)   // мопеды доставки — свои (mopeds.js)
+@@ -9455,6 +9458,6 @@
+ }
+-function carShadow () {
++function carShadow (dt) {
+   FSH.noCircle(car);                               // старый круг полной модели — прятать: под машиной одно пятно (fakeshadows.js)
+   const p = car.position, gy = V.air || FLYC.on() ? supportAt(V.x, V.z, V.y) + 0.15 : p.y;   // и в полёте родстера (flycar.js)   // в прыжке — на крыше под ним, если есть (roofs.js)
+-  CSH.step(p.x, p.z, car.rotation.y, gy, p.y, car.rotation.x, car.rotation.z, ENV.night || 0, car.visible && car.parent === scene && V.sink === undefined, sun.position.x - V.x, sun.position.z - V.z);
++  CSH.step(p.x, p.z, car.rotation.y, gy, p.y, car.rotation.x, car.rotation.z, ENV.night || 0, car.visible && car.parent === scene && V.sink === undefined, sun.position.x - V.x, sun.position.z - V.z, dt);
+ }
 @@ -12897,20 +12900,5 @@
  
 -/* ─── площадка: реклама, пауза, язык, настройки ───
@@ -271,6 +354,11 @@
 -  // Полноэкранная реклама (Яндекс) — раз в несколько доставок, в паузе между заказами
 -  if (adDue()) { S.adDone = S.done; showAd().then(loadPizza); return; }
    loadPizza();
+@@ -17306,3 +17291,3 @@
+   resetCar();
+-  DIRT.wash(SEAS.snowAmt());                      // новая смена — машина чистая, зимой — снег на крыше (cardirt.js)
++  DIRT.wash(MOBM.ON ? 0 : SEAS.snowAmt());                      // новая смена — машина чистая, зимой — снег на крыше (cardirt.js)
+   S.hpMax = curCar().hp;
 @@ -17318,3 +17303,3 @@
    JUMPS.reset();                                   // Толик про крышу — снова раз за смену (jumps.js)
 -  if (!SNOW.enabled) SNOWPRINT.reset();                               // зимние следы от прошлого выезда
@@ -293,16 +381,50 @@
 -if (!INTRO) LATE.add('yardcars2', () => YCARS.cars());   // машины во дворах по местам: пустые модели, рисует InstancedMesh (yardcars.js)
 +if (!INTRO && !MOBM.ON) LATE.add('yardcars2', () => YCARS.cars());   // машины во дворах по местам: пустые модели, рисует InstancedMesh (yardcars.js)
  // машин в потоке вокруг курьера (40–330 м): было 36 — на улицах Северска толпа, и на Деке
-@@ -18916,3 +18901,3 @@
+@@ -18638,2 +18623,6 @@
+   scene.fog.near = (230 - R * 110) * (0.4 + 0.6 * gk) * fogRange;
++  if (MOBM.ON) {
++    scene.fog.far = Math.min(scene.fog.far, cam.far * 0.95);
++    scene.fog.near = scene.fog.far * 0.38;
++  }
+   sun.color.copy(mix(A[3], B[3]));
+@@ -18651,2 +18640,6 @@
+   SKYM.env({ t: ENV.t, night: ENV.night, rain: R, over: SEAS.snowFall(), snow: SEAS.snowAmt(), scene, sun, hemi, amb, dt });   // небо, туман, тёплое солнце и прохладная тень (sky.js)
++  if (MOBM.ON) {
++    sun.intensity *= 0.85;
++    if (hemi) hemi.intensity *= 1.1;
++  }
+   MATS.env({ night: ENV.night, rain: R, snow: SEAS.snowAmt(), scene, sun, dt });   // блики, мокрый асфальт, отсвет в тени, стекло (materials.js)
+@@ -18682,3 +18675,3 @@
+   // дождь
+-  rainLines.visible = R > 0.03;
++  rainLines.visible = R > 0.03 && (!MOBM.ON || SEAS.snowAmt() <= 0.45);
+   RAIN_U.uA.value = R * 0.85;
+@@ -18916,3 +18909,3 @@
  LATE.add('pubs', buildPubSpots);
 -LATE.add('peds', initPeds);
 +if (!MOBM.ON) LATE.add('peds', initPeds);
  LATE.add('people', initPeople);
-@@ -19105,3 +19090,3 @@
+@@ -19105,3 +19098,3 @@
  // потока: с ?nolate кусок строится сразу, а busApi объявлен только тут
 -if (!INTRO) LATE.add('buses', () => BUSES.build(busApi()));
 +if (!INTRO && !MOBM.ON) LATE.add('buses', () => BUSES.build(busApi()));
  const LIFE_API = {
+@@ -19465,3 +19458,3 @@
+   CL.step('cardirt', DIRT.step, dt, car, LIVE_DIRT.has(S.state) ? vf : 0, DIRT_W(DIRT_ENV));   // грязь и снег на машине (cardirt.js)
+-  CSNOW.season(SEAS.snowAmt(), SEAS.wetAmt());     // снег на машинах города (carsnow.js)
++  CSNOW.season(MOBM.ON ? 0 : SEAS.snowAmt(), SEAS.wetAmt());     // снег на машинах города (carsnow.js)
+   S.hurt = Math.max(0, S.hurt - dt);
+@@ -19547,3 +19540,3 @@
+   CL.step('warm', WARM.step, dt);                   // собранные на ходу программы шейдеров не выгружаются (warmup.js)
+-  CL.step('carshadow', carShadow);                 // пятно-тень под машиной игрока (carshadow.js)
++  CL.step('carshadow', carShadow, dt);                 // пятно-тень под машиной игрока (carshadow.js)
+   CL.step('fakeshadows', fakeShadows);             // тени домов (маска) и пятна под машинами, людьми, зверями (fakeshadows.js)
+@@ -19590,3 +19583,3 @@
+ LATE.add('fsh', function* () { yield* FSH.buildSteps({ renderer, buildings: CITY.buildings, groundH, solids: SOLIDS, smash: SMASH, props: PROPS }); });   // маска теней домов, столбов и стволов (fakeshadows.js)
+-LATE.add('sunsh', function* () { yield* SUNSH.initSteps({ scene, renderer, gfxOn: GFX.realShadows, forest: FOREST.shadowCells }); });   // настоящие тени от солнца — после сборки города, до прогрева шейдеров (sunshadow.js)
++if (!MOBM.ON) LATE.add('sunsh', function* () { yield* SUNSH.initSteps({ scene, renderer, gfxOn: GFX.realShadows, forest: FOREST.shadowCells }); });   // настоящие тени от солнца — после сборки города, до прогрева шейдеров (sunshadow.js)
+ LATE.add('first', function* () {
 --- a/src/game/garage.js
 +++ b/src/game/garage.js
 @@ -250,3 +250,3 @@
@@ -334,6 +456,11 @@
 -export const DEFAULTS = { ios: 'low', phone: 'low', deck: 'mid', pc: 'high' };
 +export const DEFAULTS = { ios: 'low', phone: 'low', deck: 'low', pc: 'low' };
  
+@@ -150,3 +150,3 @@
+ /* тени: настоящие от солнца (sunshadow.js, 2г2) — только где пункт «тени: настоящие» (по умолчанию — «Высокая»); сразу, без перезапуска */
+-export const realShadows = () => !!val('shadow');
++export const realShadows = () => !MOBILE && !!val('shadow');
+ export const winQ = () => (val('win') ? { interior: 1, lod: 70 } : { interior: 0, lod: 0 });
 @@ -163,3 +163,3 @@
  export const DETAIL = [
 -  { R: 80, small: 40, thin: 0.5, lawn: 0, meadow: 1 },     // низкая
@@ -396,7 +523,7 @@
 +      ground *= 1.0 - step(0.5, vColor.a);
 +      #endif
 +      vec3 seasonal = mix(base, vec3(0.46, 0.39, 0.17), uDry * vegetation * 0.7);
-+      diffuseColor.rgb = mix(seasonal * (1.0 - uWet * ground * 0.18), vec3(0.84, 0.89, 0.97), uSnow * ground * vegetation);
++      diffuseColor.rgb = mix(seasonal * (1.0 - uWet * ground * 0.18), vec3(0.73, 0.79, 0.85), uSnow * ground * vegetation);
 +    `);
 +  };
 +  material.customProgramCacheKey = () => 'vk-mobile-season';
@@ -482,6 +609,18 @@
 -  const snow = A.snowAmt();
 -  U.uWIce.value = ICE !== null ? ICE : Math.min(1, Math.max(0, (snow - 0.12) / 0.33));
    // ясный день: солнце белое (днём #fff4de, в линейном цвете синий/красный ≈ 0,73; на рассвете ≈ 0,33, на закате ≈ 0,15), не ночь, без дождя, не лёд (закат и ночь — как было)
+--- a/src/game/weather.js
++++ b/src/game/weather.js
+@@ -224,3 +224,3 @@
+   C = ctx; THREE = ctx.THREE;
+-  if (!ctx.intro) { try { yield* buildDeep(); } catch (e) { console.error('[weather] сугробы', e); } }
++  if (!ctx.intro && !MOBILE) { try { yield* buildDeep(); } catch (e) { console.error('[weather] сугробы', e); } }
+   yield 'deep';
+@@ -768,3 +768,3 @@
+   sky(dt);
+-  if (ID === 'snowy') stepDeep(dt);
++  if (!MOBILE && ID === 'snowy') stepDeep(dt);
+   stepSleds(dt);
 --- a/src/game/yardcars.js
 +++ b/src/game/yardcars.js
 @@ -64,3 +64,3 @@
