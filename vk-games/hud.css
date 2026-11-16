@@ -223,15 +223,27 @@ html[data-map] body #hud-right #cambtn {
 .vk-pizza.cold { color: #c1bdb6; }
 
 html[data-map] body #touchpad .tp-left {
+  --vk-wheel-size: var(--tw, 128px);
   position: absolute;
   bottom: 0;
-  left: var(--vk-left);
-  align-items: flex-start;
-  height: calc(var(--tw, 128px) / 2);
+  left: 0;
+  width: min(50%, calc(var(--vk-left) + var(--vk-wheel-size) + 66px));
+  height: calc(var(--vk-wheel-size) / 2 + 40px);
   margin: 0;
-  overflow: hidden;
 }
-html[data-map] body #touchpad .tp-right { margin-inline-start: auto; }
+.vk-wheel-clip {
+  position: absolute;
+  bottom: 0;
+  left: calc(var(--vk-left) + 18px);
+  height: calc(var(--vk-wheel-size) / 2);
+  overflow: hidden;
+  pointer-events: none;
+}
+html[data-map] body #touchpad .tp-right {
+  position: relative;
+  z-index: 1;
+  margin-inline-start: auto;
+}
 html[data-map] body #touchpad .tp-right button {
   --vk-pedal-ink: var(--vk-muted);
   display: grid;
