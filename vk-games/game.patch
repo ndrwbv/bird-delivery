@@ -66,6 +66,32 @@
 +  P.set(x, groundY + SHADOW.UP, z);
 +  Q.setFromEuler(E.set(0, h, 0));
    S.set(sc, 1, sc);
+--- a/src/game/chat.js
++++ b/src/game/chat.js
+@@ -187,17 +187,10 @@
+ function placePhone (W, H) {
+-  const rad = rectOf('#radar'), ctr = rectOf('#ctrls'), tags = rectOf('#otags'), ped = rectOf('#touchpad .tp-right'), hl = rectOf('#hud-left');
+-  let right = W - 10;
+-  for (const r of [rad, ctr]) if (r && r.left > W / 2) right = Math.min(right, r.left - 8);
+-  let top = tags ? tags.bottom + 6 : rad ? rad.top : 10;
+-  const bot = ped ? ped.top - 6 : H - 10;
+-  const lim = Math.max(hl ? hl.right + 12 : 10, W * 0.5 - 40);   // левее — машина посередине и колонка хада слева
+-  const w = Math.round(Math.max(140, Math.min(PH.W, right - lim)));
+-  for (const r of [rectOf('#toast'), rectOf('#hint'), rectOf('#dlg-live'), rectOf('#ach-toast')]) {
+-    if (r && r.right > right - w && r.left < right && r.top < bot && r.bottom > top - 4) top = Math.max(top, r.bottom + 6);
+-  }
+-  C.bot = Math.max(top + 40, bot);
++  const rad = rectOf('#radar'), pedals = rectOf('#touchpad .tp-right');
++  const w = Math.round(Math.min(420, W * 0.66));
++  const top = (rad ? rad.bottom : 48) + 9;
++  C.bot = pedals ? pedals.top - 6 : H - 10;
+   C.el.style.top = Math.round(top) + 'px';
+-  C.el.style.right = Math.round(W - right) + 'px';
++  C.el.style.right = Math.round((W - w) / 2) + 'px';
+   C.el.style.width = w + 'px';
+-  C.maxW = Math.max(w, Math.round(right - lim));
++  C.maxW = w;
+   drive();
 --- a/src/game/daily.js
 +++ b/src/game/daily.js
 @@ -109,3 +109,3 @@
@@ -129,68 +155,81 @@
  import * as FSH from './fakeshadows.js';         // поддельные тени: дома — маска в шейдере земли, машины, люди, звери — пятна (fakeshadows.js)
 -import * as SUNP from './sunpath.js';           // путь солнца: днём ~35°, утром и вечером низко, длинные тени (sunpath.js, 2г2; ?oldsun — прежний)
  import * as SUNSH from './sunshadow.js';         // настоящие тени от солнца на «Высокой»: карта теней рядом с камерой (sunshadow.js, 2г2)
-@@ -345,3 +344,3 @@
+@@ -148,3 +147,3 @@
+ import * as ORD from './orders.js';
+-import * as NFRAME from './nitroframe.js';
++import * as VKHUD from './vk-hud.js';
+ import * as HANDOFF from './handover.js';
+@@ -216,3 +215,2 @@
+ import * as SHIFTPREVIEW from './shiftpreview.js';
+-import * as HUDMAP from './hudmapios.js';        // карта и запас нитро слева от телефона
+ import * as PCOLD from './pizzacold.js';         // одна реакция холодного клиента на адрес
+@@ -309,3 +307,2 @@
+ import * as OS from './ordersheet.js';         // лист накладной: одна сборка для накладной, домофона и подъезда (ordersheet.js)
+-import * as OTAGS from './ordertags.js';       // мини-карточки заказа над радаром: аватарка, имя, сколько метров; доставил — вычеркнуто (ordertags.js)
+ import * as NICK from './nicks.js';             // ники и аватарки клиентов «как в приложении» (nicks.js, docs/ORDERS.md)
+@@ -345,3 +342,3 @@
     ключ dlv-edition больше не читаем), ?kids — детская для проверки. */
 -const ADULT = !!Platform.features.adult && !new URLSearchParams(location.search).has('kids');
 +const ADULT = false;
  const GORE_ON = ADULT;
-@@ -640,3 +639,3 @@
+@@ -640,3 +637,3 @@
    // мобильный режим: цвет вершин байтами (как у Mesher), а не float — вчетверо меньше и в JS, и в видеокарте (mobile.js)
 -  const BY = MOBM.ON, pos = new Float32Array(vn * 3), col = BY ? new Uint8Array(vn * 3) : new Float32Array(vn * 3);
 +  const BY = MOBM.MOB.on, pos = new Float32Array(vn * 3), col = BY ? new Uint8Array(vn * 3) : new Float32Array(vn * 3);
    const idx = vn > 65535 ? new Uint32Array(iN) : new Uint16Array(iN);
-@@ -941,3 +940,3 @@
+@@ -941,3 +938,3 @@
  const CW = CITY.meta.size[0], CD = CITY.meta.size[1];
 -const BOUNDS = { x0: -CW / 2 + 12, x1: CW / 2 - 12, z0: -CD / 2 + 12, z1: CD / 2 - 12 };
 +const BOUNDS = MAP.bounds || { x0: -CW / 2 + 12, x1: CW / 2 - 12, z0: -CD / 2 + 12, z1: CD / 2 - 12 };
  /* Край карты — многоугольник, если он у карты есть (Северск: по забору
-@@ -1432,3 +1431,3 @@
+@@ -1432,3 +1429,3 @@
      const span = Math.max(Math.abs(x1 - x0), Math.abs(x2 - x0), Math.abs(z1 - z0), Math.abs(z2 - z0));
 -    const k = span > CHUNK ? -1 : (Math.floor((x0 + x1 + x2) / 3 / CHUNK) + 50000) * 100000 + Math.floor((z0 + z1 + z2) / 3 / CHUNK) + 50000;
 +    const k = opt?.singleTile || span > CHUNK ? -1 : (Math.floor((x0 + x1 + x2) / 3 / CHUNK) + 50000) * 100000 + Math.floor((z0 + z1 + z2) / 3 / CHUNK) + 50000;
      if (k === lastK && !lastB.done) return lastB;
-@@ -1995,3 +1994,3 @@
+@@ -1995,3 +1992,3 @@
  // городу — крупнее: сорок тысяч мелких кусков дороже обходить, чем дорисовать лишнее
 -const CHUNK = MAP.border ? 200 : 100;
 +const CHUNK = 88;
  PANELS.PANEL.CHUNK = CHUNK;                       // стены панелек — кусками по тем же клеткам (panels.js)
-@@ -2274,3 +2273,3 @@
+@@ -2274,3 +2271,3 @@
    }
 -  STARTUP.work('city.winterRoads', () => WINROAD.build({ M: WINM, rutM: WINRUTM, softM: WINSOFTM, roads: CITY.roads, roadWidth, yOf: r => yOf(r, true), groundH, junction, sendRoadSheets }));
 +
  }
-@@ -2721,3 +2720,2 @@
+@@ -2721,3 +2718,2 @@
      }
 -    WINROAD.bridge({ M: WINM, softM: WINSOFTM, road: r, points: P, width: w });
      // быки — там, где под настилом есть глубина
-@@ -2967,3 +2965,3 @@
+@@ -2967,3 +2963,3 @@
      for (const it of ch.items) { it.v0 = v; v += it.nv; }
 -    const m = new THREE.Mesh(mergeGeos(ch.geos, true, MOBM.ON), SMASH_MAT);
 +    const m = new THREE.Mesh(mergeGeos(ch.geos, true, MOBM.MOB.on), SMASH_MAT);
      boundSphere(m.geometry);
-@@ -5453,3 +5451,3 @@
+@@ -5453,3 +5449,3 @@
    const lit = [], flat = [], haz = [];
 -  let shadow = null, stick = null;
 +  let stick = null;
    for (const m of u.hazard) haz.push(put([], m.geometry.clone().applyMatrix4(m.matrixWorld), '#ffa024', 0, 0, 0));
-@@ -5458,3 +5456,3 @@
+@@ -5458,3 +5454,3 @@
      if (o.userData.sticker) { stick = o.geometry.clone().applyMatrix4(o.matrixWorld); return; }   // наклейки — своим мешем на общем атласе
 -    if (o.material.transparent) { shadow = o; return; }            // тень-кружок — отдельно, как была
 +    if (o.material.transparent) return;
      const geo = o.geometry.clone().applyMatrix4(o.matrixWorld);
-@@ -5470,3 +5468,3 @@
+@@ -5470,3 +5466,3 @@
      wheel: w0.geometry, wpos: u.wheels.map((w, i) => [w.parent.position.x, w.parent.position.y, w.parent.position.z, i < 2]),
 -    shadow: shadow ? { geo: shadow.geometry, mat: shadow.material, y: shadow.position.y, sx: shadow.scale.x } : null, stick,
 +    stick,
    };
-@@ -5474,5 +5472,4 @@
+@@ -5474,5 +5470,4 @@
    CSNOW.tag(T.lit, 'rival');                                         // снег зимой — местами (carsnow.js)
 -  if (T.shadow) { T.shadow.geo.userData.shared = true; T.shadow.mat.userData.shared = true; }
    g.traverse(o => {
 -    if (!o.isMesh || (T.shadow && o === shadow)) return;
 +    if (!o.isMesh) return;
      if (o !== w0) o.geometry.dispose();
-@@ -5493,7 +5490,2 @@
+@@ -5493,7 +5488,2 @@
    g.add(hz);
 -  if (T.shadow) {
 -    const sh = new THREE.Mesh(T.shadow.geo, T.shadow.mat);
@@ -198,21 +237,21 @@
 -    g.add(sh);
 -  }
    // колёса: пустышки для езды (rotation.x — качение, у передних пивот rotation.y — руль) и один InstancedMesh
-@@ -6041,3 +6033,3 @@
+@@ -6041,3 +6031,3 @@
  const DIRT_ENV = { rain: 0, snowFall: 0, snow: 0, mud: 0, wet: 0 };
 -const DIRT_W = w => { w.rain = SEAS.snowy() ? 0 : ENV.rain; w.snowFall = SEAS.snowFall(); w.snow = SEAS.snowAmt(); w.mud = SEAS.mudAmt(); w.wet = SEAS.wetAmt(); return w; };
 +const DIRT_W = w => { w.rain = SEAS.snowy() ? 0 : ENV.rain; w.snowFall = MOBM.ON ? 0 : SEAS.snowFall(); w.snow = MOBM.ON ? 0 : SEAS.snowAmt(); w.mud = SEAS.mudAmt(); w.wet = SEAS.wetAmt(); return w; };
  const exhApi = () => ({ V, TRAFFIC, ACT: TGRID.TG.ACT, cam, career: CAREER, auto: AUTO, snd: Snd, car: () => car, gas: () => IN.gas, beast: () => FXS.beastT > 0,
-@@ -6174,3 +6166,3 @@
+@@ -6174,3 +6164,3 @@
    if (CITY.rails) tm0('rails', () => { BUILD_T.railKm = Math.round(CBITS.buildRails(cityApi(), CITY.rails, CITY.levelx)); });
 -  if (MAPFIX) { BUILD_T.mapfix = Math.round(MAPFIX.ms); BUILD_T.mapfixT = MAPFIX.T; tm0('mapworks', () => MAPW.buildWorks(MAPFIX, mapApi())); }   // тупики: блоки и ремонт
 +  if (MAPFIX) { BUILD_T.mapfix = Math.round(MAPFIX.ms); BUILD_T.mapfixT = MAPFIX.T; }   // тупики: блоки и ремонт
    { const t0 = performance.now();
-@@ -6231,3 +6223,2 @@
+@@ -6231,3 +6221,2 @@
    tm('roadlife', () => RL.build(roadApi()));      // знаки и заборы (roadlife.js) — до smashBuild
 -  if (!INTRO) tm('billboards', () => BB.build(bbApi()));   // щиты с рекламой у больших дорог (billboards.js)
    if (CAREER) tm('pots', function* () { BUILD_T.carsInfo = yield* AUTO.buildSteps(); });   // ямы в статику дорог, гараж Дяди Жени (cars.js)
-@@ -6235,11 +6226,7 @@
+@@ -6235,11 +6224,7 @@
    tm('yard', function* () { yield* osmPitches(); yield 'pitches'; if (!INTRO) BUILD_T.workout = WORK.build({ THREE, PITCHES, LIT, box, obb, groundH, inHouse, nearestRoad, solidAt, BENCHES, onPave: PAVE.onPave }); });
 -  tm('yardbits', function* () { yield* osmYardBits(); yield 'bits'; if (!INTRO) yield* JUNK.yard(); yield 'junk'; osmVerandas(); });
 -  if (!INTRO) tm('yardtrees', function* () { BUILD_T.yardTrees = yield* TREES.plantYardsSteps({ CITY, tree, inHouse, inBounds, inPoly, groundH, nearestRoad, solidAt, SMASH, YARD_PATHS, PITCHES }); });   // шагами (latebuild.js)   // группы деревьев во дворах и кусты под окнами (trees.js)
@@ -226,7 +265,7 @@
 +    ycBlocks: (x, z, r) => YCARS.blocks(x, z, r), ...extra }, preparedPhysics);
 +  if (!INTRO && !streamLand) tm('yardcurbs', function* () {
      // Physics and the snow edge lookups use a deterministic index separate
-@@ -6265,8 +6252,3 @@
+@@ -6265,8 +6250,3 @@
    });
 -  if (!INTRO) tm('yarddecor', () => DECOR.build({ ...ymApi(), LITM, groundHex, mazeBlocks: (x, z, r) => YMAZE.blocks(x, z, r), mazeAdd: YMAZE.addObj, groves: () => YMAZE.DEBUG.OBJ.filter(o => o.kind === 'grove'),
 -    curbNear: CURBS.near, greenHex: g => GREEN_HEX[g.k] || '#95c579', greenY: g => 0.04 + flatRank(GREEN_RANK, GREEN_HEX[g.k] || '#95c579', 5) * 0.0007 }));   // палисадники, грядки, круги у деревьев, холмики — после бордюров, до сугробов и smashBuild (yarddecor.js); ?nodecor — без них
@@ -235,18 +274,18 @@
 -  if (!INTRO && !new URLSearchParams(location.search).has('nojumps')) tm('jumps', () => JUMPS.build(jumpApi()));   // большие трамплины у низких крыш — после дворов и кортов, до smashBuild (jumps.js); ?nojumps — без них
 -  if (!INTRO) tm('yardfill', () => YFILL.build(yfApi()));   // дворы без пустых мест — после кортов и трамплинов, до smashBuild и сугробов (yardfill.js); ?nofill — без них
    if (!INTRO) tm('pitchnet', () => PNET.finish({ scene }));   // полотно сетки футбольных коробок — одним мешем, после дворов, до smashBuild (pitchnet.js); ?nopnet — без неё
-@@ -6365,3 +6347,3 @@
+@@ -6365,3 +6345,3 @@
    }
 -  tm('seasons', SEAS.seasonSteps);                // сугробы, ёлки, гирлянды — шагами (latebuild.js)
 +  tm('trees', SEAS.summerTrees);
    if (!INTRO) tm('trails', WASTE.trails);         // тропинки наискосок, вытоптанное у лавочек, лужи — после дворов и лавочек (wastelands.js)
-@@ -6387,3 +6369,4 @@
+@@ -6387,3 +6367,4 @@
    const tq = performance.now();
 -  const litMat = HUR.holeMat(LAWN.lawnMat(RW.wearMat(WORLD.paveMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }), 1, 0.4, !NO_SMJ && !EDL.ED.on)))));   // + узор плитки (world.js), + вид асфальта (roadwear.js), + пятна газона (lawn.js), + ураган (hurricane.js); у реквизита (признак в цвете) сухость травы 0,4 и без плитки, износа и газона
 +  const seasonGround = SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }), 1, 0.4, !NO_SMJ && !EDL.ED.on);
 +  const litMat = HUR.holeMat(LAWN.lawnMat(RW.wearMat(WORLD.paveMat(seasonGround))));   // + узор плитки (world.js), + вид асфальта (roadwear.js), + пятна газона (lawn.js), + ураган (hurricane.js); у реквизита (признак в цвете) сухость травы 0,4 и без плитки, износа и газона
    if (HELL_ENABLED) HELL.cutMaterial(litMat);
-@@ -6440,7 +6423,7 @@
+@@ -6440,7 +6421,7 @@
    if (streamLand) {
 +    const ground = new THREE.MeshLambertMaterial({vertexColors:true,flatShading:true,side:THREE.DoubleSide});
 +    const tileMat = HUR.holeMat(LAWN.lawnMat(WORLD.paveMat(SEAS.seasonMat(ground))));
@@ -257,24 +296,24 @@
 -    const streamRadius = GFX.device() === 'deck' ? 640 : 832;
 +    const streamRadius = 540;
      LAND_STREAM=createLandStream({terrain:TER,radius:streamRadius,retries:citySurface ? 1 : 0,profile:new URLSearchParams(location.search).has('deckprofile'),build:function* (bounds, id) {
-@@ -6448,3 +6431,3 @@
+@@ -6448,3 +6429,3 @@
        landPackageUsable();
 -      const M=Mesher({alpha:true,index:true,keepFront:true,mainRGB:true,noLandRecord:true});
 +      const M=Mesher({alpha:true,index:true,keepFront:true,mainRGB:true,noLandRecord:true,singleTile:true});
        const g=new THREE.Group();g.matrixAutoUpdate=false;g.matrixWorldAutoUpdate=false;
-@@ -6481,3 +6464,3 @@
+@@ -6481,3 +6462,3 @@
            yield* buildCurbs({LITM:clippedMesher(M,bounds,{includeMaxX:bounds[2]===TX0+(TNX-1)*TG,includeMaxZ:bounds[3]===TZ0+(TNZ-1)*TG}),
 -            groundH:terrainH,visualOnly:true,contours:()=>RLAND.boundaries({bounds:halo}),
 +            groundH:terrainH,visualOnly:true,mobile:()=>true,contours:()=>RLAND.boundaries({bounds:halo}),
              landTopAt:(x,z)=>RLAND.topOffset(x,z,terrainH(x,z))});
-@@ -6487,4 +6470,4 @@
+@@ -6487,4 +6468,4 @@
            triangulate:(p,holes=[])=>THREE.ShapeUtils.triangulateShape(p.map(q=>new THREE.Vector2(...q)),holes.map(h=>h.map(q=>new THREE.Vector2(...q))))});
 -        yield* M.prep(litMat,g,()=>{},false,null,0);
 -        const tail=M.mesh(litMat);for(const m of tail.children.slice())g.add(m);
 +        yield* M.prep(tileMat,g,()=>{},false,null,0);
 +        const tail=M.mesh(tileMat);for(const m of tail.children.slice())g.add(m);
        }
-@@ -6555,22 +6538,2 @@
+@@ -6555,22 +6536,2 @@
    LATE.add('mesh', function* () {
 -    SNOW_FENCES.build(SMASH);
 -    if (RLAND.ON) { RLAND.cover.cachePointQueries(); RLAND.green.cachePointQueries(); }
@@ -297,12 +336,12 @@
 -    for (const mesh of banks.children.slice()) winterSoftGroup.add(mesh);
 -    yield 'snow banks';
      if (citySurface) {
-@@ -6923,3 +6886,3 @@
+@@ -6923,3 +6884,3 @@
  FXP.init({ scene, cam, geo: { spark: sparkGeo, bit: bitGeo, puff: puffGeo }, fxLow: GFX.fxLow, fxDrop: GFX.fxDrop, fxLife: GFX.fxLife, legacy: (m, o, f) => fxAdd(m, o, f) });
 -if (!SNOW.enabled) SNOWPRINT.init(scene);
 +if (!SNOW.enabled && !MOBM.ON) SNOWPRINT.init(scene);
  const fxPart = FXP.part;
-@@ -7388,7 +7351,2 @@
+@@ -7388,7 +7349,2 @@
    }
 -  const sh = new THREE.Mesh(new THREE.CircleGeometry(hl + 0.25, 14),
 -    new THREE.MeshBasicMaterial({ color: 0x24303f, transparent: true, opacity: 0.26, depthWrite: false }));
@@ -310,22 +349,22 @@
 -  g.add(sh);
 -
    g.userData = { wheels, steer, panels, glass: cg || open ? [] : [wsF, wsB], cg, dmg: 0, smokeT: 0, bodyHex, hazard, hl, model, trunk,
-@@ -8051,3 +8009,3 @@
+@@ -8051,3 +8007,3 @@
  function initPeople () {
 -  for (let k = 0; k < (INTRO ? 18 : 44); k++) {
 +  for (let k = 0; k < 11; k++) {
      // во вступлении лица у прохожих не грузим: в кадре их не разглядеть, а
-@@ -8117,3 +8075,3 @@
+@@ -8117,3 +8073,3 @@
  function initScoots () {
 -  for (let k = 0; k < 16; k++) {
 +  for (let k = 0; k < 2; k++) {
      const two = chance(0.25);
-@@ -9356,3 +9314,3 @@
+@@ -9356,3 +9312,3 @@
  function trafficNight () { const h = trafficHour(), [a, b] = ECON.TRAFFIC.NIGHT; return h >= a && h < b; }
 -const trafficWant = () => Math.round(ECON.trafficAt(trafficHour()) * (TOUCH || MOBM.ON ? ECON.TRAFFIC.TOUCH_K : 1));   // мобильный режим — как на касаниях
 +const trafficWant = () => Math.round(ECON.trafficAt(trafficHour()) * 0.55);
  const isFlow = t => !t.parked && !t.svc && !t.gone && !t.chase && t.model !== 'moped' && !t.bus;   // автобусов своё число (buses.js)   // мопеды доставки — свои (mopeds.js)
-@@ -9420,11 +9378,2 @@
+@@ -9420,11 +9376,2 @@
  CSH.init(scene);
 -/* поддельные тени (fakeshadows.js): пятна — один InstancedMesh; маска теней домов — когда дома построены (LATE 'fsh') */
 -FSH.init(scene);
@@ -337,7 +376,7 @@
 -  FSH.step(FSH_E);
 -}
  let SUNSH_E = null;
-@@ -9455,6 +9404,6 @@
+@@ -9455,6 +9402,6 @@
  }
 -function carShadow () {
 +function carShadow (dt) {
@@ -346,11 +385,16 @@
 -  CSH.step(p.x, p.z, car.rotation.y, gy, p.y, car.rotation.x, car.rotation.z, ENV.night || 0, car.visible && car.parent === scene && V.sink === undefined, sun.position.x - V.x, sun.position.z - V.z);
 +  CSH.step(p.x, p.z, car.rotation.y, gy, p.y, ENV.night || 0, car.visible && car.parent === scene && V.sink === undefined, dt);
  }
-@@ -10961,3 +10910,2 @@
+@@ -10961,3 +10908,2 @@
      for (const g of [T.lit, T.flat, T.haz, T.wheel, T.stick]) if (g) g.dispose();
 -    if (T.shadow) { T.shadow.geo.dispose(); T.shadow.mat.dispose(); }
      delete RIV_LITE[k];
-@@ -12897,20 +12845,5 @@
+@@ -11220,3 +11166,3 @@
+   CREWR.sheet(dt, !!on && ['drive', 'back', 'handover', 'loading', 'side'].includes(S.state) && !S.ride, !RQ.busy(),
+-    FM.open || S.paused || briefShown() || DLG.isOpen() || DOOR.on() || STORY.active() || FIRST.on() || !!S.meal || CH.opts.length > 0, rivalBoard, SC.DEBUG.el);
++    FM.open || S.paused || DLG.isOpen() || DOOR.on() || STORY.active() || FIRST.on() || !!S.meal || CH.opts.length > 0, rivalBoard, SC.DEBUG.el);
+   if (!on || (rivalsT -= dt) > 0) return;
+@@ -12897,20 +12843,5 @@
  
 -/* ─── площадка: реклама, пауза, язык, настройки ───
 -   Всё, что зависит от Яндекса или Стима, идёт через Platform. Полноэкранная
@@ -373,12 +417,12 @@
 -  try { await Platform.showInterstitial(); } catch (e) { console.warn('[ad]', e); }
 -}
  const nitroKey = () => (TMODE.touchOn() ? $t('кнопку нитро') : PAD.active ? 'A' : 'Shift');
-@@ -13040,3 +12973,3 @@
+@@ -13040,3 +12971,3 @@
      try {
 -      await resetSingleProgress({ store: Platform.store, storage: localStorage, keep: RESET_KEEP, heroName: heroName(), requestId });
 +      await resetSingleProgress({ store: Platform.store, storage: Platform.storage, keep: RESET_KEEP, heroName: heroName(), requestId });
      } catch (e) {
-@@ -13345,5 +13278,5 @@
+@@ -13345,5 +13276,5 @@
    V.wheel += (vf + (IN.gas && !dead ? softSnow * WINROAD.WINTER_ROAD.WHEEL_SPIN : 0)) * dt / 0.46;
 -  if (!snowOwned) WINROAD.spray(V, IN.gas && !dead, softSnow, dt, fxPart);
 -  if (!snowOwned && !V.air && !flyOn) WINROAD.scatter(V, Math.abs(vf), SEAS.snowAmt(), fxPart);
@@ -387,19 +431,154 @@
 +  if (!MOBM.ON && !snowOwned && !V.air && !flyOn) WINROAD.scatter(V, Math.abs(vf), SEAS.snowAmt(), fxPart);
 +  if (!MOBM.ON && !SNOW.enabled) { const snow = SEAS.snowAmt();
      if (snow > 0.55 && !flyOn) {
-@@ -14284,3 +14217,3 @@
+@@ -13913,3 +13844,3 @@
+     && !REPLAY.on() && !(CAREER && CAREERM.padRoot()) && !document.body.classList.contains('story-cut'),
+-  padCan: () => !briefShown() });   // висит накладная — правый стик листает её (padmenu.js)
++  padCan: () => true });
+ /* вручение в кадре (handcam.js, 11бд): поворот на клиента, сцена «курьер отдаёт коробку» перед окном разговора */
+@@ -14284,3 +14215,3 @@
  function paintBase (x, px, B) {
 -  const phoneMap = !TOUCH;
 +  const phoneMap = false;
    const vis = o => { const b = FM.bb.get(o); return !b || !(b[2] < B[0] || b[0] > B[2] || b[3] < B[1] || b[1] > B[3]); };
-@@ -15480,4 +15413,3 @@
+@@ -15244,12 +15175,6 @@
+ function payShow (total, rows, title, face, done, touch, delivery = false) {
+-  if (delivery && HUDFONE.active()) {
+-    PAYVIS.hide();
+-    HUDFONE.showPayment({
+-      name: face?.person ? NICK.label(face.person, $t('клиент')) : $t('клиент'),
+-      avatar: face?.person ? NICK.avatar(face.person, 64, face.mood) : '', mood: face?.mood || 'ok',
+-      amount: (total < 0 ? '−' : '+') + money(Math.abs(total)), money: money(S.money), zero: money(0),
+-      breakdown: rows.map(r => ({ label: r[0], amount: (r[1] < 0 ? '−' : '+') + money(Math.abs(r[1])), kind: r[2] })),
+-      ready: () => NQ.DEBUG.phase() === 'ride' && NQ.showing() === 'pay', done, touch,
+-    });
++  if (delivery) {
++    VKHUD.delivery((total < 0 ? '−' : '+') + money(Math.abs(total)), money(S.money));
+     Snd.coin();
++    done();
+     return;
+@@ -15290,4 +15215,3 @@
+ /* ─────────────── хад ─────────────── */
+-const elHearts = $('hearts'), elMoney = $('money'), elTask = $('task'), elAddr = $('addr'),
+-      elDist = $('dist'),
++const elHearts = $('hearts'), elMoney = $('money'),
+       elBurgers = $('burgers'), elSpeed = $('speed'), elToast = $('toast'),
+@@ -15318,5 +15242,4 @@
+ 
+-const elFx = $('fxs'), elRadarBox = $('radar');
+-NFRAME.init([elRadarBox, elFull.querySelector('.fm-view')]);
+-HUDMAP.init(elRadarBox);
++const elFx = $('fxs');
++VKHUD.init($('radar'), $('hud-left'), $('hud-right'));
+ const TOUCH_NOS = document.querySelector('#touchpad .tp-nos');
+@@ -15367,8 +15290,6 @@
+    счётчики) сравниваем числом, без сборки строки; язык сменился — пересобрать (HUDC.lang) */
+-const HUDC = { lang: '', money: NaN, bur: '', spd: -1, nos: -1, burn: null, fx: '', on: null, vis: '', key: '', dist: -1, pizzaT: 0 };
+-const hudTxt = (el, s) => { if (el._hs !== s) { el._hs = s; el.textContent = s; } };
+-const hudHtml = (el, s) => { if (el._hs !== s) { el._hs = s; el.innerHTML = s; } };
++const HUDC = { lang: '', money: NaN, bur: '', spd: -1, nos: -1, burn: null, fx: '', pizzaT: 0 };
+ function hudStep (dt) {
+   const lg = curLang();
+-  if (lg !== HUDC.lang) { HUDC.lang = lg; HUDC.money = NaN; HUDC.nos = -1; HUDC.bur = ''; HUDC.spd = -1; HUDC.key = ''; HUDC.dist = -1; HUDC.fx = '#'; }
++  if (lg !== HUDC.lang) { HUDC.lang = lg; HUDC.money = NaN; HUDC.nos = -1; HUDC.bur = ''; HUDC.spd = -1; HUDC.fx = '#'; }
+   if (CAREER) walletHud(dt); else if (S.money !== HUDC.money) { HUDC.money = S.money; elMoney.textContent = money(S.money); }
+@@ -15383,11 +15304,6 @@
+   if (kmh !== HUDC.spd) { HUDC.spd = kmh; elSpeed.textContent = $t('{n} км/ч', { n: kmh }); }
+-  // нитро — контуром миникарты и раскрытой карты, без второй шкалы
+-  const nq = Math.round(NOS.tank * 1000);
++  const nq = Math.round(NOS.tank * 100);
+   if (nq !== HUDC.nos) {
+     HUDC.nos = nq;
+-    const nv = (nq / 1000).toFixed(3);
+-    NFRAME.update(NOS.tank, NOS.burn, $t('нитро'));
+-    HUDMAP.fuel(NOS.tank);
+-    elRadarBox.style.setProperty('--nos', nv);
+-    if (TOUCH_NOS) TOUCH_NOS.style.setProperty('--nos', nv);   // на телефоне бак — кольцом по краю кнопки нитро
++    VKHUD.fuel(NOS.tank);
+   }
+@@ -15395,5 +15311,3 @@
+     HUDC.burn = NOS.burn;
+-    NFRAME.update(NOS.tank, NOS.burn, $t('нитро'));
+-    elRadarBox.classList.toggle('burn', NOS.burn);
+-    if (TOUCH_NOS) TOUCH_NOS.classList.toggle('burn', NOS.burn);
++    TOUCH_NOS?.classList.toggle('burn', NOS.burn);
+   }
+@@ -15405,5 +15319,2 @@
+   if (toastT > 0 && (toastT -= dt) <= 0) elToast.style.opacity = 0;
+-  if (phoneT > 0 && (phoneT -= dt) <= 0) hidePhone();
+-  OTAGS.step(dt);                                  // мини-карточки заказа над радаром (ordertags.js)
+-  HUDFONE.resources({ hp: S.hp, hpMax: S.hpMax, money: CAREER ? (SC.DEBUG.text || money(S.money)) : money(S.money), order: OTAGS.current(), hasOrder: !!S.order });
+   if ((HUDC.pizzaT -= dt) <= 0) {
+@@ -15412,25 +15323,8 @@
+     const cooling = carried ? ECON.coldCut({ ...DENTM.wear(car), hp: S.hp, hpMax: S.hpMax }).k : 0;
+-    HUDMAP.pizza({ carried, cooling, cold: cooling >= ECON.PRESS.COLD_BAD });
+-  }
+-
+-  const on = S.state === 'drive' || S.state === 'back' || S.state === 'handover' || S.state === 'side';
+-  if (on && S.ride) {
+-    hudTxt(elTask, $t('просто катаюсь'));
+-    hudHtml(elAddr, '<span class="sub">' + $t('без заказов и рекордов · esc — в меню') + '</span>');
+-    hudTxt(elDist, '');
+-    HUDC.key = ''; HUDC.dist = -1;
+-  } else if (on && S.target) {
+-    const o = S.order, back = S.state === 'back';
+-    // заказ, адрес, «в пиццерию» — меняются редко: собираем строки, только когда сменился ключ
+-    const key = (back ? 'b' : 'd') + S.orders + '|' + (o ? o.idx + '/' + o.stops.length : '') + '|' + S.addr + '|' + (S.addrLine || '');
+-    if (key !== HUDC.key) {
+-      HUDC.key = key;
+-      hudTxt(elTask, back ? $t('в пиццерию')
+-        : $t('заказ {n}', { n: S.orders }) + (o && o.stops.length > 1 ? ' · ' + $t('{i} из {n}', { i: o.idx + 1, n: o.stops.length }) : ''));
+-      hudHtml(elAddr, back ? (PIZZA ? PIZZA.name.toLowerCase() : '')
+-        : S.addr + (S.addrLine ? '<br><span class="sub">' + S.addrLine + '</span>' : ''));
+-    }
+-    const dx = S.target.x - V.x, dz = S.target.z - V.z, dm = Math.round(Math.sqrt(dx * dx + dz * dz));
+-    if (dm !== HUDC.dist) { HUDC.dist = dm; hudTxt(elDist, $t('{n} м', { n: dm })); }
+-  } else { hudTxt(elTask, ''); hudTxt(elAddr, ''); hudTxt(elDist, ''); HUDC.key = ''; HUDC.dist = -1; }
++    VKHUD.cooling(carried, cooling, cooling >= ECON.PRESS.COLD_BAD);
++  }
++  const target = isPlaying() && S.target;
++  const recipient = S.order?.stops[S.order.idx]?.persons?.[0];
++  const name = S.state === 'back' ? $t('в пиццерию') : recipient ? NICK.short(recipient, $t('клиент')) : target && target.name;
++  VKHUD.routeStep(dt, V, target, routePts, name || $t('клиент'));
+ }
+@@ -15480,4 +15374,3 @@
    if (!picked && DISTRICTS && CITYOPEN.beforeShift(() => goRun(true, checkIn))) return;
 -  if (S.state === 'over' && Platform.features.ads && (S.delivered || 0) > 0) { S.state = 'title'; $('over').hidden = true; showAd().then(() => startRun(false, checkIn)); }
 -  else startRun(false, checkIn);
 +  startRun(false, checkIn);
  }
-@@ -15784,10 +15716,2 @@
-   document.body.classList.add('brief');
+@@ -15751,14 +15644,5 @@
+ 
+-const elPhone = $('phone'), elPhWhy = $('ph-why'), elPhList = $('ph-list'), elPhWhat = $('ph-what');
+-let phoneT = 0;
+-
+-/* накладная заказа: кому (только имя), куда, что, оплата; фото на скрепке. Пометок и комментария курьера нет */
+-const KIND_LABEL = { group: $t('групповой заказ'), chain: $t('последовательный заказ'), bundle: $t('сборный заказ'), solo: $t('заказ') };
++let vkReadyOrder = null;
+ 
+ function showOrderCard (order) {
+-  // весь попап — накладная: шапка «накладная · заказ  № 0007», таблица, фото на скрепке; кнопки нет —
+-  // повисит BRIEF.T с и сама «упадёт» к радару мини-карточкой (briefStep, dropPhone, ordertags.js)
+-  $('ph-kind').textContent = $t('накладная') + ' · ' + (KIND_LABEL[order.kind] || $t('заказ'));
+-  const src = elPhone.querySelector('.ph-src');
+-  if (src) src.textContent = '№ ' + String(S.orders).padStart(4, '0');
+   // квартира — в накладной с самого начала (домофон и подъезд берут её же: doorstep.js homeOf, docs/ORDERS.md «Домофон у подъезда»)
+@@ -15770,34 +15654,6 @@
+   if (CAREER && (!DOOR.DEBUG.timer.due || DIRECTOR.can('mini'))) DIRECTOR.planned(DOOR.plan(order));
+-  // лист — общий с домофоном и подъездом (ordersheet.js): получатель, адрес, заказ, оплата, фото на скрепке
+-  elPhList.innerHTML = OS.html(order, { extra: order.ord ? ORD.cardRows(order) : [], t: $t }) +
+-    (order.rush ? '<div class="oc-rush">⏱ ' + order.rushText + '<span>' + $t('после загрузки — полный бак нитро · оплата ×1,5') + '</span></div>' : '') +
+-    (order.surf ? '<div class="oc-rush oc-surf">🏄 ' + $t(MAP.river.surfCard, { name: SURF.person ? SURF.person.first : '' }) + '<span>' + $t('подъедь к набережной и притормози — пицца долетит прямо на доску · оплата ×2') + '</span></div>' : '') +
+-    briefGoHTML();
+-  elPhWhat.textContent = order.items;
+-  elPhWhy.textContent = order.why;
+-  if (order.ord) ORD.card(order);                 // карьера: полоса цвета вида (очередь «дальше» не показываем)
+-  else if (order.look) ORD.card({ stops: order.stops, ord: order.look });   // учебный Стёпа — сюжетный: розовая полоса, «история · накладная»
+-  else elPhone.classList.remove('ord-typed', 'ord-urgent', 'ord-story');
+-  clearTimeout(BRIEF.drop);
+-  elPhone.classList.remove('drop');
+-  elPhone.classList.add('on');
+-  document.body.classList.add('brief');
 -  const ik = inputKind();
 -  const recipient = order.stops[0] && order.stops[0].persons && order.stops[0].persons[0];
 -  const routeOverview = { route: routePts, roads: RSEG, origin: [V.x, V.z], target: S.target && [S.target.x, S.target.z] };
@@ -408,28 +587,109 @@
 -    many: order.stops.length > 1, routeOverview,
 -    driveKey: ik.kind === 'pad' ? (ik.family === 'ps' ? 'R2' : 'RT') : 'W' });
 -  if (phoneOrder) HUDMAP.routePreview($('radar'), routeOverview);
-   phoneT = 0;
-@@ -16316,4 +16240,2 @@
+-  phoneT = 0;
+-  BRIEF.t = 0; BRIEF.gasUp = !IN.gas;           // газ зажат с прошлого заказа — не считается, нужен новый нажим
+-}
+-const hidePhone = () => { clearTimeout(BRIEF.drop); elPhone.classList.remove('on', 'drop'); document.body.classList.remove('brief'); phoneT = 0; };
+-
+-/* Автор 10.10.2026: «хочется, чтобы меня ничего не блокировало»: руль свободен с первой секунды, пицца сразу
+-   летит в багажник (startLoad), накладная висит, пока стоишь, — BRIEF.T с (первый заказ — BRIEF.TUT), а поехал
+-   (быстрее BRIEF.V м/с) — сворачивается через BRIEF.MOVE с после показа. */
+-const BRIEF = { T: 4, TUT: 4.5, MOVE: 1.4, V: 2, t: 0, gasUp: true, drop: 0 };
+-const briefShown = () => elPhone.classList.contains('on') && !elPhone.classList.contains('drop');
++  vkReadyOrder = order;
++}
++const hidePhone = () => { vkReadyOrder = null; };
++
+ /* одно уведомление за раз (notifyq.js, docs/CAREER.md «Одно уведомление за раз»): когда очередь идёт.
+@@ -15810,44 +15666,10 @@
+   return S.paused || EXT.paused || S.meal || FM.open || DLG.isOpen() || DOOR.on() || STORY.active() || FIRST.on() || REPLAY.on()
+-    || (CAREER && CAREERM.padRoot()) || briefShown() || document.body.classList.contains('story-cut') ? 'wait' : 'ride';
++    || (CAREER && CAREERM.padRoot()) || document.body.classList.contains('story-cut') ? 'wait' : 'ride';
+ } });
+-function briefStep (dt) {
+-  if (!briefShown() || (S.state !== 'brief' && S.state !== 'loading' && S.state !== 'drive')) return;
++function briefStep () {
++  if (S.state !== 'brief' || !S.order || S.order !== vkReadyOrder) return;
+   if (S.paused || FM.open || DLG.isOpen() || (CAREER && CAREERM.padRoot())) return;
+-  if (S.state === 'brief') startLoad();          // показалась — коробка сразу в багажник, руль свободен
+-  if (HUDFONE.active()) {
+-    if (!IN.gas) BRIEF.gasUp = true;
+-    if (BRIEF.gasUp && IN.gas) acceptOrder();      // телефон и накладная уходят только на новый нажим газа
+-    return;
+-  }
+-  BRIEF.t += dt;
+-  const moving = Math.hypot(V.vx, V.vz) > BRIEF.V;
+-  if (BRIEF.t >= (moving ? BRIEF.MOVE : S.order && S.order.tut ? BRIEF.TUT : BRIEF.T)) acceptOrder();
+-}
+-/* лист летит вниз к текущей мини-карточке над радаром, сжимаясь; город сразу в фокусе */
+-/* подсказка на накладной (автор 10.10.2026: «нужно делать подсказку, что можешь начать ехать, чтобы начать заказ»):
+-   «[W] газ — поехали»; значок — по вводу: клавиатура W, геймпад RT / R2, палец — «газ» */
+-function briefGoHTML () {
+-  const ik = inputKind();
+-  const key = ik.kind === 'pad' ? (ik.family === 'ps' ? 'R2' : 'RT') : 'W';
+-  return '<div class="oc-go">' + (ik.kind === 'touch' ? escHtml($t('жми газ — поехали'))
+-    : '<kbd class="pp-key">' + key + '</kbd>' + escHtml($t('газ — поехали'))) + '</div>';
+-}
+-function dropPhone () {
+-  if (HUDFONE.active() && HUDFONE.hasOrder()) {
+-    hidePhone();
+-    HUDFONE.dock();
+-    OTAGS.land(0.4);
+-    return;
+-  }
+-  const to = OTAGS.anchor(), r = elPhone.getBoundingClientRect();
+-  document.body.classList.remove('brief');
+-  if (!to || !r.width) { hidePhone(); OTAGS.land(0); return; }
+-  elPhone.style.setProperty('--dx', Math.round(to.x - (r.left + r.width / 2)) + 'px');
+-  elPhone.style.setProperty('--dy', Math.round(to.y - (r.top + r.height / 2)) + 'px');
+-  elPhone.classList.add('drop');
+-  clearTimeout(BRIEF.drop);
+-  BRIEF.drop = setTimeout(hidePhone, 520);
+-  OTAGS.land(0.4);
+-}
+-
++  vkReadyOrder = null;
++  startLoad();
++}
+ /* ─────────────── куда везти ───────────────
+@@ -16221,3 +16043,3 @@
+   FAHEAD.client(S.order);                       // лица получателей для диалогов у двери — заранее (faceahead.js)
+-  S.state = 'brief';                            // накладная показалась; руль не блокируется (автор 10.10.2026), пицца сразу летит в багажник (briefStep)
++  S.state = 'brief';                            // загрузка начнётся после подготовки заказа или вступления
+   syncTarget();
+@@ -16308,5 +16130,3 @@
+ function acceptOrder () {
+-  if (S.state === 'brief') startLoad();
+-  if (!briefShown()) return;
+-  dropPhone();                                    // накладная падает к радару мини-карточкой (ordertags.js)
++  if (S.state === 'brief' && S.order && S.order === vkReadyOrder) briefStep();
+ }
+@@ -16316,4 +16136,2 @@
    S.state = 'loading';
 -  // Полноэкранная реклама (Яндекс) — раз в несколько доставок, в паузе между заказами
 -  if (adDue()) { S.adDone = S.done; showAd().then(loadPizza); return; }
    loadPizza();
-@@ -17281,3 +17203,3 @@
+@@ -17281,3 +17099,3 @@
    const place=PIZZERIAS[DIST.cur()]||PIZZA;
 -  if (LAND_STREAM && !LAND_STREAM.gpuReadyAt(place.bx,place.bz,640)) {
 +  if (LAND_STREAM && !LAND_STREAM.gpuReadyAt(place.bx,place.bz,190)) {
      LAND_ENTERING=true;
-@@ -17306,3 +17228,3 @@
+@@ -17306,3 +17124,3 @@
    resetCar();
 -  DIRT.wash(SEAS.snowAmt());                      // новая смена — машина чистая, зимой — снег на крыше (cardirt.js)
 +  DIRT.wash(MOBM.ON ? 0 : SEAS.snowAmt());                      // новая смена — машина чистая, зимой — снег на крыше (cardirt.js)
    S.hpMax = curCar().hp;
-@@ -17318,3 +17240,3 @@
+@@ -17315,2 +17133,3 @@
+   HANDOFF.cancel();
++  VKHUD.hidePayment();
+   S.state = 'drive'; S.hp = S.hpMax; S.money = 0; S.orders = 0; S.burgers = 0; S.shiftT = 0;
+@@ -17318,3 +17137,3 @@
    JUMPS.reset();                                   // Толик про крышу — снова раз за смену (jumps.js)
 -  if (!SNOW.enabled) SNOWPRINT.reset();                               // зимние следы от прошлого выезда
 +  if (!MOBM.ON && !SNOW.enabled) SNOWPRINT.reset();                               // зимние следы от прошлого выезда
    GUN.shiftStart();                                // гранатомёт: полный ящик на смену (turret.js)
-@@ -17355,26 +17277,3 @@
+@@ -17355,26 +17174,3 @@
      STARTUP.work('shift.rivals', initRivals);
 -    if (checkIn && CAREER && !TOUCH) {
 -      if (GFX.device() === 'deck' && SEAS.snowAmt() > 0.015) shiftSnowWork = SNOW.prepare();
@@ -457,12 +717,49 @@
 -    } else newOrder();
 +    newOrder();
    }
-@@ -18096,3 +17995,3 @@
+@@ -17394,2 +17190,3 @@
+   hideOver();
++  VKHUD.hidePayment();
+   S.ride = true; S.free = true; S.freeRun = true; S.money = 0;
+@@ -17569,4 +17366,2 @@
+ 
+-/* накладная: клик или касание по листу — свернуть сразу (кнопки нет, сама сворачивается через BRIEF.T с) */
+-elPhone.addEventListener('click', () => { if (briefShown()) acceptOrder(); });
+ 
+@@ -17602,8 +17397,2 @@
+   if (CH.pause) return;
+-  // накладная: Enter — свернуть сразу, как A на геймпаде (без кнопки она и так свернётся сама)
+-  if (!HUDFONE.active() && briefShown() && (e.code === 'Enter' || e.code === 'NumpadEnter') && !S.paused && !FM.open && !DLG.isOpen() && !(CAREER && CAREERM.padRoot())) {
+-    e.preventDefault();
+-    if (!e.repeat && elPhone.classList.contains('on')) acceptOrder();
+-    return;
+-  }
+   if (matchKey('x', e) && !e.repeat && !S.paused && !FM.open && isPlaying() && GFX.offerYes()) { e.preventDefault(); return; }   // X — «включить „среднюю“» (gfx.js)
+@@ -17616,3 +17405,2 @@
+   }
+-  if (phoneT > 0 && e.code !== 'KeyM') hidePhone();
+   if (e.code === 'KeyM' && !e.repeat) { Snd.set(!Snd.on); toast(Snd.on ? $t('звук вкл') : $t('звук выкл')); }
+@@ -17989,3 +17777,3 @@
+   reserve: amount => CAREER ? SC.reserve(amount) : null, extend: SC.extend,
+-  settle: (ticket, visible) => SC.settle(ticket, visible && !HUDFONE.active()), hidePay: payHide,
++  settle: ticket => SC.settle(ticket, false), hidePay: payHide,
+   cancelScene: list => HCAM.cancelHanded(list),
+@@ -18035,3 +17823,3 @@
+   mealPauseOwners: () => ({ paused: CH.pause || !!(elPause && !elPause.hidden), meal: CH.pause }),
+-  mealNitroHud: () => NFRAME.update(NOS.tank, false, $t('нитро')),
++  mealNitroHud: () => VKHUD.fuel(NOS.tank),
+   mealRepair: () => { S.hp = S.hpMax; S.hurt = 0; AUTO.repair(100); AUTO.reset(); resetCar(); hudHearts(); },
+@@ -18096,3 +17884,3 @@
    parkingClear: pinFree, surfaceAt, setPause, acceptOrder });
 -const NO_E = /[?&]noE(&|$)/.test(location.search);   // ?noE — без леса у Ленина, змеев и качалок (сравнить кадр)
 +const NO_E = true;   // Меньше фоновых аттракционов на карте VK.
  /* змеи и дроны (kites.js): места в парках и на Ленина, люди — только рядом с камерой */
-@@ -18185,16 +18084,2 @@
+@@ -18118,3 +17906,3 @@
+ FIRST.init({ THREE, cam, V, S, Store, Snd, ADULT, car: () => car, pizza: () => PIZZA, brand: () => OWN.pizza(), carName: () => curCar().name,
+-  puff, camClear, camTree, groundH, guestStep, hud: () => { drawRadar(); hudStep(0); }, hearts: () => hudHearts() });
++  puff, camClear, camTree, groundH, guestStep, hud: () => hudStep(0), hearts: () => hudHearts() });
+ HINTS.init({ S, V, NOS: () => NOS, Store, Snd, ADULT, CAREER, sayBubble, puff, toast, money });
+@@ -18185,16 +17973,2 @@
  /* мелочь на газоне (lawnprops.js): тоже клетками вокруг камеры */
 -LATE.add('meadow', () => MEADOW.init({ renderer, scene, cam, CITY, groundH, car: V, cutMaterial: HELL_ENABLED ? HELL.cutMaterial : null }));   // некошеная трава (meadow.js); ?oldgrass — по-старому
 -LATE.add('lawnp', () => LAWNP.init({ THREE, scene, cam, CITY, ADULT, forests: () => [...LWOOD.polys(), ...RINGM.polys(), ...(MAP.woods || [])], groundH, inHouse, inBounds, nearestRoad, roadWidth, car: V, Snd,
@@ -479,11 +776,21 @@
 -  debris: (x, z, nx, nz, force, hex, n, kind) => DEBRIS.chunks(DEB_API, x, z, nx, nz, force, hex, n, kind === 'rail' || kind === 'beater' || kind === 'line'),   // куски из запаса, вразнобой (debris.js)
 -  }));
  // Курьера ставим раньше всех: припаркованные, трафик и прохожие заводятся
-@@ -18227,3 +18112,2 @@
+@@ -18227,3 +18001,2 @@
  });
 -if (!INTRO) LATE.add('yardcars2', () => YCARS.cars());   // машины во дворах по местам: пустые модели, рисует InstancedMesh (yardcars.js)
  // машин в потоке вокруг курьера (40–330 м): было 36 — на улицах Северска толпа, и на Деке
-@@ -18632,8 +18516,4 @@
+@@ -18298,9 +18071,2 @@
+ NICK.init({ adult: ADULT, store: { get: Store.get, set: Store.set } });   // store — журнал подписей без тёзок в окне смен (nicks.js NK.WIN)
+-OTAGS.init({ S, V, faceDataURL, routeLeft: () => {
+-  const P = routePts, tg = S.target;
+-  if (!tg || P.length < 2) return null;
+-  let L = Math.hypot(P[0][0] - V.x, P[0][1] - V.z);
+-  for (let i = 1; i < P.length; i++) L += Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]);
+-  return L + Math.hypot(tg.x - P[P.length - 1][0], tg.z - P[P.length - 1][1]);
+-} });
+ RADIO.init({ Store, S, ADULT, Snd, isPlaying, root: () => $('game') || document.body,
+@@ -18632,8 +18398,4 @@
    scene.fog.color.copy(FOG_C);
 -  const gk = GFX.rangeK();                          // дальность по настройке графики: 250 / 370 / 490 м (gfx.js)
 -  const fogRange = CULL.Q.k * CULL.Q.t;              // обе границы сжимаются вместе при тяжёлом кадре
@@ -494,7 +801,7 @@
 +  scene.fog.far = cam.far * (0.98 - R * 0.3);
 +  scene.fog.near = scene.fog.far * (0.72 - R * 0.2);
    sun.color.copy(mix(A[3], B[3]));
-@@ -18644,8 +18524,2 @@
+@@ -18644,8 +18406,2 @@
    SOFTCITY.light(sun, hemi, amb, ENV.night, R);
 -  // солнце ходит по небу: днём ~35°, утром и вечером низко, ночью — как было (sunpath.js; ?oldsun — прежний путь ниже)
 -  if (!SUNP.place(sun, ENV.t, ENV.night, V.x, 0, V.z)) {
@@ -503,49 +810,76 @@
 -    sun.target.position.set(V.x, 0, V.z); sun.target.updateMatrixWorld();   // цель — под машиной, иначе вдали от центра карты свет почти горизонтальный
 -  }
    SKYM.env({ t: ENV.t, night: ENV.night, rain: R, over: SEAS.snowFall(), snow: SEAS.snowAmt(), scene, sun, hemi, amb, dt });   // небо, туман, тёплое солнце и прохладная тень (sky.js)
-@@ -18682,3 +18556,3 @@
+@@ -18682,3 +18438,3 @@
    // дождь
 -  rainLines.visible = R > 0.03;
 +  rainLines.visible = R > 0.03 && (!MOBM.ON || SEAS.snowAmt() <= 0.45);
    RAIN_U.uA.value = R * 0.85;
-@@ -18916,3 +18790,2 @@
+@@ -18916,3 +18672,2 @@
  LATE.add('pubs', buildPubSpots);
 -LATE.add('peds', initPeds);
  LATE.add('people', initPeople);
-@@ -19105,3 +18978,2 @@
+@@ -19062,3 +18817,2 @@
+   } else if (p.view && !screen && !S.paused && isPlaying()) CV.cycle(true);   // View / Back — вид камеры (camview.js)
+-  if (!HUDFONE.active() && p.accept && briefShown() && !S.paused && !FM.open && !DLG.isOpen() && !(CAREER && CAREERM.padRoot())) acceptOrder();   // A — свернуть прежнюю накладную вне телефона
+   if (p.btnX && !screen && !S.paused && !FM.open && isPlaying() && GFX.offerYes()) p.btnX = false;   // X — «включить „среднюю“» на плашке «кадр не успевает» (gfx.js)
+@@ -19105,3 +18859,2 @@
  // потока: с ?nolate кусок строится сразу, а busApi объявлен только тут
 -if (!INTRO) LATE.add('buses', () => BUSES.build(busApi()));
  const LIFE_API = {
-@@ -19249,3 +19121,2 @@
+@@ -19249,3 +19002,2 @@
    if (LAND_ENTERING) { last = now; return; }
 -  HUDFONE.setVisible(SHIFTIN.active() || (!TOUCH && isPlaying() && (!S.paused || FM.open || HUDFONE.conversationActive())));
    if (LATE.busy() && lateFrame(now)) return;      // город ещё достраивается за меню (latebuild.js)
-@@ -19278,3 +19149,3 @@
+@@ -19278,3 +19030,3 @@
    }
 -  CULL.govern(raw, isPlaying() && !S.paused && !EXT.paused && !FM.open && !document.hidden);
 +  CULL.govern(raw, false);
    padStep();
-@@ -19465,3 +19336,3 @@
+@@ -19310,3 +19062,3 @@
+   } else if (S.state === 'brief' || S.state === 'loading') {
+-    briefStep(dt);                               // накладная сама сворачивается; руль свободен (автор 10.10.2026)
++    briefStep();
+     if (dlgHold || HCAM.busy()) holdCar(dt);       // разговор поверх накладной (директор): руль из рук, машина стоит
+@@ -19330,3 +19082,2 @@
+   } else {
+-    briefStep(dt);                                 // пицца уже в багажнике, а накладная ещё висит — досчитать её время
+     startupDrivable = S.state === 'drive' && !DOOR.on() && !dlgHold && !HCAM.busy() && !FPD.busy() && !ST3.on();
+@@ -19465,3 +19216,3 @@
    CL.step('cardirt', DIRT.step, dt, car, LIVE_DIRT.has(S.state) ? vf : 0, DIRT_W(DIRT_ENV));   // грязь и снег на машине (cardirt.js)
 -  CSNOW.season(SEAS.snowAmt(), SEAS.wetAmt());     // снег на машинах города (carsnow.js)
 +  CSNOW.season(MOBM.ON ? 0 : SEAS.snowAmt(), SEAS.wetAmt());     // снег на машинах города (carsnow.js)
    S.hurt = Math.max(0, S.hurt - dt);
-@@ -19547,4 +19418,3 @@
+@@ -19527,3 +19278,2 @@
+   CL.step('lod', humanLod);
+-  CL.step('radar', radarStep);                    // радар ~20 раз в секунду, между — поворот холста (radarStep)
+   CL.step('hud', hudStep, dt);
+@@ -19547,4 +19297,3 @@
    CL.step('warm', WARM.step, dt);                   // собранные на ходу программы шейдеров не выгружаются (warmup.js)
 -  CL.step('carshadow', carShadow);                 // пятно-тень под машиной игрока (carshadow.js)
 -  CL.step('fakeshadows', fakeShadows);             // тени домов (маска) и пятна под машинами, людьми, зверями (fakeshadows.js)
 +  CL.step('carshadow', carShadow, dt);                 // пятно-тень под машиной игрока (carshadow.js)
    if (S.state !== 'title' && S.state !== 'over') CL.step('replay', REPLAY.rec, dt); else REPLAY.idle();   // запись последних 10 с для повтора (replay.js)
-@@ -19570,3 +19440,3 @@
+@@ -19570,3 +19319,3 @@
        !document.body.classList.contains('booting') && !document.querySelector('.late-wait') &&
 -      (!LAND_STREAM || LAND_STREAM.gpuReadyAt(V.x, V.z, 640)) && (!RLAND.ON || RLAND.ST.supportReady)) {
 +      (!LAND_STREAM || LAND_STREAM.gpuReadyAt(V.x, V.z, 190)) && (!RLAND.ON || RLAND.ST.supportReady)) {
      if (!STARTUP.firstSteerable || S.state === 'drive') {
-@@ -19589,4 +19459,2 @@
+@@ -19589,4 +19338,2 @@
     здесь, до прогрева шейдеров (их новые материалы прогреваются там же). dt = 0: время не идёт, в меню они дальше не идут */
 -LATE.add('fsh', function* () { yield* FSH.buildSteps({ renderer, buildings: CITY.buildings, groundH, solids: SOLIDS, smash: SMASH, props: PROPS }); });   // маска теней домов, столбов и стволов (fakeshadows.js)
 -LATE.add('sunsh', function* () { yield* SUNSH.initSteps({ scene, renderer, gfxOn: GFX.realShadows, forest: FOREST.shadowCells }); });   // настоящие тени от солнца — после сборки города, до прогрева шейдеров (sunshadow.js)
  LATE.add('first', function* () {
+@@ -19774,3 +19521,3 @@
+ const SBX = { god: false, nitro: false, noStall: false };
+-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { SOFTCITY, SOFTSURF, inWall, FLY: FLYC, WRONG: WRONG.DEBUG, GUN, inTallHouse, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, SMOOTH: { SM: SMOOTH.SM, STATS: SMOOTH.STATS, ARCS: SMOOTH.ARCS, isArc: SMOOTH.isArc }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, chaseEnd, CHS, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, addPickup, PKI: PKI.STATS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLREFRESH: CULL.refresh, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
++if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { SOFTCITY, SOFTSURF, inWall, FLY: FLYC, WRONG: WRONG.DEBUG, GUN, inTallHouse, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, SMOOTH: { SM: SMOOTH.SM, STATS: SMOOTH.STATS, ARCS: SMOOTH.ARCS, isArc: SMOOTH.isArc }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, VKHUD, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, chaseEnd, CHS, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, addPickup, PKI: PKI.STATS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLREFRESH: CULL.refresh, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
+   STARTUP,
+@@ -19787,3 +19534,3 @@
+   // оплата адреса: лицо клиента и чат Толика
+-  popPay, CHAT, bossOnDeliver, payMood, checkArrival,
++  popPay, toast, CHAT, bossOnDeliver, payMood, checkArrival,
+   // Москва: граф, светофоры, зебры, самокатчики, ввод
 --- a/src/game/garage.js
 +++ b/src/game/garage.js
 @@ -250,3 +250,3 @@
