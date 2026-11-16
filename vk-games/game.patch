@@ -58,6 +58,17 @@
 -  BY_HOUR: [8, 6, 5, 4, 4, 6, 10, 18, 28, 26, 22, 21, 22, 22, 21, 21, 23, 27, 28, 27, 20, 16, 13, 10],
 +  BY_HOUR: [5, 4, 3, 3, 3, 4, 6, 9, 13, 13, 11, 11, 11, 11, 11, 11, 12, 13, 14, 13, 10, 8, 7, 6],
    TOUCH_K: 0.86, STEP_S: 1.2, HIDE_R: 230,
+--- a/src/game/fakeshadows.js
++++ b/src/game/fakeshadows.js
+@@ -37,2 +37,3 @@
+ import { ON as SUNP_ON } from './sunpath.js';   // путь солнца ниже (2г2): длина тени — по высоте солнца   // 2г2: где настоящие тени от солнца — маски домов нет (sunshadow.js)
++import { ON as MOBILE } from './mobile.js';
+ import { car as matCar } from './materials.js';   // 2г11: лак кузова — метка MAT_CAR у всех материалов машин (materials.js)
+@@ -43,3 +44,3 @@
+ export const FS = {
+-  HOUSES: !OFF && !Q.has('nofsh'),
++  HOUSES: !OFF && !MOBILE && !Q.has('nofsh'),
+   BLOBS: !OFF && !Q.has('nofsb'),
 --- a/src/game/game.js
 +++ b/src/game/game.js
 @@ -345,3 +345,3 @@
@@ -70,17 +81,149 @@
 -const BOUNDS = { x0: -CW / 2 + 12, x1: CW / 2 - 12, z0: -CD / 2 + 12, z1: CD / 2 - 12 };
 +const BOUNDS = MAP.bounds || { x0: -CW / 2 + 12, x1: CW / 2 - 12, z0: -CD / 2 + 12, z1: CD / 2 - 12 };
  /* Край карты — многоугольник, если он у карты есть (Северск: по забору
-@@ -8051,3 +8051,3 @@
+@@ -1995,3 +1995,3 @@
+ // городу — крупнее: сорок тысяч мелких кусков дороже обходить, чем дорисовать лишнее
+-const CHUNK = MAP.border ? 200 : 100;
++const CHUNK = MOBM.ON ? 88 : MAP.border ? 200 : 100;
+ PANELS.PANEL.CHUNK = CHUNK;                       // стены панелек — кусками по тем же клеткам (panels.js)
+@@ -2254,3 +2254,3 @@
+         const startCap = !pass && i === 1 && r.softEnds?.[0], endCap = !pass && i === p.length - 1 && r.softEnds?.[1];
+-        if (pass && r.c !== 6 && SOFTSURF.roadSeam(LITM, p[i - 1], p[i], MI?.[i - 1], MI?.[i], w / 2, y, roadHex, pv, baseGrad)) { /* same footprint, softer colour at the seam */ }
++        if (!MOBM.ON && pass && r.c !== 6 && SOFTSURF.roadSeam(LITM, p[i - 1], p[i], MI?.[i - 1], MI?.[i], w / 2, y, roadHex, pv, baseGrad)) { /* same footprint, softer colour at the seam */ }
+         else if ((startCap || endCap) && SOFTSURF.endRibbon(LITM, p[i - 1], p[i], w / 2, y, startCap, endCap)) { /* shared with curb */ }
+@@ -2271,6 +2271,6 @@
+       if (jp) LITM.grad(null);
+-      if (pass) RW.decorate(LITM, r, w, y, junction);   // заплатки
+-    }
+-  }
+-  STARTUP.work('city.winterRoads', () => WINROAD.build({ M: WINM, rutM: WINRUTM, softM: WINSOFTM, roads: CITY.roads, roadWidth, yOf: r => yOf(r, true), groundH, junction, sendRoadSheets }));
++      if (pass && !MOBM.ON) RW.decorate(LITM, r, w, y, junction);   // заплатки
++    }
++  }
++  if (!MOBM.ON) STARTUP.work('city.winterRoads', () => WINROAD.build({ M: WINM, rutM: WINRUTM, softM: WINSOFTM, roads: CITY.roads, roadWidth, yOf: r => yOf(r, true), groundH, junction, sendRoadSheets }));
+ }
+@@ -2721,3 +2721,3 @@
+     }
+-    WINROAD.bridge({ M: WINM, softM: WINSOFTM, road: r, points: P, width: w });
++    if (!MOBM.ON) WINROAD.bridge({ M: WINM, softM: WINSOFTM, road: r, points: P, width: w });
+     // быки — там, где под настилом есть глубина
+@@ -6174,3 +6174,3 @@
+   if (CITY.rails) tm0('rails', () => { BUILD_T.railKm = Math.round(CBITS.buildRails(cityApi(), CITY.rails, CITY.levelx)); });
+-  if (MAPFIX) { BUILD_T.mapfix = Math.round(MAPFIX.ms); BUILD_T.mapfixT = MAPFIX.T; tm0('mapworks', () => MAPW.buildWorks(MAPFIX, mapApi())); }   // тупики: блоки и ремонт
++  if (MAPFIX) { BUILD_T.mapfix = Math.round(MAPFIX.ms); BUILD_T.mapfixT = MAPFIX.T; if (!MOBM.ON) tm0('mapworks', () => MAPW.buildWorks(MAPFIX, mapApi())); }   // тупики: блоки и ремонт
+   { const t0 = performance.now();
+@@ -6231,3 +6231,3 @@
+   tm('roadlife', () => RL.build(roadApi()));      // знаки и заборы (roadlife.js) — до smashBuild
+-  if (!INTRO) tm('billboards', () => BB.build(bbApi()));   // щиты с рекламой у больших дорог (billboards.js)
++  if (!INTRO && !MOBM.ON) tm('billboards', () => BB.build(bbApi()));   // щиты с рекламой у больших дорог (billboards.js)
+   if (CAREER) tm('pots', function* () { BUILD_T.carsInfo = yield* AUTO.buildSteps(); });   // ямы в статику дорог, гараж Дяди Жени (cars.js)
+@@ -6235,11 +6235,11 @@
+   tm('yard', function* () { yield* osmPitches(); yield 'pitches'; if (!INTRO) BUILD_T.workout = WORK.build({ THREE, PITCHES, LIT, box, obb, groundH, inHouse, nearestRoad, solidAt, BENCHES, onPave: PAVE.onPave }); });
+-  tm('yardbits', function* () { yield* osmYardBits(); yield 'bits'; if (!INTRO) yield* JUNK.yard(); yield 'junk'; osmVerandas(); });
+-  if (!INTRO) tm('yardtrees', function* () { BUILD_T.yardTrees = yield* TREES.plantYardsSteps({ CITY, tree, inHouse, inBounds, inPoly, groundH, nearestRoad, solidAt, SMASH, YARD_PATHS, PITCHES }); });   // шагами (latebuild.js)   // группы деревьев во дворах и кусты под окнами (trees.js)
++  if (!MOBM.ON) tm('yardbits', function* () { yield* osmYardBits(); yield 'bits'; if (!INTRO) yield* JUNK.yard(); yield 'junk'; osmVerandas(); });
++  if (!INTRO && !MOBM.ON) tm('yardtrees', function* () { BUILD_T.yardTrees = yield* TREES.plantYardsSteps({ CITY, tree, inHouse, inBounds, inPoly, groundH, nearestRoad, solidAt, SMASH, YARD_PATHS, PITCHES }); });   // шагами (latebuild.js)   // группы деревьев во дворах и кусты под окнами (trees.js)
+   tm('edits', () => EDL.apply({ THREE, scene, tree: (x, z, s, k) => tree(x, z, s, k, true), bench, lamp: o => SL.lamp({ THREE, scene, LAMPH, LAMP_SPOTS, put, smashAdd, groundH, curbAt }, o), unlamp: SL.unlamp, lampHide: SL.edHide, unsign: RL.unsign, board: BB.edHide, boards: BB.boards, smashAdd, put, box, LIT, obb, groundH, curbAt,
+     BENCHES, PROPS, SOLIDS, SMASH, SMASH_GRID, SM_CHUNKS, SM_CELL, LAMPH, LAMP_SPOTS }));   // правки из редактора: поставить добавленное (editlayer.js)
+-  if (!INTRO && !new URLSearchParams(location.search).has('noyc')) tm('yardcars', () => YCARS.build(ycApi()));   // карманы парковки у дворовых проездов — после деревьев дворов, до сугробов (yardcars.js); ?noyc — без них
+-  if (!INTRO) tm('yardmaze', () => YMAZE.build(ymApi()));   // дворы сложнее: заборы у тротуаров, клумбы, кусты, лесочки — после карманов парковки, до сугробов и smashBuild (yardmaze.js); ?nomaze — без них
++  if (!INTRO && !MOBM.ON && !new URLSearchParams(location.search).has('noyc')) tm('yardcars', () => YCARS.build(ycApi()));   // карманы парковки у дворовых проездов — после деревьев дворов, до сугробов (yardcars.js); ?noyc — без них
++  if (!INTRO && !MOBM.ON) tm('yardmaze', () => YMAZE.build(ymApi()));   // дворы сложнее: заборы у тротуаров, клумбы, кусты, лесочки — после карманов парковки, до сугробов и smashBuild (yardmaze.js); ?nomaze — без них
+   const buildCurbs = (extra, preparedPhysics) => CURBS.build({ CITY, LITM: CURB_M, drawSections: !RLAND.ON, groundH, inHouse, houseIn, inBounds, inPoly, roadWidth, onPave: PAVE.onPave, roadWalk: PAVE.roadWalk, roadWalkL: PAVE.roadWalkL, roadsIn: PAVE.roadsIn, pathAt: PAVE.pathAt, onAlley: (x, z, m) => WORLD.onAlley(x, z, m), curbAt,
+     ycBlocks: (x, z, r) => YCARS.blocks(x, z, r), mobile: () => TOUCH || MOBM.ON, ...extra }, preparedPhysics);
+-  if (!INTRO) tm('yardcurbs', function* () {
++  if (!INTRO && !MOBM.ON) tm('yardcurbs', function* () {
+     // Physics and the snow edge lookups use a deterministic index separate
+@@ -6265,8 +6265,8 @@
+   });
+-  if (!INTRO) tm('yarddecor', () => DECOR.build({ ...ymApi(), LITM, groundHex, mazeBlocks: (x, z, r) => YMAZE.blocks(x, z, r), mazeAdd: YMAZE.addObj, groves: () => YMAZE.DEBUG.OBJ.filter(o => o.kind === 'grove'),
++  if (!INTRO && !MOBM.ON) tm('yarddecor', () => DECOR.build({ ...ymApi(), LITM, groundHex, mazeBlocks: (x, z, r) => YMAZE.blocks(x, z, r), mazeAdd: YMAZE.addObj, groves: () => YMAZE.DEBUG.OBJ.filter(o => o.kind === 'grove'),
+     curbNear: CURBS.near, greenHex: g => GREEN_HEX[g.k] || '#95c579', greenY: g => 0.04 + flatRank(GREEN_RANK, GREEN_HEX[g.k] || '#95c579', 5) * 0.0007 }));   // палисадники, грядки, круги у деревьев, холмики — после бордюров, до сугробов и smashBuild (yarddecor.js); ?nodecor — без них
+-  tm('seasonyard', () => { SNOW_FENCES.build(SMASH); return SEAS.seasonYard(); });
++  if (!MOBM.ON) tm('seasonyard', () => { SNOW_FENCES.build(SMASH); return SEAS.seasonYard(); });
+   if (!INTRO) tm('courts', () => COURTS.build(courtsApi()));   // теннисные и падел-корты — после горок дворов, до smashBuild (courts.js); ?nocourts — без них
+-  if (!INTRO && !new URLSearchParams(location.search).has('nojumps')) tm('jumps', () => JUMPS.build(jumpApi()));   // большие трамплины у низких крыш — после дворов и кортов, до smashBuild (jumps.js); ?nojumps — без них
+-  if (!INTRO) tm('yardfill', () => YFILL.build(yfApi()));   // дворы без пустых мест — после кортов и трамплинов, до smashBuild и сугробов (yardfill.js); ?nofill — без них
++  if (!INTRO && !MOBM.ON && !new URLSearchParams(location.search).has('nojumps')) tm('jumps', () => JUMPS.build(jumpApi()));   // большие трамплины у низких крыш — после дворов и кортов, до smashBuild (jumps.js); ?nojumps — без них
++  if (!INTRO && !MOBM.ON) tm('yardfill', () => YFILL.build(yfApi()));   // дворы без пустых мест — после кортов и трамплинов, до smashBuild и сугробов (yardfill.js); ?nofill — без них
+   if (!INTRO) tm('pitchnet', () => PNET.finish({ scene }));   // полотно сетки футбольных коробок — одним мешем, после дворов, до smashBuild (pitchnet.js); ?nopnet — без неё
+@@ -6365,3 +6365,3 @@
+   }
+-  tm('seasons', SEAS.seasonSteps);                // сугробы, ёлки, гирлянды — шагами (latebuild.js)
++  if (!MOBM.ON) tm('seasons', SEAS.seasonSteps);                // сугробы, ёлки, гирлянды — шагами (latebuild.js)
+   if (!INTRO) tm('trails', WASTE.trails);         // тропинки наискосок, вытоптанное у лавочек, лужи — после дворов и лавочек (wastelands.js)
+@@ -6387,3 +6387,4 @@
+   const tq = performance.now();
+-  const litMat = HUR.holeMat(LAWN.lawnMat(RW.wearMat(WORLD.paveMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }), 1, 0.4, !NO_SMJ && !EDL.ED.on)))));   // + узор плитки (world.js), + вид асфальта (roadwear.js), + пятна газона (lawn.js), + ураган (hurricane.js); у реквизита (признак в цвете) сухость травы 0,4 и без плитки, износа и газона
++  const seasonGround = SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }), 1, 0.4, !NO_SMJ && !EDL.ED.on);
++  const litMat = MOBM.ON ? seasonGround : HUR.holeMat(LAWN.lawnMat(RW.wearMat(WORLD.paveMat(seasonGround))));   // + узор плитки (world.js), + вид асфальта (roadwear.js), + пятна газона (lawn.js), + ураган (hurricane.js); у реквизита (признак в цвете) сухость травы 0,4 и без плитки, износа и газона
+   if (HELL_ENABLED) HELL.cutMaterial(litMat);
+@@ -6555,22 +6556,24 @@
+   LATE.add('mesh', function* () {
+-    SNOW_FENCES.build(SMASH);
+-    if (RLAND.ON) { RLAND.cover.cachePointQueries(); RLAND.green.cachePointQueries(); }
+-    yield* STARTUP.steps('mesh.snowDrifts', SEAS.fitDrifts());
+-    STARTUP.work('mesh.snowWaste', () => WASTE.buildSnowDrifts(snowDriftFloor, SNOW_FENCES, snowCurbCover));
+-    const bankStream = deferOutsidePreview && {
+-      size: CHUNK,
+-      defer: (bounds, build) => deferOutsidePreview(bounds, function* () {
+-        const M = makeSoftSnowMesher();
+-        try {
+-          yield* build(M);
+-          return M.mesh(winterSoftMat);
+-        } finally {
+-          M.discard();
+-        }
+-      }, SEAS.addWinterRoadMesh),
+-    };
+-    yield* STARTUP.steps('mesh.snowBanks', WINROAD.finishBanks(snowGroundH, snowGroundReceiver, SNOW_FENCES, snowCurbCover, !SNOW.enabled, bankStream));
+-    const banks = STARTUP.work('mesh.snowBankMeshes', () => WINSOFTM.mesh(winterSoftMat));
+-    for (const mesh of banks.children.slice()) winterSoftGroup.add(mesh);
+-    yield 'snow banks';
++    if (!MOBM.ON) {
++      SNOW_FENCES.build(SMASH);
++      if (RLAND.ON) { RLAND.cover.cachePointQueries(); RLAND.green.cachePointQueries(); }
++      yield* STARTUP.steps('mesh.snowDrifts', SEAS.fitDrifts());
++      STARTUP.work('mesh.snowWaste', () => WASTE.buildSnowDrifts(snowDriftFloor, SNOW_FENCES, snowCurbCover));
++      const bankStream = deferOutsidePreview && {
++        size: CHUNK,
++        defer: (bounds, build) => deferOutsidePreview(bounds, function* () {
++          const M = makeSoftSnowMesher();
++          try {
++            yield* build(M);
++            return M.mesh(winterSoftMat);
++          } finally {
++            M.discard();
++          }
++        }, SEAS.addWinterRoadMesh),
++      };
++      yield* STARTUP.steps('mesh.snowBanks', WINROAD.finishBanks(snowGroundH, snowGroundReceiver, SNOW_FENCES, snowCurbCover, !SNOW.enabled, bankStream));
++      const banks = STARTUP.work('mesh.snowBankMeshes', () => WINSOFTM.mesh(winterSoftMat));
++      for (const mesh of banks.children.slice()) winterSoftGroup.add(mesh);
++      yield 'snow banks';
++    }
+     if (citySurface) {
+@@ -6923,3 +6926,3 @@
+ FXP.init({ scene, cam, geo: { spark: sparkGeo, bit: bitGeo, puff: puffGeo }, fxLow: GFX.fxLow, fxDrop: GFX.fxDrop, fxLife: GFX.fxLife, legacy: (m, o, f) => fxAdd(m, o, f) });
+-if (!SNOW.enabled) SNOWPRINT.init(scene);
++if (!SNOW.enabled && !MOBM.ON) SNOWPRINT.init(scene);
+ const fxPart = FXP.part;
+@@ -8051,3 +8054,3 @@
  function initPeople () {
 -  for (let k = 0; k < (INTRO ? 18 : 44); k++) {
-+  for (let k = 0; k < 20; k++) {
++  for (let k = 0; k < (MOBM.ON ? 11 : 20); k++) {
      // во вступлении лица у прохожих не грузим: в кадре их не разглядеть, а
-@@ -8117,3 +8117,3 @@
+@@ -8117,3 +8120,3 @@
  function initScoots () {
 -  for (let k = 0; k < 16; k++) {
-+  for (let k = 0; k < 5; k++) {
++  for (let k = 0; k < (MOBM.ON ? 2 : 5); k++) {
      const two = chance(0.25);
-@@ -12897,20 +12897,5 @@
+@@ -9356,3 +9359,3 @@
+ function trafficNight () { const h = trafficHour(), [a, b] = ECON.TRAFFIC.NIGHT; return h >= a && h < b; }
+-const trafficWant = () => Math.round(ECON.trafficAt(trafficHour()) * (TOUCH || MOBM.ON ? ECON.TRAFFIC.TOUCH_K : 1));   // мобильный режим — как на касаниях
++const trafficWant = () => Math.round(ECON.trafficAt(trafficHour()) * (MOBM.ON ? 0.55 : TOUCH ? ECON.TRAFFIC.TOUCH_K : 1));
+ const isFlow = t => !t.parked && !t.svc && !t.gone && !t.chase && t.model !== 'moped' && !t.bus;   // автобусов своё число (buses.js)   // мопеды доставки — свои (mopeds.js)
+@@ -12897,20 +12900,5 @@
  
 -/* ─── площадка: реклама, пауза, язык, настройки ───
 -   Всё, что зависит от Яндекса или Стима, идёт через Platform. Полноэкранная
@@ -103,27 +246,63 @@
 -  try { await Platform.showInterstitial(); } catch (e) { console.warn('[ad]', e); }
 -}
  const nitroKey = () => (TMODE.touchOn() ? $t('кнопку нитро') : PAD.active ? 'A' : 'Shift');
-@@ -13040,3 +13025,3 @@
+@@ -13040,3 +13028,3 @@
      try {
 -      await resetSingleProgress({ store: Platform.store, storage: localStorage, keep: RESET_KEEP, heroName: heroName(), requestId });
 +      await resetSingleProgress({ store: Platform.store, storage: Platform.storage, keep: RESET_KEEP, heroName: heroName(), requestId });
      } catch (e) {
-@@ -15480,4 +15465,3 @@
+@@ -13345,5 +13333,5 @@
+   V.wheel += (vf + (IN.gas && !dead ? softSnow * WINROAD.WINTER_ROAD.WHEEL_SPIN : 0)) * dt / 0.46;
+-  if (!snowOwned) WINROAD.spray(V, IN.gas && !dead, softSnow, dt, fxPart);
+-  if (!snowOwned && !V.air && !flyOn) WINROAD.scatter(V, Math.abs(vf), SEAS.snowAmt(), fxPart);
+-  if (!SNOW.enabled) { const snow = SEAS.snowAmt();
++  if (!MOBM.ON && !snowOwned) WINROAD.spray(V, IN.gas && !dead, softSnow, dt, fxPart);
++  if (!MOBM.ON && !snowOwned && !V.air && !flyOn) WINROAD.scatter(V, Math.abs(vf), SEAS.snowAmt(), fxPart);
++  if (!MOBM.ON && !SNOW.enabled) { const snow = SEAS.snowAmt();
+     if (snow > 0.55 && !flyOn) {
+@@ -15480,4 +15468,3 @@
    if (!picked && DISTRICTS && CITYOPEN.beforeShift(() => goRun(true, checkIn))) return;
 -  if (S.state === 'over' && Platform.features.ads && (S.delivered || 0) > 0) { S.state = 'title'; $('over').hidden = true; showAd().then(() => startRun(false, checkIn)); }
 -  else startRun(false, checkIn);
 +  startRun(false, checkIn);
  }
-@@ -16316,4 +16300,2 @@
+@@ -16316,4 +16303,2 @@
    S.state = 'loading';
 -  // Полноэкранная реклама (Яндекс) — раз в несколько доставок, в паузе между заказами
 -  if (adDue()) { S.adDone = S.done; showAd().then(loadPizza); return; }
    loadPizza();
-@@ -18096,3 +18078,3 @@
+@@ -17318,3 +17303,3 @@
+   JUMPS.reset();                                   // Толик про крышу — снова раз за смену (jumps.js)
+-  if (!SNOW.enabled) SNOWPRINT.reset();                               // зимние следы от прошлого выезда
++  if (!MOBM.ON && !SNOW.enabled) SNOWPRINT.reset();                               // зимние следы от прошлого выезда
+   GUN.shiftStart();                                // гранатомёт: полный ящик на смену (turret.js)
+@@ -18096,3 +18081,3 @@
    parkingClear: pinFree, surfaceAt, setPause, acceptOrder });
 -const NO_E = /[?&]noE(&|$)/.test(location.search);   // ?noE — без леса у Ленина, змеев и качалок (сравнить кадр)
 +const NO_E = true;   // Меньше фоновых аттракционов на карте VK.
  /* змеи и дроны (kites.js): места в парках и на Ленина, люди — только рядом с камерой */
+@@ -18185,4 +18170,4 @@
+ /* мелочь на газоне (lawnprops.js): тоже клетками вокруг камеры */
+-LATE.add('meadow', () => MEADOW.init({ renderer, scene, cam, CITY, groundH, car: V, cutMaterial: HELL_ENABLED ? HELL.cutMaterial : null }));   // некошеная трава (meadow.js); ?oldgrass — по-старому
+-LATE.add('lawnp', () => LAWNP.init({ THREE, scene, cam, CITY, ADULT, forests: () => [...LWOOD.polys(), ...RINGM.polys(), ...(MAP.woods || [])], groundH, inHouse, inBounds, nearestRoad, roadWidth, car: V, Snd,
++if (!MOBM.ON) LATE.add('meadow', () => MEADOW.init({ renderer, scene, cam, CITY, groundH, car: V, cutMaterial: HELL_ENABLED ? HELL.cutMaterial : null }));   // некошеная трава (meadow.js); ?oldgrass — по-старому
++if (!MOBM.ON) LATE.add('lawnp', () => LAWNP.init({ THREE, scene, cam, CITY, ADULT, forests: () => [...LWOOD.polys(), ...RINGM.polys(), ...(MAP.woods || [])], groundH, inHouse, inBounds, nearestRoad, roadWidth, car: V, Snd,
+   onAlley: (x, z, m) => WORLD.onAlley(x, z, m), yardBlocks: (x, z, r) => YARDS.blocks(x, z, r) || YCARS.blocks(x, z, r) || YMAZE.blocks(x, z, r) || COURTS.blocks(x, z, r) || JUMPS.blocks(x, z, r), pzBlocks: PZD.blocks, isForest: FOREST.isForest,
+@@ -18227,3 +18212,3 @@
+ });
+-if (!INTRO) LATE.add('yardcars2', () => YCARS.cars());   // машины во дворах по местам: пустые модели, рисует InstancedMesh (yardcars.js)
++if (!INTRO && !MOBM.ON) LATE.add('yardcars2', () => YCARS.cars());   // машины во дворах по местам: пустые модели, рисует InstancedMesh (yardcars.js)
+ // машин в потоке вокруг курьера (40–330 м): было 36 — на улицах Северска толпа, и на Деке
+@@ -18916,3 +18901,3 @@
+ LATE.add('pubs', buildPubSpots);
+-LATE.add('peds', initPeds);
++if (!MOBM.ON) LATE.add('peds', initPeds);
+ LATE.add('people', initPeople);
+@@ -19105,3 +19090,3 @@
+ // потока: с ?nolate кусок строится сразу, а busApi объявлен только тут
+-if (!INTRO) LATE.add('buses', () => BUSES.build(busApi()));
++if (!INTRO && !MOBM.ON) LATE.add('buses', () => BUSES.build(busApi()));
+ const LIFE_API = {
 --- a/src/game/garage.js
 +++ b/src/game/garage.js
 @@ -250,3 +250,3 @@
@@ -133,19 +312,22 @@
  }
 --- a/src/game/gfx.js
 +++ b/src/game/gfx.js
-@@ -61,3 +61,3 @@
+@@ -61,5 +61,5 @@
    { id: 'fps', label: N_('кадров в секунду'), vals: [30, 40, 60, 0] },   // 0 — без ограничения (как у экрана)
 -  { id: 'range', label: N_('дальность'), vals: [250, 370, 490] },
-+  { id: 'range', label: N_('дальность'), vals: [220, 260, 320] },
++  { id: 'range', label: N_('дальность'), vals: MOBILE ? [140, 175, 220] : [220, 260, 320] },
    { id: 'menu', label: N_('город за меню'), vals: [0, 30, -1] },
+-  { id: 'px', label: N_('разрешение отрисовки'), vals: [430, 540, 720, 0] },
++  { id: 'px', label: N_('разрешение отрисовки'), vals: MOBILE ? [360, 430, 540, 0] : [430, 540, 720, 0] },
+   { id: 'win', label: N_('окна с комнатами'), vals: [0, 1] },
 @@ -72,5 +72,5 @@
  export const PRESETS = {
 -  low: { fps: 0, range: 0, menu: 0, px: 0, win: 0, fx: 0, far: 0, aa: 0, edge: 1, shadow: 0 },   // edge: у низкой нет MSAA — мягкие края заметнее всего (телефон: +0,06 мс процессора, видеокарта ~+0,3 мс на M4)
 -  mid: { fps: 3, range: 1, menu: 1, px: 1, win: 1, fx: 1, far: 1, aa: 1, edge: 0, shadow: 0 },   // edge: Дека — проход ~0,25 мс на M4, на Деке по прикидке ×3 ≈ 0,6—0,9 мс > 0,5 — выкл (MSAA и так есть)
 -  high: { fps: 3, range: 2, menu: 2, px: 2, win: 1, fx: 1, far: 1, aa: 1, edge: 1, shadow: 1 },   // far: вдали раз в 2 кадра, как на средней (10.10.2026: на «Деке» поток −0,15 мс, люди и прохожие −0,1…0,2 мс; на средней так и было)
-+  low: { fps: 0, range: 0, menu: 0, px: 0, win: 0, fx: 0, far: 0, aa: 0, edge: 0, shadow: 0 },
-+  mid: { fps: 0, range: 1, menu: 0, px: 1, win: 0, fx: 0, far: 0, aa: 0, edge: 1, shadow: 0 },
-+  high: { fps: 1, range: 2, menu: 0, px: 2, win: 0, fx: 0, far: 0, aa: 0, edge: 1, shadow: 0 },
++  low: { fps: MOBILE ? 2 : 0, range: 0, menu: 0, px: 0, win: 0, fx: 0, far: 0, aa: 0, edge: Number(MOBILE), shadow: 0 },
++  mid: { fps: MOBILE ? 2 : 0, range: 1, menu: 0, px: 1, win: 0, fx: 0, far: 0, aa: 0, edge: 1, shadow: 0 },
++  high: { fps: MOBILE ? 2 : 1, range: 2, menu: 0, px: 2, win: 0, fx: 0, far: 0, aa: 0, edge: 1, shadow: 0 },
  };
 @@ -78,3 +78,3 @@
  const NAMES = { low: N_('низкая'), mid: N_('средняя'), high: N_('высокая'), custom: N_('своя') };
@@ -157,6 +339,18 @@
 -  { R: 80, small: 40, thin: 0.5, lawn: 0, meadow: 1 },     // низкая
 +  { R: 64, small: 32, thin: 0.35, lawn: 0, meadow: 0 },     // низкая
    { R: 100, small: 64, thin: 0.7, lawn: 0, meadow: 2 },    // средняя (Steam Deck)
+@@ -175,3 +175,3 @@
+ };
+-export const hideR = () => (O.far === 0 ? { people: 100, cars: 200, lod: 32 } : { people: 130, cars: 220, lod: 45 });
++export const hideR = () => MOBILE ? { people: 72, cars: 128, lod: 24 } : O.far === 0 ? { people: 100, cars: 200, lod: 32 } : { people: 130, cars: 220, lod: 45 };
+ /* что видно сейчас (game.js cullFar, humanLod, стоящие машины): hideR, а пока кадр тяжёлый — ближе (tune.js);
+--- a/src/game/latebuild.js
++++ b/src/game/latebuild.js
+@@ -34,3 +34,3 @@
+ const IDLE_Q = typeof location !== 'undefined' ? (location.search.match(/[?&]lateidle=(\d+)/) || [])[1] : undefined;
+-const IDLE = IDLE_Q !== undefined ? +IDLE_Q : MOB.on ? 30 : 0;
++const IDLE = IDLE_Q !== undefined ? +IDLE_Q : MOB.on ? 8 : 0;
+ 
 --- a/src/game/raisedland.js
 +++ b/src/game/raisedland.js
 @@ -11,3 +11,3 @@
@@ -183,6 +377,35 @@
 -export const RESOLUTION_PRESETS = {pc:[1,3,5],deck:[0,1,2]};
 +export const RESOLUTION_PRESETS = {pc:[0,1,1],deck:[0,0,1]};
  export function migrateResolution(index,device) {
+--- a/src/game/seasons.js
++++ b/src/game/seasons.js
+@@ -300,3 +300,26 @@
+ diffuseColor.rgb = seasonTint(diffuseColor.rgb, sjDry, 1.0, S_LAND ? 1.0 : 0.0);`;
++function mobileSeasonMat (material) {
++  material.onBeforeCompile = shader => {
++    Object.assign(shader.uniforms, U);
++    shader.vertexShader = 'varying vec3 vSW;\n' + shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
++    shader.fragmentShader = `uniform float uSnow, uDry, uWet;
++      varying vec3 vSW;
++` + shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
++      vec3 base = diffuseColor.rgb;
++      float vegetation = smoothstep(0.02, 0.14, base.g - max(base.r, base.b));
++      float up = smoothstep(0.45, 0.8, normalize(cross(dFdx(vSW), dFdy(vSW))).y);
++      float ground = up;
++      #ifdef USE_COLOR_ALPHA
++      ground *= 1.0 - step(0.5, vColor.a);
++      #endif
++      vec3 seasonal = mix(base, vec3(0.46, 0.39, 0.17), uDry * vegetation * 0.7);
++      diffuseColor.rgb = mix(seasonal * (1.0 - uWet * ground * 0.18), vec3(0.84, 0.89, 0.97), uSnow * ground * vegetation);
++    `);
++  };
++  material.customProgramCacheKey = () => 'vk-mobile-season';
++  return material;
++}
++
+ export function seasonMat (m, dryK = 1, propK, smashJ) {
++  if (MOBILE) return mobileSeasonMat(m);
+   const dry = propK === undefined ? dryK.toFixed(2) : '(S_LAND ? ' + dryK.toFixed(2) + ' : ' + propK.toFixed(2) + ')';
 --- a/src/game/settings.js
 +++ b/src/game/settings.js
 @@ -191,2 +191,3 @@
@@ -200,6 +423,65 @@
 +const snowMode = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('snowv2') : '0';
 +export const enabled = snowMode !== '0' && (!MOBILE || snowMode === '1');
  export function captureBenches(benches) { if (enabled) captureBenchReceivers(benches); }
+--- a/src/game/water.js
++++ b/src/game/water.js
+@@ -38,2 +38,4 @@
+    ────────────────────────────────────────────────────────────────────────── */
++
++import { ON as MOBILE } from './mobile.js';
+ 
+@@ -227,3 +229,17 @@
+    цвет воды — тот же, что у Томи (до сезона: лёд и снег зимой — как у Томи) */
++function mobileWaterMat () {
++  const material = new THREE.MeshLambertMaterial({ color: 0x6fb0c9, flatShading: true, side: THREE.DoubleSide });
++  material.onBeforeCompile = shader => {
++    shader.uniforms.uWIce = U.uWIce;
++    shader.fragmentShader = 'uniform float uWIce;\n' + shader.fragmentShader.replace(
++      '#include <color_fragment>',
++      '#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.77, 0.85, 0.95), uWIce);'
++    );
++  };
++  material.customProgramCacheKey = () => 'vk-mobile-water';
++  return material;
++}
++
+ function waterMat (seasonMat, inland) {
++  if (MOBILE) return mobileWaterMat();
+   const m = seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }));
+@@ -271,11 +287,13 @@
+   A = api; THREE = api.THREE;
+-  const T = api.ter;
+-  U.uWH.value = heightTex(api.TH, T.nx, T.nz);
+-  U.uWG.value = [T.x0, T.z0, T.g, 0];
+-  U.uWN.value = [T.nx, T.nz];
+-  U.uWSky.value = api.scene.background;
+-  U.uWFog.value = api.scene.fog.color;
+-  U.uWSunD.value = new THREE.Vector3(0.5, 0.7, 0.3);
+-  U.uWSunC.value = new THREE.Color(0, 0, 0);
+-  CUR.q = quality(api.gfx);
++  if (!MOBILE) {
++    const T = api.ter;
++    U.uWH.value = heightTex(api.TH, T.nx, T.nz);
++    U.uWG.value = [T.x0, T.z0, T.g, 0];
++    U.uWN.value = [T.nx, T.nz];
++    U.uWSky.value = api.scene.background;
++    U.uWFog.value = api.scene.fog.color;
++    U.uWSunD.value = new THREE.Vector3(0.5, 0.7, 0.3);
++    U.uWSunC.value = new THREE.Color(0, 0, 0);
++    CUR.q = quality(api.gfx);
++  }
+   MAT = waterMat(api.seasonMat);
+@@ -310,2 +328,5 @@
+   if (!MAT) return;
++  const snow = A.snowAmt();
++  U.uWIce.value = ICE !== null ? ICE : Math.min(1, Math.max(0, (snow - 0.12) / 0.33));
++  if (MOBILE) return;
+   U.uWT.value = (U.uWT.value + dt) % 3600;
+@@ -316,4 +337,2 @@
+   U.uWSunC.value.copy(sun.color).multiplyScalar(sun.intensity * 0.7);
+-  const snow = A.snowAmt();
+-  U.uWIce.value = ICE !== null ? ICE : Math.min(1, Math.max(0, (snow - 0.12) / 0.33));
+   // ясный день: солнце белое (днём #fff4de, в линейном цвете синий/красный ≈ 0,73; на рассвете ≈ 0,33, на закате ≈ 0,15), не ночь, без дождя, не лёд (закат и ночь — как было)
 --- a/src/game/yardcars.js
 +++ b/src/game/yardcars.js
 @@ -64,3 +64,3 @@
@@ -280,3 +562,10 @@
 -const Platform = mod.default;
 +import Platform from './vk.js';
  export default Platform;
+--- a/src/styles/delivery.css
++++ b/src/styles/delivery.css
+@@ -42,2 +42,4 @@
+ }
++
++body.mobile #view { image-rendering: auto; }
+ 
