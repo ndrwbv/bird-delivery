@@ -121,7 +121,7 @@
 -const STEPS = [1.0, 1.0, 1.0, 1.0, 1.0, 1.5, 2.0, 2.0, 2.0, 2.0, 4.0, 8.0];
 -export const SUBPIX = 0.35, EDGE_THR = 0.166, EDGE_MIN = 0.0833;
 +const STEPS = [1, 1, 1.5, 2, 4, 8];
-+export const SUBPIX = 0.8, EDGE_THR = 0.125, EDGE_MIN = 0.045;
++export const SUBPIX = 0.28, EDGE_THR = 0.166, EDGE_MIN = 0.0833;
  
 --- a/src/game/game.js
 +++ b/src/game/game.js
@@ -217,7 +217,7 @@
 -  if (!INTRO) tm('yardmaze', () => YMAZE.build(ymApi()));   // дворы сложнее: заборы у тротуаров, клумбы, кусты, лесочки — после карманов парковки, до сугробов и smashBuild (yardmaze.js); ?nomaze — без них
    const buildCurbs = (extra, preparedPhysics) => CURBS.build({ CITY, LITM: CURB_M, drawSections: !RLAND.ON, groundH, inHouse, houseIn, inBounds, inPoly, roadWidth, onPave: PAVE.onPave, roadWalk: PAVE.roadWalk, roadWalkL: PAVE.roadWalkL, roadsIn: PAVE.roadsIn, pathAt: PAVE.pathAt, onAlley: (x, z, m) => WORLD.onAlley(x, z, m), curbAt,
 -    ycBlocks: (x, z, r) => YCARS.blocks(x, z, r), mobile: () => TOUCH || MOBM.ON, ...extra }, preparedPhysics);
-+    ycBlocks: (x, z, r) => YCARS.blocks(x, z, r), mobile: () => true, ...extra }, preparedPhysics);
++    ycBlocks: (x, z, r) => YCARS.blocks(x, z, r), ...extra }, preparedPhysics);
    if (!INTRO) tm('yardcurbs', function* () {
 @@ -6265,8 +6252,3 @@
    });
@@ -239,7 +239,14 @@
 +  const seasonGround = SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }), 1, 0.4, !NO_SMJ && !EDL.ED.on);
 +  const litMat = HUR.holeMat(LAWN.lawnMat(RW.wearMat(WORLD.paveMat(seasonGround))));   // + узор плитки (world.js), + вид асфальта (roadwear.js), + пятна газона (lawn.js), + ураган (hurricane.js); у реквизита (признак в цвете) сухость травы 0,4 и без плитки, износа и газона
    if (HELL_ENABLED) HELL.cutMaterial(litMat);
-@@ -6555,22 +6538,2 @@
+@@ -6442,5 +6425,3 @@
+     const landGpu=createTileGpu({renderer,scene,cam,keep:()=>WARM.keep()});
+-    // На старте готовы 640 м. На Deck не пересчитываем сразу
+-    // дополнительное кольцо в 192 м за пределами дальности камеры.
+-    const streamRadius = GFX.device() === 'deck' ? 640 : 832;
++    const streamRadius = 540;
+     LAND_STREAM=createLandStream({terrain:TER,radius:streamRadius,retries:citySurface ? 1 : 0,profile:new URLSearchParams(location.search).has('deckprofile'),build:function* (bounds, id) {
+@@ -6555,22 +6536,2 @@
    LATE.add('mesh', function* () {
 -    SNOW_FENCES.build(SMASH);
 -    if (RLAND.ON) { RLAND.cover.cachePointQueries(); RLAND.green.cachePointQueries(); }
@@ -262,12 +269,12 @@
 -    for (const mesh of banks.children.slice()) winterSoftGroup.add(mesh);
 -    yield 'snow banks';
      if (citySurface) {
-@@ -6923,3 +6886,3 @@
+@@ -6923,3 +6884,3 @@
  FXP.init({ scene, cam, geo: { spark: sparkGeo, bit: bitGeo, puff: puffGeo }, fxLow: GFX.fxLow, fxDrop: GFX.fxDrop, fxLife: GFX.fxLife, legacy: (m, o, f) => fxAdd(m, o, f) });
 -if (!SNOW.enabled) SNOWPRINT.init(scene);
 +if (!SNOW.enabled && !MOBM.ON) SNOWPRINT.init(scene);
  const fxPart = FXP.part;
-@@ -7388,7 +7351,2 @@
+@@ -7388,7 +7349,2 @@
    }
 -  const sh = new THREE.Mesh(new THREE.CircleGeometry(hl + 0.25, 14),
 -    new THREE.MeshBasicMaterial({ color: 0x24303f, transparent: true, opacity: 0.26, depthWrite: false }));
@@ -275,22 +282,22 @@
 -  g.add(sh);
 -
    g.userData = { wheels, steer, panels, glass: cg || open ? [] : [wsF, wsB], cg, dmg: 0, smokeT: 0, bodyHex, hazard, hl, model, trunk,
-@@ -8051,3 +8009,3 @@
+@@ -8051,3 +8007,3 @@
  function initPeople () {
 -  for (let k = 0; k < (INTRO ? 18 : 44); k++) {
 +  for (let k = 0; k < 11; k++) {
      // во вступлении лица у прохожих не грузим: в кадре их не разглядеть, а
-@@ -8117,3 +8075,3 @@
+@@ -8117,3 +8073,3 @@
  function initScoots () {
 -  for (let k = 0; k < 16; k++) {
 +  for (let k = 0; k < 2; k++) {
      const two = chance(0.25);
-@@ -9356,3 +9314,3 @@
+@@ -9356,3 +9312,3 @@
  function trafficNight () { const h = trafficHour(), [a, b] = ECON.TRAFFIC.NIGHT; return h >= a && h < b; }
 -const trafficWant = () => Math.round(ECON.trafficAt(trafficHour()) * (TOUCH || MOBM.ON ? ECON.TRAFFIC.TOUCH_K : 1));   // мобильный режим — как на касаниях
 +const trafficWant = () => Math.round(ECON.trafficAt(trafficHour()) * 0.55);
  const isFlow = t => !t.parked && !t.svc && !t.gone && !t.chase && t.model !== 'moped' && !t.bus;   // автобусов своё число (buses.js)   // мопеды доставки — свои (mopeds.js)
-@@ -9420,11 +9378,2 @@
+@@ -9420,11 +9376,2 @@
  CSH.init(scene);
 -/* поддельные тени (fakeshadows.js): пятна — один InstancedMesh; маска теней домов — когда дома построены (LATE 'fsh') */
 -FSH.init(scene);
@@ -302,7 +309,7 @@
 -  FSH.step(FSH_E);
 -}
  let SUNSH_E = null;
-@@ -9455,6 +9404,6 @@
+@@ -9455,6 +9402,6 @@
  }
 -function carShadow () {
 +function carShadow (dt) {
@@ -311,11 +318,11 @@
 -  CSH.step(p.x, p.z, car.rotation.y, gy, p.y, car.rotation.x, car.rotation.z, ENV.night || 0, car.visible && car.parent === scene && V.sink === undefined, sun.position.x - V.x, sun.position.z - V.z);
 +  CSH.step(p.x, p.z, car.rotation.y, gy, p.y, ENV.night || 0, car.visible && car.parent === scene && V.sink === undefined, dt);
  }
-@@ -10961,3 +10910,2 @@
+@@ -10961,3 +10908,2 @@
      for (const g of [T.lit, T.flat, T.haz, T.wheel, T.stick]) if (g) g.dispose();
 -    if (T.shadow) { T.shadow.geo.dispose(); T.shadow.mat.dispose(); }
      delete RIV_LITE[k];
-@@ -12897,20 +12845,5 @@
+@@ -12897,20 +12843,5 @@
  
 -/* ─── площадка: реклама, пауза, язык, настройки ───
 -   Всё, что зависит от Яндекса или Стима, идёт через Platform. Полноэкранная
@@ -338,12 +345,12 @@
 -  try { await Platform.showInterstitial(); } catch (e) { console.warn('[ad]', e); }
 -}
  const nitroKey = () => (TMODE.touchOn() ? $t('кнопку нитро') : PAD.active ? 'A' : 'Shift');
-@@ -13040,3 +12973,3 @@
+@@ -13040,3 +12971,3 @@
      try {
 -      await resetSingleProgress({ store: Platform.store, storage: localStorage, keep: RESET_KEEP, heroName: heroName(), requestId });
 +      await resetSingleProgress({ store: Platform.store, storage: Platform.storage, keep: RESET_KEEP, heroName: heroName(), requestId });
      } catch (e) {
-@@ -13345,5 +13278,5 @@
+@@ -13345,5 +13276,5 @@
    V.wheel += (vf + (IN.gas && !dead ? softSnow * WINROAD.WINTER_ROAD.WHEEL_SPIN : 0)) * dt / 0.46;
 -  if (!snowOwned) WINROAD.spray(V, IN.gas && !dead, softSnow, dt, fxPart);
 -  if (!snowOwned && !V.air && !flyOn) WINROAD.scatter(V, Math.abs(vf), SEAS.snowAmt(), fxPart);
@@ -352,18 +359,18 @@
 +  if (!MOBM.ON && !snowOwned && !V.air && !flyOn) WINROAD.scatter(V, Math.abs(vf), SEAS.snowAmt(), fxPart);
 +  if (!MOBM.ON && !SNOW.enabled) { const snow = SEAS.snowAmt();
      if (snow > 0.55 && !flyOn) {
-@@ -14284,3 +14217,3 @@
+@@ -14284,3 +14215,3 @@
  function paintBase (x, px, B) {
 -  const phoneMap = !TOUCH;
 +  const phoneMap = false;
    const vis = o => { const b = FM.bb.get(o); return !b || !(b[2] < B[0] || b[0] > B[2] || b[3] < B[1] || b[1] > B[3]); };
-@@ -15480,4 +15413,3 @@
+@@ -15480,4 +15411,3 @@
    if (!picked && DISTRICTS && CITYOPEN.beforeShift(() => goRun(true, checkIn))) return;
 -  if (S.state === 'over' && Platform.features.ads && (S.delivered || 0) > 0) { S.state = 'title'; $('over').hidden = true; showAd().then(() => startRun(false, checkIn)); }
 -  else startRun(false, checkIn);
 +  startRun(false, checkIn);
  }
-@@ -15784,10 +15716,2 @@
+@@ -15784,10 +15714,2 @@
    document.body.classList.add('brief');
 -  const ik = inputKind();
 -  const recipient = order.stops[0] && order.stops[0].persons && order.stops[0].persons[0];
@@ -374,22 +381,27 @@
 -    driveKey: ik.kind === 'pad' ? (ik.family === 'ps' ? 'R2' : 'RT') : 'W' });
 -  if (phoneOrder) HUDMAP.routePreview($('radar'), routeOverview);
    phoneT = 0;
-@@ -16316,4 +16240,2 @@
+@@ -16316,4 +16238,2 @@
    S.state = 'loading';
 -  // Полноэкранная реклама (Яндекс) — раз в несколько доставок, в паузе между заказами
 -  if (adDue()) { S.adDone = S.done; showAd().then(loadPizza); return; }
    loadPizza();
-@@ -17306,3 +17228,3 @@
+@@ -17281,3 +17201,3 @@
+   const place=PIZZERIAS[DIST.cur()]||PIZZA;
+-  if (LAND_STREAM && !LAND_STREAM.gpuReadyAt(place.bx,place.bz,640)) {
++  if (LAND_STREAM && !LAND_STREAM.gpuReadyAt(place.bx,place.bz,300)) {
+     LAND_ENTERING=true;
+@@ -17306,3 +17226,3 @@
    resetCar();
 -  DIRT.wash(SEAS.snowAmt());                      // новая смена — машина чистая, зимой — снег на крыше (cardirt.js)
 +  DIRT.wash(MOBM.ON ? 0 : SEAS.snowAmt());                      // новая смена — машина чистая, зимой — снег на крыше (cardirt.js)
    S.hpMax = curCar().hp;
-@@ -17318,3 +17240,3 @@
+@@ -17318,3 +17238,3 @@
    JUMPS.reset();                                   // Толик про крышу — снова раз за смену (jumps.js)
 -  if (!SNOW.enabled) SNOWPRINT.reset();                               // зимние следы от прошлого выезда
 +  if (!MOBM.ON && !SNOW.enabled) SNOWPRINT.reset();                               // зимние следы от прошлого выезда
    GUN.shiftStart();                                // гранатомёт: полный ящик на смену (turret.js)
-@@ -17355,26 +17277,3 @@
+@@ -17355,26 +17275,3 @@
      STARTUP.work('shift.rivals', initRivals);
 -    if (checkIn && CAREER && !TOUCH) {
 -      if (GFX.device() === 'deck' && SEAS.snowAmt() > 0.015) shiftSnowWork = SNOW.prepare();
@@ -417,12 +429,12 @@
 -    } else newOrder();
 +    newOrder();
    }
-@@ -18096,3 +17995,3 @@
+@@ -18096,3 +17993,3 @@
    parkingClear: pinFree, surfaceAt, setPause, acceptOrder });
 -const NO_E = /[?&]noE(&|$)/.test(location.search);   // ?noE — без леса у Ленина, змеев и качалок (сравнить кадр)
 +const NO_E = true;   // Меньше фоновых аттракционов на карте VK.
  /* змеи и дроны (kites.js): места в парках и на Ленина, люди — только рядом с камерой */
-@@ -18185,16 +18084,2 @@
+@@ -18185,16 +18082,2 @@
  /* мелочь на газоне (lawnprops.js): тоже клетками вокруг камеры */
 -LATE.add('meadow', () => MEADOW.init({ renderer, scene, cam, CITY, groundH, car: V, cutMaterial: HELL_ENABLED ? HELL.cutMaterial : null }));   // некошеная трава (meadow.js); ?oldgrass — по-старому
 -LATE.add('lawnp', () => LAWNP.init({ THREE, scene, cam, CITY, ADULT, forests: () => [...LWOOD.polys(), ...RINGM.polys(), ...(MAP.woods || [])], groundH, inHouse, inBounds, nearestRoad, roadWidth, car: V, Snd,
@@ -439,16 +451,22 @@
 -  debris: (x, z, nx, nz, force, hex, n, kind) => DEBRIS.chunks(DEB_API, x, z, nx, nz, force, hex, n, kind === 'rail' || kind === 'beater' || kind === 'line'),   // куски из запаса, вразнобой (debris.js)
 -  }));
  // Курьера ставим раньше всех: припаркованные, трафик и прохожие заводятся
-@@ -18227,3 +18112,2 @@
+@@ -18227,3 +18110,2 @@
  });
 -if (!INTRO) LATE.add('yardcars2', () => YCARS.cars());   // машины во дворах по местам: пустые модели, рисует InstancedMesh (yardcars.js)
  // машин в потоке вокруг курьера (40–330 м): было 36 — на улицах Северска толпа, и на Деке
-@@ -18638,2 +18522,4 @@
-   scene.fog.near = (230 - R * 110) * (0.4 + 0.6 * gk) * fogRange;
-+  scene.fog.far = Math.min(scene.fog.far, cam.far * 0.95);
-+  scene.fog.near = scene.fog.far * 0.38;
+@@ -18632,8 +18514,4 @@
+   scene.fog.color.copy(FOG_C);
+-  const gk = GFX.rangeK();                          // дальность по настройке графики: 250 / 370 / 490 м (gfx.js)
+-  const fogRange = CULL.Q.k * CULL.Q.t;              // обе границы сжимаются вместе при тяжёлом кадре
+-  scene.fog.far = (470 - R * 170) * fogRange * gk;
+-  // Снег дополнительно сокращает дальнюю границу. Если сокращать только
+-  // её, при тяжёлом кадре туман у шейдера пойдёт от дальнего к ближнему.
+-  scene.fog.near = (230 - R * 110) * (0.4 + 0.6 * gk) * fogRange;
++  scene.fog.far = cam.far * (0.98 - R * 0.3);
++  scene.fog.near = scene.fog.far * (0.72 - R * 0.2);
    sun.color.copy(mix(A[3], B[3]));
-@@ -18644,9 +18530,5 @@
+@@ -18644,8 +18522,2 @@
    SOFTCITY.light(sun, hemi, amb, ENV.night, R);
 -  // солнце ходит по небу: днём ~35°, утром и вечером низко, ночью — как было (sunpath.js; ?oldsun — прежний путь ниже)
 -  if (!SUNP.place(sun, ENV.t, ENV.night, V.x, 0, V.z)) {
@@ -457,43 +475,45 @@
 -    sun.target.position.set(V.x, 0, V.z); sun.target.updateMatrixWorld();   // цель — под машиной, иначе вдали от центра карты свет почти горизонтальный
 -  }
    SKYM.env({ t: ENV.t, night: ENV.night, rain: R, over: SEAS.snowFall(), snow: SEAS.snowAmt(), scene, sun, hemi, amb, dt });   // небо, туман, тёплое солнце и прохладная тень (sky.js)
-+  sun.intensity *= 0.85;
-+  if (hemi) hemi.intensity *= 1.1;
-   MATS.env({ night: ENV.night, rain: R, snow: SEAS.snowAmt(), scene, sun, dt });   // блики, мокрый асфальт, отсвет в тени, стекло (materials.js)
-@@ -18682,3 +18564,3 @@
+@@ -18682,3 +18554,3 @@
    // дождь
 -  rainLines.visible = R > 0.03;
 +  rainLines.visible = R > 0.03 && (!MOBM.ON || SEAS.snowAmt() <= 0.45);
    RAIN_U.uA.value = R * 0.85;
-@@ -18916,3 +18798,2 @@
+@@ -18916,3 +18788,2 @@
  LATE.add('pubs', buildPubSpots);
 -LATE.add('peds', initPeds);
  LATE.add('people', initPeople);
-@@ -19105,3 +18986,2 @@
+@@ -19105,3 +18976,2 @@
  // потока: с ?nolate кусок строится сразу, а busApi объявлен только тут
 -if (!INTRO) LATE.add('buses', () => BUSES.build(busApi()));
  const LIFE_API = {
-@@ -19249,3 +19129,2 @@
+@@ -19249,3 +19119,2 @@
    if (LAND_ENTERING) { last = now; return; }
 -  HUDFONE.setVisible(SHIFTIN.active() || (!TOUCH && isPlaying() && (!S.paused || FM.open || HUDFONE.conversationActive())));
    if (LATE.busy() && lateFrame(now)) return;      // город ещё достраивается за меню (latebuild.js)
-@@ -19278,3 +19157,3 @@
+@@ -19278,3 +19147,3 @@
    }
 -  CULL.govern(raw, isPlaying() && !S.paused && !EXT.paused && !FM.open && !document.hidden);
 +  CULL.govern(raw, false);
    padStep();
-@@ -19465,3 +19344,3 @@
+@@ -19465,3 +19334,3 @@
    CL.step('cardirt', DIRT.step, dt, car, LIVE_DIRT.has(S.state) ? vf : 0, DIRT_W(DIRT_ENV));   // грязь и снег на машине (cardirt.js)
 -  CSNOW.season(SEAS.snowAmt(), SEAS.wetAmt());     // снег на машинах города (carsnow.js)
 +  CSNOW.season(MOBM.ON ? 0 : SEAS.snowAmt(), SEAS.wetAmt());     // снег на машинах города (carsnow.js)
    S.hurt = Math.max(0, S.hurt - dt);
-@@ -19547,4 +19426,3 @@
+@@ -19547,4 +19416,3 @@
    CL.step('warm', WARM.step, dt);                   // собранные на ходу программы шейдеров не выгружаются (warmup.js)
 -  CL.step('carshadow', carShadow);                 // пятно-тень под машиной игрока (carshadow.js)
 -  CL.step('fakeshadows', fakeShadows);             // тени домов (маска) и пятна под машинами, людьми, зверями (fakeshadows.js)
 +  CL.step('carshadow', carShadow, dt);                 // пятно-тень под машиной игрока (carshadow.js)
    if (S.state !== 'title' && S.state !== 'over') CL.step('replay', REPLAY.rec, dt); else REPLAY.idle();   // запись последних 10 с для повтора (replay.js)
-@@ -19589,4 +19467,2 @@
+@@ -19570,3 +19438,3 @@
+       !document.body.classList.contains('booting') && !document.querySelector('.late-wait') &&
+-      (!LAND_STREAM || LAND_STREAM.gpuReadyAt(V.x, V.z, 640)) && (!RLAND.ON || RLAND.ST.supportReady)) {
++      (!LAND_STREAM || LAND_STREAM.gpuReadyAt(V.x, V.z, 300)) && (!RLAND.ON || RLAND.ST.supportReady)) {
+     if (!STARTUP.firstSteerable || S.state === 'drive') {
+@@ -19589,4 +19457,2 @@
     здесь, до прогрева шейдеров (их новые материалы прогреваются там же). dt = 0: время не идёт, в меню они дальше не идут */
 -LATE.add('fsh', function* () { yield* FSH.buildSteps({ renderer, buildings: CITY.buildings, groundH, solids: SOLIDS, smash: SMASH, props: PROPS }); });   // маска теней домов, столбов и стволов (fakeshadows.js)
 -LATE.add('sunsh', function* () { yield* SUNSH.initSteps({ scene, renderer, gfxOn: GFX.realShadows, forest: FOREST.shadowCells }); });   // настоящие тени от солнца — после сборки города, до прогрева шейдеров (sunshadow.js)
@@ -510,10 +530,10 @@
 @@ -61,5 +61,5 @@
    { id: 'fps', label: N_('кадров в секунду'), vals: [30, 40, 60, 0] },   // 0 — без ограничения (как у экрана)
 -  { id: 'range', label: N_('дальность'), vals: [250, 370, 490] },
-+  { id: 'range', label: N_('дальность'), vals: [165, 200, 240] },
++  { id: 'range', label: N_('дальность'), vals: [250, 330, 420] },
    { id: 'menu', label: N_('город за меню'), vals: [0, 30, -1] },
 -  { id: 'px', label: N_('разрешение отрисовки'), vals: [430, 540, 720, 0] },
-+  { id: 'px', label: N_('разрешение отрисовки'), vals: MOBILE ? [360, 430, 540, 0] : [430, 540, 720, 0] },
++  { id: 'px', label: N_('разрешение отрисовки'), vals: MOBILE ? [430, 500, 600, 0] : [430, 540, 720, 0] },
    { id: 'win', label: N_('окна с комнатами'), vals: [0, 1] },
 @@ -72,5 +72,5 @@
  export const PRESETS = {
@@ -562,6 +582,13 @@
 -  for (const it of ITEMS.filter(it => it.id !== 'px')) body.querySelector('#gfx-' + it.id).onclick = () => { set(it.id, (O[it.id] + 1) % it.vals.length); again('gfx-' + it.id); };
 +  for (const it of visibleItems.filter(it => it.id !== 'px')) body.querySelector('#gfx-' + it.id).onclick = () => { set(it.id, (O[it.id] + 1) % it.vals.length); again('gfx-' + it.id); };
    const select=body.querySelector('#gfx-px');
+--- a/src/game/landstream.js
++++ b/src/game/landstream.js
+@@ -101,3 +101,3 @@
+   return {ready,published:ready,uploaded,warmed,stats,size,nx,nz,x0,z0,x1:x0+(terrain.nx-1)*terrain.g,z1:z0+(terrain.nz-1)*terrain.g,bounds,
+-    *prepare(x,z,r=640){
++    *prepare(x,z,r=300){
+       lastPlan=null;quiet(()=>request(x,z,r,{initial:true}));while(advance())yield 'земля рядом';
 --- a/src/game/latebuild.js
 +++ b/src/game/latebuild.js
 @@ -34,3 +34,3 @@
@@ -719,7 +746,7 @@
 @@ -11,3 +11,3 @@
  import {createLandCleaner,createLandRegionCleaner} from './landcleanpool.js';
 -export const ON = typeof location!=='undefined'&&!new URLSearchParams(location.search).has('oldland');
-+export const ON = false;
++export const ON = typeof location !== 'undefined' && new URLSearchParams(location.search).get('raisedland') === '1';
  export const LIFT=LAND_LIFT;
 --- a/src/game/realcar.js
 +++ b/src/game/realcar.js
@@ -733,13 +760,6 @@
 -export const TRAFFIC = { MODELS: ['semerka'], SHARE: 0.5, WEAR: [0, 0.8] };   // «Копейка» — вышла плохо (автор 13.10), ждёт модель получше
 +export const TRAFFIC = { MODELS: [], SHARE: 0, WEAR: [0, 0.8] };   // VK: оставляем процедурные кузова и лёгкие меши потока.
  const GLASS_HIT = { CRACK: 9, BREAK: 15, BOTH: 24 };   // BOTH — подробная копия: с такого удара трескаются и остальные стёкла
---- a/src/game/renderresolution.js
-+++ b/src/game/renderresolution.js
-@@ -3,3 +3,3 @@
- export const RESOLUTIONS = [[960,540],[1280,720],[1280,800],[1600,900],[1680,1050],[1920,1080],[1920,1200],[2560,1440],[2560,1600],0];
--export const RESOLUTION_PRESETS = {pc:[1,3,5],deck:[0,1,2]};
-+export const RESOLUTION_PRESETS = {pc:[0,1,1],deck:[0,0,1]};
- export function migrateResolution(index,device) {
 --- a/src/game/roadwear.js
 +++ b/src/game/roadwear.js
 @@ -553,4 +553,4 @@
@@ -996,7 +1016,14 @@
 -  image-rendering: crisp-edges;
 +  image-rendering: auto;
    touch-action: none;
-@@ -1174,6 +1173,6 @@
+@@ -520,6 +519,3 @@
+    появляются за ней, а не разом на глазах; достроился — плавно наводится резкость (game.js lateHaze) */
+-body.late-haze #view { filter: blur(5px) saturate(0.85) brightness(1.06); }
+-body.late-clear #view { transition: filter 1.4s ease-out; }
+ /* пока висит анкета, мир за ней размыт */
+-body.brief #view { filter: blur(6px) brightness(0.72); transition: filter .25s; }
+ #view { transition: filter .25s; }
+@@ -1174,6 +1170,6 @@
     скорость и щит — столбиком под паузой, боком — слева от радара; деньги — слева под сердцами */
 -body.touch #radar { border-radius: 12px; left: auto; right: max(10px, var(--sa-r, env(safe-area-inset-right))); bottom: auto; top: max(10px, var(--sa-t, env(safe-area-inset-top))); width: 96px; }
 -html[data-map="moscow"] body.touch #radar, body.touch #radar { padding: 0; border: 3px solid #33210c; background: #1d2440; box-shadow: 0 4px 12px rgba(0, 0, 0, .35); }
@@ -1007,12 +1034,12 @@
 +body #hud-right { top: calc(max(10px, var(--sa-t, env(safe-area-inset-top))) + 142px); right: max(10px, var(--sa-r, env(safe-area-inset-right))); }
 +body #ctrls { bottom: auto; top: calc(max(10px, var(--sa-t, env(safe-area-inset-top))) + 104px); right: max(10px, var(--sa-r, env(safe-area-inset-right))); transform: none; flex-direction: column; }
  /* часы заказа стоя — по центру места слева от радара, а не экрана (иначе краем на радаре) */
-@@ -1187,3 +1186,3 @@
+@@ -1187,3 +1183,3 @@
  @media (max-height: 460px) {                                    /* боком: столбик — слева от радара */
 -  body.touch #hud-right { top: max(10px, var(--sa-t, env(safe-area-inset-top))); right: calc(max(10px, var(--sa-r, env(safe-area-inset-right))) + 108px); }
 +  body #hud-right { top: max(10px, var(--sa-t, env(safe-area-inset-top))); right: calc(max(10px, var(--sa-r, env(safe-area-inset-right))) + 108px); }
  }
-@@ -1311,8 +1310,8 @@
+@@ -1311,8 +1307,8 @@
  /* телефон: внизу — педали и руль касанием, накладная — по центру, как раньше */
 -body.touch #phone, body.touch #phone.on { top: 50%; bottom: auto; }
 -body.touch #phone { transform: translate(-50%, -46%) scale(.96); }
