@@ -10,7 +10,14 @@
  import * as STOUR from './shifttour.js';        // первый чек смены: Толик облачками показывает, что тут где (shifttour.js)
 +import { addShiftReward } from './vk-shift-reward.js';
  import * as SSTEPS from './shiftsteps.js';      // конец смены экранами по очереди: деньги → «давай депнем?» → рейтинг → машина → чек (shiftsteps.js)
-@@ -562,2 +563,4 @@
+@@ -135,5 +136,6 @@
+ /* круглосуточная пиццерия: со второго района (ECON.SHIFT.ALLDAY_FROM) */
+ export const allDay = (i = DIST.cur()) => DIST.has() && i >= (ECON.SHIFT.ALLDAY_FROM ?? 99);
+ export const shiftOn = () => SH.on;
++export const firstShift = () => SH.on && SH.n === 0;
+ /** на часах мира около полуночи, а пиццерия не круглосуточная: можно сказать «полночь» (orders.js, развоз смены) */
+ export const midnightNow = () => !(SH.on ? SH.allDay : allDay()) && DAYT.nearMidnight(hour());
+@@ -562,2 +564,4 @@
    buildEnd();
 +  addShiftReward({ over: ov, eligible: wasOn && full && S.delivered > 0, money: A.money,
 +    grant: amount => { A.addWallet(amount); A.Store.flush(); refreshEnd(); } });
@@ -674,7 +681,7 @@
 -  OTAGS.step(dt);                                  // мини-карточки заказа над радаром (ordertags.js)
 -  HUDFONE.resources({ hp: S.hp, hpMax: S.hpMax, money: CAREER ? (SC.DEBUG.text || money(S.money)) : money(S.money), order: OTAGS.current(), hasOrder: !!S.order });
    if ((HUDC.pizzaT -= dt) <= 0) {
-@@ -15412,25 +15321,9 @@
+@@ -15412,25 +15321,10 @@
      const cooling = carried ? ECON.coldCut({ ...DENTM.wear(car), hp: S.hp, hpMax: S.hpMax }).k : 0;
 -    HUDMAP.pizza({ carried, cooling, cold: cooling >= ECON.PRESS.COLD_BAD });
 -  }
@@ -705,7 +712,8 @@
 +  const back = S.state === 'back';
 +  const timed = (S.state === 'drive' || back || S.state === 'side') && (!S.free || S.state === 'side');
 +  const time = timed && S.timeMax > 0 && Number.isFinite(S.time) ? Math.max(0, Math.ceil(S.time)) : null;
-+  VKHUD.routeStep(V, playing, target, routePts, time);
++  const firstShift = playing && CAREER && !S.ride && CAREERM.firstShift();
++  VKHUD.routeStep(V, playing, target, routePts, time, firstShift);
  }
 @@ -15480,4 +15373,3 @@
    if (!picked && DISTRICTS && CITYOPEN.beforeShift(() => goRun(true, checkIn))) return;

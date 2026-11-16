@@ -1,6 +1,6 @@
 /* Карта сверху с поворотом по курсу машины. */
 const WIDTH = 144, HEIGHT = 54, DRIVER_Y = 34;
-const SCALE = 0.14, RANGE = 580, FRAME_MS = 40;
+const SCALE = 0.14, RANGE = 580, FRAME_MS = 40, MAX_PIXELS = 1280;
 
 export const MAP_INK = {
   houseFill: '#49332348',
@@ -68,9 +68,21 @@ export function createMinimap (canvas, outerCanvas, buildings) {
   const ctx = canvas.getContext('2d');
   ctx.scale(2, 2);
   const houses = buildings.filter(b => b.p.length >= 3).map(buildingShape);
-  let lastFrame = -Infinity, lastX, lastZ, lastHeading, lastRoute, lastTarget, visible = false;
+  let lastFrame = -Infinity, lastX, lastZ, lastHeading, lastRoute, lastTarget, lastFirstShift;
+  let visible = false, resized = false;
+  const observer = new ResizeObserver(([entry]) => {
+    const { width } = entry.contentRect;
+    if (!width) return;
+    const pixels = Math.min(MAX_PIXELS, Math.round(width * Math.min(2, window.devicePixelRatio || 1)));
+    if (pixels === canvas.width) return;
+    canvas.width = outerCanvas.width = pixels;
+    canvas.height = outerCanvas.height = Math.round(pixels * HEIGHT / WIDTH);
+    ctx.setTransform(canvas.width / WIDTH, 0, 0, canvas.height / HEIGHT, 0, 0);
+    resized = true;
+  });
+  observer.observe(canvas);
 
-  function draw (car, target, route) {
+  function draw (car, target, route, firstShift) {
     const sin = Math.sin(car.h), cos = Math.cos(car.h);
     const project = (x, z) => {
       const dx = x - car.x, dz = z - car.z;
@@ -100,9 +112,11 @@ export function createMinimap (canvas, outerCanvas, buildings) {
     const x = WIDTH / 2, y = DRIVER_Y;
     if (target) {
       const path = ctx.createRadialGradient(x, y, 10, x, y, 91);
-      path.addColorStop(0, '#ffb272ef');
-      path.addColorStop(0.65, '#ffa45bd9');
+      path.addColorStop(0, firstShift ? '#ffd363' : '#ffb272ef');
+      path.addColorStop(0.65, firstShift ? '#ffb046' : '#ffa45bd9');
       path.addColorStop(1, '#f0803b76');
+      const lineWidth = firstShift ? 2.65 : 1.45;
+      const outlineWidth = firstShift ? 1.65 : 0.95;
       for (const [points, dashed] of [[route, false], [route.offroadStart, true], [route.offroad, true]]) {
         if (!points || points.length < 2 || Math.hypot(points[0][0] - car.x, points[0][1] - car.z) > RANGE) continue;
         ctx.setLineDash(dashed ? [2, 2] : []);
@@ -116,23 +130,24 @@ export function createMinimap (canvas, outerCanvas, buildings) {
           ctx.lineTo(...project(ax + (bx - ax) * fraction, az + (bz - az) * fraction));
           remaining -= length;
         }
-        strokeRoute(ctx, path, 1.65, 1.05);
+        strokeRoute(ctx, path, lineWidth, outlineWidth);
       }
       ctx.setLineDash([]);
     }
-    drawDriver(ctx, x, y);
+    drawDriver(ctx, x, y, 0, firstShift ? 1.28 : 1);
   }
 
-  return (show, car, target, route) => {
+  return (show, car, target, route, firstShift) => {
     const now = performance.now();
-    const changed = !visible || target !== lastTarget || route !== lastRoute;
+    const changed = !visible || resized || target !== lastTarget || route !== lastRoute || firstShift !== lastFirstShift;
     visible = show;
     if (!show || (!changed && now - lastFrame < FRAME_MS)) return;
     if (!changed && Math.hypot(car.x - lastX, car.z - lastZ) < 0.3 && Math.abs(car.h - lastHeading) < 0.01) return;
-    draw(car, target, route);
+    draw(car, target, route, firstShift);
+    resized = false;
     outer.clearRect(0, 0, outerCanvas.width, outerCanvas.height);
     outer.drawImage(canvas, 0, 0);
     lastX = car.x; lastZ = car.z; lastHeading = car.h;
-    lastFrame = now; lastRoute = route; lastTarget = target;
+    lastFrame = now; lastRoute = route; lastTarget = target; lastFirstShift = firstShift;
   };
 }

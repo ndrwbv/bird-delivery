@@ -17,7 +17,7 @@ const pedalIcons = {
 };
 
 let nav, updateMinimap, pause, clock, digits, payment, gain, shift, nitro, pizza;
-let shownTime;
+let shownTime, shownFirstShift = false;
 let payTimer;
 
 function meter (root, kind, icon, label) {
@@ -90,10 +90,14 @@ function setText (el, value) {
   if (el.textContent !== value) el.textContent = value;
 }
 
-export function routeStep (car, playing, target, route, time) {
+export function routeStep (car, playing, target, route, time, firstShift) {
   nav.hidden = !playing;
   pause.hidden = !playing;
-  updateMinimap(playing, car, target, route);
+  if (firstShift !== shownFirstShift) {
+    nav.classList.toggle('is-first-shift', firstShift);
+    shownFirstShift = firstShift;
+  }
+  updateMinimap(playing, car, target, route, firstShift);
   clock.hidden = !target || time === null;
   if (clock.hidden || time === shownTime) return;
   const minutes = String(Math.floor(time / 60)).padStart(2, '0');

@@ -38,7 +38,6 @@ body {
 .vk-start-garage { min-height: 36px; }
 
 html[data-map] body #radar {
-  --vk-nav-width: min(11rem, var(--vk-center-width));
   top: var(--vk-top);
   left: 50%;
   right: auto;
@@ -74,8 +73,9 @@ html[data-map] body :is(#hud-left #cash, #task, #addr, #dist, #phone, #otags) {
 
 .vk-nav {
   display: grid;
-  width: max-content;
-  max-width: var(--vk-nav-width);
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  width: min(30vw, 46dvh, var(--vk-center-width));
+  aspect-ratio: 8 / 3;
   box-sizing: border-box;
   padding: 0;
   overflow: hidden;
@@ -87,15 +87,15 @@ html[data-map] body :is(#hud-left #cash, #task, #addr, #dist, #phone, #otags) {
   cursor: pointer;
   transition: opacity .2s ease;
 }
+.vk-nav.is-first-shift { width: min(42vw, 68dvh, var(--vk-center-width)); }
 .vk-nav:focus-visible { outline: 2px solid var(--vk-orange); outline-offset: 2px; }
 .vk-nav[hidden], .vk-countdown[hidden],
 .vk-payment[hidden], .vk-meter[hidden] { display: none; }
 html[data-map] body #radar .vk-minimap {
   grid-area: 1 / 1;
   position: static;
-  width: clamp(112px, 21vw, 144px);
-  max-width: 100%;
-  height: auto;
+  width: 100%;
+  height: 100%;
   margin: 0;
   will-change: auto;
   clip-path: none;
@@ -104,8 +104,11 @@ html[data-map] body #radar .vk-minimap {
   mask-image: radial-gradient(ellipse 50% 44% at 50% 56%, #000 56%, transparent 84%);
 }
 .vk-minimap-outer {
-  filter: blur(1.65px);
+  filter: blur(clamp(1.65px, 0.5vmin, 4px));
   mask-image: radial-gradient(ellipse 50% 44% at 50% 56%, transparent 52%, #000 75%, transparent 99%);
+}
+.vk-nav.is-first-shift .vk-minimap-center {
+  mask-image: radial-gradient(ellipse 50% 48% at 50% 53%, #000 62%, transparent 89%);
 }
 body:has(#choice:not([hidden])) .vk-nav { opacity: .5; }
 .vk-countdown {
