@@ -1,6 +1,6 @@
 /* Карта сверху с поворотом по курсу машины. */
-const WIDTH = 144, HEIGHT = 112, DRIVER_Y = 65;
-const SCALE = 0.92, RANGE = 120, FRAME_MS = 40;
+const WIDTH = 144, HEIGHT = 54, DRIVER_Y = 34;
+const SCALE = 0.62, RANGE = 120, FRAME_MS = 40;
 
 function buildingShape ({ p }) {
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
@@ -31,8 +31,8 @@ export function createMinimap (canvas, buildings) {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     ctx.lineWidth = 0.85;
-    ctx.fillStyle = '#6e89944d';
-    ctx.strokeStyle = '#a6c1cd6b';
+    ctx.fillStyle = '#49332348';
+    ctx.strokeStyle = '#f0c19f70';
     for (const house of houses) {
       if (house.x0 > car.x + RANGE || house.x1 < car.x - RANGE ||
           house.z0 > car.z + RANGE || house.z1 < car.z - RANGE) continue;
@@ -49,9 +49,9 @@ export function createMinimap (canvas, buildings) {
     const x = WIDTH / 2, y = DRIVER_Y;
     if (target) {
       const path = ctx.createRadialGradient(x, y, 10, x, y, 91);
-      path.addColorStop(0, '#b6f1ffef');
-      path.addColorStop(0.65, '#8ee6ffd9');
-      path.addColorStop(1, '#72d5ff76');
+      path.addColorStop(0, '#ffb272ef');
+      path.addColorStop(0.65, '#ffa45bd9');
+      path.addColorStop(1, '#f0803b76');
       for (const [points, dashed] of [[route, false], [route.offroadStart, true], [route.offroad, true]]) {
         if (!points || points.length < 2 || Math.hypot(points[0][0] - car.x, points[0][1] - car.z) > RANGE) continue;
         ctx.setLineDash(dashed ? [3, 3] : []);
@@ -66,7 +66,7 @@ export function createMinimap (canvas, buildings) {
           remaining -= length;
         }
         ctx.lineWidth = 4.5;
-        ctx.strokeStyle = '#102833ca';
+        ctx.strokeStyle = '#412417bd';
         ctx.stroke();
         ctx.lineWidth = 2.8;
         ctx.strokeStyle = path;
@@ -80,8 +80,8 @@ export function createMinimap (canvas, buildings) {
     ctx.lineTo(x, y + 2);
     ctx.lineTo(x - 4.5, y + 4);
     ctx.closePath();
-    ctx.fillStyle = '#eef7fa';
-    ctx.strokeStyle = '#183144';
+    ctx.fillStyle = '#fff0df';
+    ctx.strokeStyle = '#4c2d1e';
     ctx.lineWidth = 1.5;
     ctx.fill();
     ctx.stroke();

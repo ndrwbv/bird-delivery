@@ -5,14 +5,16 @@ body {
   --vk-bottom: max(8px, var(--sa-b, env(safe-area-inset-bottom)));
   --vk-center-width: calc(100vw - 2 * max(var(--vk-left), var(--vk-right)) - 12px);
   --vk-note-width: min(42rem, var(--vk-center-width));
-  --vk-note-gap: clamp(94px, 18vw, 118px);
-  --vk-panel: #142332d9;
-  --vk-control: #182b3bbb;
-  --vk-control-active: #314e60e6;
-  --vk-edge: #a6bfce74;
-  --vk-ink: #e6f0f4;
-  --vk-muted: #bdcbd2;
-  --vk-cyan: #a5e9ff;
+  --vk-note-gap: 60px;
+  --vk-message-width: min(220px, max(145px, 30vw), var(--vk-center-width));
+  --vk-message-top: max(calc(var(--vk-top) + 69px), 18dvh);
+  --vk-panel: #2a1c16d9;
+  --vk-control: #322218bb;
+  --vk-control-active: #603a21e6;
+  --vk-edge: #efba926e;
+  --vk-ink: #fff0e2;
+  --vk-muted: #cfbaa8;
+  --vk-orange: #ffad6c;
   --vk-danger: #ff7785;
 }
 
@@ -45,7 +47,7 @@ html[data-map] body #radar {
   margin: 0;
   padding: 0;
   border: 0;
-  border-radius: 12px;
+  border-radius: 0;
   aspect-ratio: auto;
   background: transparent;
   box-shadow: none;
@@ -64,7 +66,7 @@ html[data-map] body :is(#hud-left #cash, #task, #addr, #dist, #phone, #otags) {
   color: var(--vk-ink);
   background: var(--vk-panel);
   border: 1px solid var(--vk-edge);
-  box-shadow: 0 2px 6px #07101955;
+  box-shadow: 0 2px 6px #1d110a55;
   text-shadow: none;
   font: 600 13px/1.25 system-ui, sans-serif;
 }
@@ -78,15 +80,15 @@ html[data-map] body :is(#hud-left #cash, #task, #addr, #dist, #phone, #otags) {
   box-sizing: border-box;
   padding: 0;
   overflow: hidden;
-  border: 1px solid var(--vk-edge);
-  border-radius: 12px;
-  background: #122432a8;
-  box-shadow: 0 2px 7px #06131c55;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   pointer-events: auto;
   cursor: pointer;
   transition: opacity .2s ease;
 }
-.vk-nav:focus-visible { outline: 2px solid var(--vk-cyan); outline-offset: 2px; }
+.vk-nav:focus-visible { outline: 2px solid var(--vk-orange); outline-offset: 2px; }
 .vk-nav[hidden], .vk-countdown[hidden], html[data-map] body #radar .vk-minimap[hidden],
 .vk-payment[hidden], .vk-meter[hidden] { display: none; }
 html[data-map] body #radar .vk-minimap {
@@ -98,9 +100,7 @@ html[data-map] body #radar .vk-minimap {
   will-change: auto;
   clip-path: none;
 }
-body:has(#toast[style*="opacity: 1"], #hint.on, #dlg-live.on, #bonus.on, #chat .cm.fresh, #choice:not([hidden])) .vk-nav {
-  opacity: .5;
-}
+body:has(#choice:not([hidden])) .vk-nav { opacity: .5; }
 .vk-countdown {
   display: flex;
   align-items: center;
@@ -109,13 +109,13 @@ body:has(#toast[style*="opacity: 1"], #hint.on, #dlg-live.on, #bonus.on, #chat .
   gap: 4px;
   margin-block-start: 3px;
   color: var(--vk-muted);
-  text-shadow: 0 1px 2px #101f2f, 0 0 5px #101f2f;
+  text-shadow: 0 1px 2px #29170e, 0 0 5px #29170e;
   white-space: nowrap;
 }
 .vk-countdown svg {
   width: 13px;
   height: 13px;
-  filter: drop-shadow(0 1px 2px #101f2f);
+  filter: drop-shadow(0 1px 2px #29170e);
 }
 .vk-countdown strong {
   font: 550 12px/1 ui-monospace, monospace;
@@ -126,8 +126,8 @@ body:has(#toast[style*="opacity: 1"], #hint.on, #dlg-live.on, #bonus.on, #chat .
 
 html[data-map] body #hud-left { top: var(--vk-top); left: var(--vk-left); max-width: min(28vw, 11rem); }
 html[data-map] body #hearts i {
-  --vk-heart: #f398a7;
-  --vk-heart-off: #657786;
+  --vk-heart: #faa178;
+  --vk-heart-off: #796354;
   clip-path: none;
   filter: none;
   background: var(--vk-heart);
@@ -163,7 +163,7 @@ html[data-map] body #hud-right #speed {
   border-radius: 8px;
   overflow-wrap: anywhere;
 }
-.vk-payment strong { font-size: 13px; color: var(--vk-cyan); }
+.vk-payment strong { font-size: 13px; color: var(--vk-orange); }
 .vk-payment span { font-size: 10px; }
 
 .vk-meters {
@@ -172,13 +172,13 @@ html[data-map] body #hud-right #speed {
   gap: 5px;
   padding: 5px 6px 4px;
 }
-.vk-meter { display: grid; justify-items: center; gap: 3px; color: var(--vk-cyan); }
+.vk-meter { display: grid; justify-items: center; gap: 3px; color: var(--vk-orange); }
 .vk-meter svg { width: 12px; height: 12px; }
 .vk-meter-track {
   position: relative;
   width: 7px;
   height: 33px;
-  background: #a6bfce40;
+  background: #efba9240;
   border-radius: 3px;
   overflow: hidden;
 }
@@ -193,7 +193,7 @@ html[data-map] body #hud-right #speed {
 }
 .vk-pizza { color: #ffcb72; }
 .vk-pizza.warm { color: #f9da9b; }
-.vk-pizza.cold { color: #96caff; }
+.vk-pizza.cold { color: #c1bdb6; }
 
 html[data-map] body #touchpad .tp-left {
   position: absolute;
@@ -215,11 +215,11 @@ html[data-map] body #touchpad .tp-right button {
   border: 1px solid var(--vk-edge);
   color: var(--vk-pedal-ink);
   font: 650 10px/1 system-ui, sans-serif;
-  box-shadow: 0 2px 6px #07101980;
+  box-shadow: 0 2px 6px #1d110a80;
 }
-html[data-map] body #touchpad .tp-gas { --vk-pedal-ink: #c5efdf; }
-html[data-map] body #touchpad .tp-brake { --vk-pedal-ink: #f1bdc4; }
-html[data-map] body #touchpad .tp-nos { --vk-pedal-ink: var(--vk-cyan); }
+html[data-map] body #touchpad .tp-gas { --vk-pedal-ink: #ffd7b0; }
+html[data-map] body #touchpad .tp-brake { --vk-pedal-ink: #f7b29e; }
+html[data-map] body #touchpad .tp-nos { --vk-pedal-ink: var(--vk-orange); }
 html[data-map] body #touchpad .tp-nos::before,
 html[data-map] body #touchpad .tp-nos::after { content: none; }
 html[data-map] body #touchpad .tp-right button:is(.on, .burn) {
@@ -230,7 +230,7 @@ html[data-map] body #touchpad .tp-right button:is(.on, .burn) {
 #touchpad .tp-gas .vk-icon { width: 22px; height: 22px; }
 html[data-map] body #touchpad .tw-wheel {
   opacity: 1;
-  filter: drop-shadow(0 2px 3px #07101999);
+  filter: drop-shadow(0 2px 3px #1d110a99);
 }
 .vk-wheel-grip, .vk-wheel-spokes, .vk-wheel-edge, .vk-wheel-accent { fill: none; }
 .vk-wheel-grip, .vk-wheel-spokes { stroke: var(--vk-control); stroke-width: 6.5; }
@@ -238,33 +238,75 @@ html[data-map] body #touchpad .tw-wheel {
 .vk-wheel-edge, .vk-wheel-hub { stroke: var(--vk-edge); stroke-width: .85; }
 .vk-wheel-inner { opacity: .55; }
 .vk-wheel-hub { fill: var(--vk-control); }
-.vk-wheel-accent { stroke: var(--vk-cyan); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.vk-wheel-accent { stroke: var(--vk-orange); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 #touchpad .tp-left.on .vk-wheel-grip { stroke: var(--vk-control-active); }
-#touchpad .tp-left.on .vk-wheel-edge { stroke: var(--vk-cyan); }
+#touchpad .tp-left.on .vk-wheel-edge { stroke: var(--vk-orange); }
 
-html[data-map] body :is(#toast, #hint, #dlg-live, #bonus, #payfx) {
-  box-sizing: border-box;
-  max-width: var(--vk-note-width);
-  overflow-wrap: anywhere;
-}
+body:has(.vk-payment:not([hidden])) { --vk-message-top: max(calc(var(--vk-top) + 88px), 18dvh); }
 html[data-map] body :is(#toast, #hint, #dlg-live) {
-  top: calc(var(--vk-top) + var(--vk-note-gap));
+  box-sizing: border-box;
+  left: var(--vk-left);
+  right: auto;
+  top: var(--vk-message-top);
   bottom: auto;
   width: max-content;
+  max-width: var(--vk-message-width);
+  transform: none;
+  overflow-wrap: anywhere;
+  text-align: left;
 }
-html[data-map] body #toast {
-  padding: 6px 10px;
-  border-radius: 8px;
+html[data-map] body :is(#toast, #hint) {
+  padding: 5px 8px;
+  border: 1px solid var(--vk-edge);
+  border-radius: 6px;
   color: var(--vk-ink);
   background: var(--vk-panel);
-  font: 600 13px/1.35 system-ui, sans-serif;
-  text-align: center;
+  box-shadow: 0 2px 6px #1d110a55;
+  font: 600 11px/1.35 system-ui, sans-serif;
   text-shadow: none;
   white-space: normal;
 }
-html[data-map] body #hint { padding: 6px 10px; line-height: 1.55; }
-html[data-map] body #dlg-live .dll-b { min-width: 0; }
-html[data-map] body #dlg-live .dll-b b { white-space: normal; }
+html[data-map] body :is(#hint, #dlg-live).on { transform: none; }
+html[data-map] body #hint kbd { padding: 1px 3px; }
+html[data-map] body :is(#chat, #dlg-live) {
+  --im-bubble: var(--vk-panel);
+  --im-text: var(--vk-ink);
+  --im-dots: var(--vk-muted);
+}
+html[data-map] body :is(#chat .cm, #dlg-live .dll-row) { gap: 5px; }
+html[data-map] body :is(#chat .cm > img, #chat .cm > i, #dlg-live .dll-row img) {
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--vk-edge);
+}
+html[data-map] body :is(#chat .cm-b, #dlg-live .dll-b) {
+  min-width: 0;
+  border-radius: 7px;
+  box-shadow: 0 2px 6px #1d110a55;
+}
+html[data-map] body :is(#chat .cm-b b, #dlg-live .dll-b b) {
+  color: var(--vk-muted);
+  margin: 4px 0 0;
+  padding: 0 7px;
+  line-height: 1.2;
+  white-space: normal;
+}
+html[data-map] body #chat .cm-n { color: var(--vk-muted); }
+html[data-map] body :is(#chat .cm-b p, #dlg-live .dll-b p) {
+  min-height: 0;
+  padding: 4px 7px;
+  font: 600 11px/1.35 system-ui, sans-serif;
+  overflow-wrap: anywhere;
+}
+html[data-map] body :is(#chat .cm-b p, #dlg-live .dll-b p)::before { content: none; }
+@media (prefers-reduced-motion: no-preference) {
+  html[data-map] body #chat .cm { animation-name: vk-message-in; }
+  html[data-map] body #chat .cm.out { animation-name: vk-message-out; }
+}
+@keyframes vk-message-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+@keyframes vk-message-out { to { opacity: 0; transform: translateX(-10px); } }
+
 body.dlg-open #touchpad { visibility: hidden; }
 html[data-map] body #radio {
   left: var(--vk-left);
@@ -284,9 +326,6 @@ body:has(#toast[style*="opacity: 1"], #hint.on, #dlg-live.on, #dlg.on) #radio {
 @media (max-height: 460px), (max-width: 540px) {
   body { --vk-note-width: min(34rem, calc(var(--vk-center-width) - clamp(80px, 24vw, 156px))); }
   html[data-map] body #radio { max-width: min(17rem, 42vw, var(--vk-center-width)); }
-  html[data-map] body #chat .cm-b { overflow-wrap: anywhere; }
-  html[data-map] body #chat .cm-b p,
-  html[data-map] body #dlg-live .dll-b p { font: 600 12px/1.4 system-ui, sans-serif; }
   html[data-map] body #choice:not(.big) {
     top: calc(var(--vk-top) + var(--vk-note-gap));
     width: min(29rem, var(--vk-center-width));
@@ -316,5 +355,7 @@ body:has(#toast[style*="opacity: 1"], #hint.on, #dlg-live.on, #dlg.on) #radio {
 }
 
 @media (max-width: 540px) {
+  body { --vk-message-top: calc(var(--vk-top) + var(--vk-note-gap) + 52px); }
+  body:has(.vk-payment:not([hidden])) { --vk-message-top: calc(var(--vk-top) + var(--vk-note-gap) + 82px); }
   html[data-map] body :is(#hud-left, #hud-right) { top: calc(var(--vk-top) + var(--vk-note-gap)); }
 }
