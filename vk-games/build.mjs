@@ -36,7 +36,7 @@ try {
   const licenses = join(assets, 'licenses');
   mkdirSync(licenses, { recursive: true });
   copyFileSync(join(edition, 'node_modules', '@vkontakte', 'vk-bridge', 'LICENSE'), join(licenses, 'vk-bridge.txt'));
-  for (const name of ['models/vaz2101', 'privacy.html', 'manifest.webmanifest', 'music', 'sfx']) {
+  for (const name of ['models', 'privacy.html', 'manifest.webmanifest', 'music', 'sfx']) {
     rmSync(join(assets, name), { recursive: true, force: true });
   }
   for (const name of ['music', 'sfx']) {

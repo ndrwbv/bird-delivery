@@ -53,27 +53,7 @@
    },
 -  WILD_P: 0.5,                 // каждое место в списке смены — «угарное» с таким шансом (в среднем половина)
    /* не в одну смену: первое задание и любое из остальных (одно мешает другому) */
-@@ -892,18 +891,3 @@
- export const CAR_LIST = [
--  { id: 'semerka', price: 0,      stars: 0,  hp: 7,  L: 3,   vmax: 44, acc: 29, handling: 3 },   // acc 34 → 29; 28.10.2026: руль 5 → 3, мягче нарастает поворот
--  { id: 'matiz',   price: 40000,  stars: 0,  hp: 6,  L: 2,   vmax: 46.5, acc: 39.8, handling: 8 },
--  { id: 'kopeyka', price: 88000,  stars: 0,  hp: 8,  L: 4,   vmax: 44.8, acc: 34.9, handling: 4 },
--  { id: 'cheri',   price: 120000, stars: 0,  hp: 7,  L: 3,   vmax: 48.1, acc: 39, handling: 9 },
--  { id: 'priora',  price: 152000, stars: 0,  hp: 8,  L: 2,   vmax: 49.8, acc: 39, handling: 6 },
--  { id: 'buhanka', price: 240000, stars: 0,  hp: 11, L: 5,   vmax: 41.5, acc: 30.7, handling: 1 },
--  { id: 'niva',    price: 360000, stars: 0,  hp: 9,  L: 3,   vmax: 48.1, acc: 38.2, handling: 4, offroad: true },
--  { id: 'belgik',  price: 440000, stars: 0,  hp: 9,  L: 1.5, vmax: 50.6, acc: 41.5, handling: 6 },
--  { id: 'volga',   price: 520000, stars: 0,  hp: 10, L: 2,   vmax: 51.5, acc: 38.2, handling: 2 },
--  { id: 'cruze',   price: 720000, stars: 0,  hp: 9,  L: 1,   vmax: 55.6, acc: 43.2, handling: 10 },
--  { id: 'havalka', price: 860000, stars: 3,  hp: 12, L: 1,   vmax: 51.5, acc: 38.2, handling: 3, offroad: true },
--  { id: 'vesta',   price: 1000000, stars: 5,  hp: 10, L: 1,   vmax: 58.1, acc: 44.8, handling: 7 },
--  { id: 'jilya',   price: 1200000, stars: 8, hp: 11, L: 0.5, vmax: 57.3, acc: 45.6, handling: 5 },
--  { id: 'patriot', price: 1440000, stars: 12, hp: 13, L: 0.3, vmax: 56.4, acc: 41.5, handling: 2, offroad: true },
--  // летающий электро-кабриолет (17.10.2026, автор: «летающий Тесла Роудстер»): самый дорогой, кнопка — подлёт на время (flycar.js FLY)
--  { id: 'roadster', price: 2400000, stars: 15, hp: 9, L: 0.3, vmax: 60, acc: 50, handling: 9, fly: true },
-+  { id: 'semerka', price: 0,      stars: 0,  hp: 7,  L: 3,   vmax: 44, acc: 29, handling: 3 },
- ];
-@@ -987,3 +971,3 @@
+@@ -987,3 +986,3 @@
    //       0  1  2  3  4  5   6   7   8   9  10  11  12  13  14  15  16  17  18  19  20  21  22  23
 -  BY_HOUR: [8, 6, 5, 4, 4, 6, 10, 18, 28, 26, 22, 21, 22, 22, 21, 21, 23, 27, 28, 27, 20, 16, 13, 10],
 +  BY_HOUR: [5, 4, 3, 3, 3, 4, 6, 9, 13, 13, 11, 11, 11, 11, 11, 11, 12, 13, 14, 13, 10, 8, 7, 6],
@@ -100,16 +80,6 @@
 -  for (let k = 0; k < 16; k++) {
 +  for (let k = 0; k < 5; k++) {
      const two = chance(0.25);
-@@ -9297,3 +9297,3 @@
- const CAR_HEX = ['#7fa8e0', '#8fd0a4', '#e6dfd2', '#d99ab8', '#e8cf8a', '#b9a7dd', '#f2f2ee', '#3c4048', '#9aa6b8', '#c85a4f'];
--const MODELS = ['sedan', 'sedan', 'hatch', 'hatch', 'hatch', 'smart', 'suv', 'suv', 'cn', 'cn', 'cn'];   // cn — китайцы, каждая четвёртая
-+const MODELS = ['sedan'];
- const TAXI_HEX = '#ffc400';
-@@ -9303,3 +9303,3 @@
-   const taxi = !parked && chance(night ? ECON.TRAFFIC.NIGHT_TAXI : 0.3);
--  const model = taxi ? pick(['sedan', 'hatch', 'suv', 'cn']) : pick(MODELS);
-+  const model = 'sedan';
-   // Поток — лёгкие машины (один-два меша вместо двадцати), как на парковке:
 @@ -12897,20 +12897,5 @@
  
 -/* ─── площадка: реклама, пауза, язык, настройки ───
@@ -154,11 +124,6 @@
 -const NO_E = /[?&]noE(&|$)/.test(location.search);   // ?noE — без леса у Ленина, змеев и качалок (сравнить кадр)
 +const NO_E = true;   // Меньше фоновых аттракционов на карте VK.
  /* змеи и дроны (kites.js): места в парках и на Ленина, люди — только рядом с камерой */
-@@ -19673,3 +19655,3 @@
-    после всей стройки, город не сдвигается */
--LATE.add('liteTaxi', function* () { for (const m of ['sedan', 'hatch', 'suv', 'cn']) { liteTemplate(m, true); yield m; } for (const m of new Set(MODELS)) { liteTemplate(m, false); yield m; } });
-+LATE.add('liteTaxi', function* () { liteTemplate('sedan', true); yield 'sedan'; liteTemplate('sedan', false); });
- GFX.init({ resize });                             // настройки графики: дальность, окна, чёткость (gfx.js)
 --- a/src/game/garage.js
 +++ b/src/game/garage.js
 @@ -250,3 +250,3 @@
@@ -201,10 +166,15 @@
  export const LIFT=LAND_LIFT;
 --- a/src/game/realcar.js
 +++ b/src/game/realcar.js
+@@ -80,3 +80,3 @@
+    ownCab — свой салон модели из-за руля (торпедо, щиток, руль модели); выключен (автор 23.10): из-за руля — салон игры, как у всех машин (camview.js) */
+-export const REAL = { on: !(typeof location !== 'undefined' && /[?&]oldcar\b/.test(location.search || '')), ownCab: false, k: 1.2, eye: new THREE.Vector3(0.36, 1.19, 0.24) };   // текущая (для game.js camStep и отладки)
++export const REAL = { on: false, ownCab: false, k: 1.2, eye: new THREE.Vector3(0.36, 1.19, 0.24) };   // текущая (для game.js camStep и отладки)
+ const CACHE = {};
 @@ -699,3 +699,3 @@
     стёкла трескаются с GLASS_HIT.CRACK м/с и бьются с GLASS_HIT.BREAK */
 -export const TRAFFIC = { MODELS: ['semerka'], SHARE: 0.5, WEAR: [0, 0.8] };   // «Копейка» — вышла плохо (автор 13.10), ждёт модель получше
-+export const TRAFFIC = { MODELS: [], SHARE: 0, WEAR: [0, 0.8] };   // «Копейка» — вышла плохо (автор 13.10), ждёт модель получше
++export const TRAFFIC = { MODELS: [], SHARE: 0, WEAR: [0, 0.8] };   // VK: оставляем процедурные кузова и лёгкие меши потока.
  const GLASS_HIT = { CRACK: 9, BREAK: 15, BOTH: 24 };   // BOTH — подробная копия: с такого удара трескаются и остальные стёкла
 --- a/src/game/renderresolution.js
 +++ b/src/game/renderresolution.js
@@ -219,6 +189,17 @@
      h += row(t('авторы и лицензии'), t('титры ▸'), 'set-credits', focus);
 +    h += '<a id="set-support" href="https://github.com/ndrwbv/bird-delivery/issues" target="_blank" rel="noopener noreferrer">' + t('Поддержка игры') + '</a>';
      // ТЕСТ: «открыть все районы» — в релизе (BUILD_VERSION, __RELEASE__) нет, с ?debug — есть
+--- a/src/game/snow/index.js
++++ b/src/game/snow/index.js
+@@ -9,3 +9,7 @@
+ 
+-export const enabled = typeof location !== 'undefined' && new URLSearchParams(location.search).get('snowv2') !== '0';
++import { ON as MOBILE } from '../mobile.js';
++
++// VK keeps the static winter surface on phones. Live snow can be enabled for a debug comparison.
++const snowMode = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('snowv2') : '0';
++export const enabled = snowMode !== '0' && (!MOBILE || snowMode === '1');
+ export function captureBenches(benches) { if (enabled) captureBenchReceivers(benches); }
 --- a/src/game/yardcars.js
 +++ b/src/game/yardcars.js
 @@ -64,3 +64,3 @@
