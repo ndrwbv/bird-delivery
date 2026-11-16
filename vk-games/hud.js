@@ -8,6 +8,7 @@ function icon (shape) {
 const nitroIcon = icon('<path d="M11.2 2.1 4.9 10.9h4.5l-.6 7 6.3-8.8h-4.4z"/>');
 const coldIcon = icon('<path d="M10 2.8v14.4M3.8 6.4l12.4 7.2M3.8 13.6l12.4-7.2M8 4.5l2 2 2-2M8 15.5l2-2 2 2"/>');
 const timerIcon = icon('<circle cx="10" cy="11.1" r="6.05"/><path d="M8.2 1.9h3.6M10 2v2.9M14.5 6.8l1.4-1.4M10 8.1v3l1.8 1.2"/>');
+const pauseIcon = icon('<path d="M7 4.5v11M13 4.5v11" stroke-width="2.1"/>');
 const pedalIcons = {
   gas: icon('<path d="m5.5 11 4.5-4.5 4.5 4.5m-9 4 4.5-4.5 4.5 4.5"/>'),
   brake: icon('<path d="M5 7.5h10M5 12.5h10"/>'),
@@ -15,7 +16,7 @@ const pedalIcons = {
   hand: icon('<circle cx="10" cy="10" r="7"/><path d="M8.1 13.5V6.7h2.5a1.8 1.8 0 0 1 0 3.6H8.1"/>'),
 };
 
-let nav, updateMinimap, clock, digits, payment, gain, shift, nitro, pizza;
+let nav, updateMinimap, pause, clock, digits, payment, gain, shift, nitro, pizza;
 let shownTime;
 let payTimer;
 
@@ -32,7 +33,7 @@ function meter (root, kind, icon, label) {
   return el;
 }
 
-export function init (radar, left, right, buildings) {
+export function init (radar, left, right, buildings, onPause) {
   nav = document.createElement('button');
   nav.className = 'vk-nav';
   nav.type = 'button';
@@ -65,7 +66,14 @@ export function init (radar, left, right, buildings) {
   nitro = meter(meters, 'nitro', nitroIcon, t('Запас нитро'));
   pizza = meter(meters, 'pizza', coldIcon, t('Остывание пиццы'));
   pizza.hidden = true;
-  right.prepend(meters);
+  pause = document.createElement('button');
+  pause.type = 'button';
+  pause.className = 'vk-pause';
+  pause.hidden = true;
+  pause.innerHTML = pauseIcon + '<span></span>';
+  pause.lastElementChild.textContent = t('Пауза');
+  pause.addEventListener('click', onPause);
+  right.prepend(pause, meters);
 
   for (const button of document.querySelectorAll('#touchpad button[data-k]')) {
     const key = button.dataset.k;
@@ -84,6 +92,7 @@ function setText (el, value) {
 
 export function routeStep (car, playing, target, route, time) {
   nav.hidden = !playing;
+  pause.hidden = !playing;
   updateMinimap(playing, car, target, route);
   clock.hidden = !target || time === null;
   if (clock.hidden || time === shownTime) return;

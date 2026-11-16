@@ -180,6 +180,55 @@ html[data-map] body #hud-right #cambtn {
 #cambtn .vk-camera-icon { width: 16px; height: 16px; color: var(--vk-orange); }
 #cambtn:focus-visible { outline: 1px solid var(--vk-orange); outline-offset: 1px; }
 #cambtn:hover .vk-camera-mode { color: var(--vk-orange); }
+.vk-pause, #vk-map-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 0 10px;
+  color: var(--vk-ink);
+  background: var(--vk-control);
+  border: 1px solid var(--vk-edge);
+  border-radius: 7px;
+  font: 650 12px/1 system-ui, sans-serif;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: pointer;
+}
+.vk-pause[hidden] { display: none; }
+.vk-pause .vk-icon, #vk-map-close svg { width: 16px; height: 16px; color: var(--vk-orange); }
+:is(.vk-pause, #vk-map-close):focus-visible { outline: 2px solid var(--vk-orange); outline-offset: 2px; }
+html[data-map] body #fullmap {
+  align-items: center;
+  justify-content: center;
+  background: #20150fee;
+  cursor: default;
+}
+#fullmap .fm-box {
+  width: min(1240px, calc(100% - var(--vk-left) - var(--vk-right) - 12px));
+  height: calc(100% - var(--vk-top) - var(--vk-bottom));
+  gap: 3px;
+  padding: 0;
+  color: var(--vk-ink);
+  font: 500 12px/1.35 system-ui, sans-serif;
+}
+#fullmap .fm-top { align-items: center; justify-content: flex-start; min-height: 44px; color: inherit; font-size: 13px; }
+#fullmap .fm-top span { color: var(--vk-muted); font-size: 11px; }
+#vk-map-close { margin-left: auto; min-width: 44px; }
+#fullmap .fm-view { border: 0; border-radius: 0; background: transparent; }
+#fullmapc {
+  image-rendering: auto;
+  mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent),
+              linear-gradient(0deg, transparent, #000 8%, #000 94%, transparent);
+  mask-composite: intersect;
+}
+#fullmap .fm-leg { color: var(--vk-muted); font-size: 11px; gap: 4px 14px; padding: 4px 0; min-height: 0; }
+#fullmap .fm-leg i { animation: none; box-shadow: none; border: 0; }
+#fullmap .lg-me { background: var(--vk-ink); clip-path: polygon(50% 0, 95% 100%, 50% 76%, 5% 100%); }
+#fullmap .lg-to { background: var(--vk-orange); border: 2px solid var(--vk-control); border-radius: 50%; transform: none; }
+#fullmap .lg-route, #fullmap .lg-dodo { background: var(--vk-orange); }
+@media (max-width: 560px) { #fullmap .fm-top span { display: none; } }
 .vk-payment {
   display: grid;
   gap: 2px;

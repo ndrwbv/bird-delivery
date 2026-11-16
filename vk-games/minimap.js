@@ -2,6 +2,45 @@
 const WIDTH = 144, HEIGHT = 54, DRIVER_Y = 34;
 const SCALE = 0.14, RANGE = 580, FRAME_MS = 40;
 
+export const MAP_INK = {
+  houseFill: '#49332348',
+  houseEdge: '#f0c19f70',
+  route: '#ffad6c',
+  routeEdge: '#412417bd',
+  driver: '#fff0df',
+  driverEdge: '#4c2d1e',
+};
+
+export function strokeRoute (ctx, ink, width, edge) {
+  ctx.lineJoin = ctx.lineCap = 'round';
+  ctx.lineWidth = width + edge;
+  ctx.strokeStyle = MAP_INK.routeEdge;
+  ctx.stroke();
+  ctx.lineWidth = width;
+  ctx.strokeStyle = ink;
+  ctx.stroke();
+}
+
+export function drawDriver (ctx, x, y, angle = 0, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.scale(scale, scale);
+  ctx.beginPath();
+  ctx.moveTo(0, -4);
+  ctx.lineTo(3, 2.5);
+  ctx.lineTo(0, 1.2);
+  ctx.lineTo(-3, 2.5);
+  ctx.closePath();
+  ctx.fillStyle = MAP_INK.driver;
+  ctx.strokeStyle = MAP_INK.driverEdge;
+  ctx.lineWidth = 1;
+  ctx.lineJoin = 'round';
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
 function buildingShape ({ p }) {
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
   for (const [x, z] of p) {
@@ -34,8 +73,8 @@ export function createMinimap (canvas, outerCanvas, buildings) {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     ctx.lineWidth = 0.85;
-    ctx.fillStyle = '#49332348';
-    ctx.strokeStyle = '#f0c19f70';
+    ctx.fillStyle = MAP_INK.houseFill;
+    ctx.strokeStyle = MAP_INK.houseEdge;
     for (const house of houses) {
       if (house.x0 > car.x + RANGE || house.x1 < car.x - RANGE ||
           house.z0 > car.z + RANGE || house.z1 < car.z - RANGE) continue;
@@ -68,26 +107,11 @@ export function createMinimap (canvas, outerCanvas, buildings) {
           ctx.lineTo(...project(ax + (bx - ax) * fraction, az + (bz - az) * fraction));
           remaining -= length;
         }
-        ctx.lineWidth = 2.7;
-        ctx.strokeStyle = '#412417bd';
-        ctx.stroke();
-        ctx.lineWidth = 1.65;
-        ctx.strokeStyle = path;
-        ctx.stroke();
+        strokeRoute(ctx, path, 1.65, 1.05);
       }
       ctx.setLineDash([]);
     }
-    ctx.beginPath();
-    ctx.moveTo(x, y - 4);
-    ctx.lineTo(x + 3, y + 2.5);
-    ctx.lineTo(x, y + 1.2);
-    ctx.lineTo(x - 3, y + 2.5);
-    ctx.closePath();
-    ctx.fillStyle = '#fff0df';
-    ctx.strokeStyle = '#4c2d1e';
-    ctx.lineWidth = 1;
-    ctx.fill();
-    ctx.stroke();
+    drawDriver(ctx, x, y);
   }
 
   return (show, car, target, route) => {
