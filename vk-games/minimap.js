@@ -1,6 +1,6 @@
 /* Карта сверху с поворотом по курсу машины. */
 const WIDTH = 144, HEIGHT = 54, DRIVER_Y = 34;
-const SCALE = 0.22, RANGE = 370, FRAME_MS = 40;
+const SCALE = 0.14, RANGE = 580, FRAME_MS = 40;
 
 function buildingShape ({ p }) {
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
@@ -57,7 +57,7 @@ export function createMinimap (canvas, outerCanvas, buildings) {
       path.addColorStop(1, '#f0803b76');
       for (const [points, dashed] of [[route, false], [route.offroadStart, true], [route.offroad, true]]) {
         if (!points || points.length < 2 || Math.hypot(points[0][0] - car.x, points[0][1] - car.z) > RANGE) continue;
-        ctx.setLineDash(dashed ? [3, 3] : []);
+        ctx.setLineDash(dashed ? [2, 2] : []);
         ctx.beginPath();
         ctx.moveTo(...project(points[0][0], points[0][1]));
         let remaining = RANGE;
@@ -68,24 +68,24 @@ export function createMinimap (canvas, outerCanvas, buildings) {
           ctx.lineTo(...project(ax + (bx - ax) * fraction, az + (bz - az) * fraction));
           remaining -= length;
         }
-        ctx.lineWidth = 4.5;
+        ctx.lineWidth = 2.7;
         ctx.strokeStyle = '#412417bd';
         ctx.stroke();
-        ctx.lineWidth = 2.8;
+        ctx.lineWidth = 1.65;
         ctx.strokeStyle = path;
         ctx.stroke();
       }
       ctx.setLineDash([]);
     }
     ctx.beginPath();
-    ctx.moveTo(x, y - 6);
-    ctx.lineTo(x + 4.5, y + 4);
-    ctx.lineTo(x, y + 2);
-    ctx.lineTo(x - 4.5, y + 4);
+    ctx.moveTo(x, y - 4);
+    ctx.lineTo(x + 3, y + 2.5);
+    ctx.lineTo(x, y + 1.2);
+    ctx.lineTo(x - 3, y + 2.5);
     ctx.closePath();
     ctx.fillStyle = '#fff0df';
     ctx.strokeStyle = '#4c2d1e';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1;
     ctx.fill();
     ctx.stroke();
   }
