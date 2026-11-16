@@ -39,8 +39,9 @@ export function init (radar, left, right, buildings) {
   nav.title = t('карта района');
   nav.setAttribute('aria-label', nav.title);
   nav.hidden = true;
-  nav.innerHTML = '<canvas class="vk-minimap" aria-hidden="true"></canvas>';
-  updateMinimap = createMinimap(nav.firstElementChild, buildings);
+  nav.innerHTML = '<canvas class="vk-minimap vk-minimap-outer" aria-hidden="true"></canvas>' +
+    '<canvas class="vk-minimap vk-minimap-center" aria-hidden="true"></canvas>';
+  updateMinimap = createMinimap(nav.lastElementChild, nav.firstElementChild, buildings);
 
   clock = document.createElement('div');
   clock.className = 'vk-countdown';

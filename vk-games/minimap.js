@@ -1,6 +1,6 @@
 /* Карта сверху с поворотом по курсу машины. */
 const WIDTH = 144, HEIGHT = 54, DRIVER_Y = 34;
-const SCALE = 0.62, RANGE = 120, FRAME_MS = 40;
+const SCALE = 0.44, RANGE = 180, FRAME_MS = 40;
 
 function buildingShape ({ p }) {
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
@@ -11,9 +11,12 @@ function buildingShape ({ p }) {
   return { p, x0, z0, x1, z1 };
 }
 
-export function createMinimap (canvas, buildings) {
+export function createMinimap (canvas, outerCanvas, buildings) {
   canvas.width = WIDTH * 2;
   canvas.height = HEIGHT * 2;
+  outerCanvas.width = canvas.width;
+  outerCanvas.height = canvas.height;
+  const outer = outerCanvas.getContext('2d');
   const ctx = canvas.getContext('2d');
   ctx.scale(2, 2);
   const houses = buildings.filter(b => b.p.length >= 3).map(buildingShape);
@@ -91,10 +94,11 @@ export function createMinimap (canvas, buildings) {
     const now = performance.now();
     const changed = !visible || target !== lastTarget || route !== lastRoute;
     visible = show;
-    canvas.hidden = !show;
     if (!show || (!changed && now - lastFrame < FRAME_MS)) return;
     if (!changed && Math.hypot(car.x - lastX, car.z - lastZ) < 0.3 && Math.abs(car.h - lastHeading) < 0.01) return;
     draw(car, target, route);
+    outer.clearRect(0, 0, outerCanvas.width, outerCanvas.height);
+    outer.drawImage(canvas, 0, 0);
     lastX = car.x; lastZ = car.z; lastHeading = car.h;
     lastFrame = now; lastRoute = route; lastTarget = target;
   };

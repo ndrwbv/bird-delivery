@@ -25,7 +25,7 @@ try {
   copyFileSync(join(edition, 'package.json'), join(stage, 'package.json'));
   copyFileSync(join(edition, 'vite.config.mjs'), join(stage, 'vite.config.mjs'));
   symlinkSync(join(edition, 'node_modules'), join(stage, 'node_modules'), 'junction');
-  for (const file of ['game.patch', 'menu.patch']) {
+  for (const file of ['game.patch', 'menu.patch', 'look.patch']) {
     run('git', ['apply', '--whitespace=nowarn', join(edition, file)], stage);
   }
   copyFileSync(join(edition, 'menu.js'), join(stage, 'src', 'game', 'menu.js'));
@@ -33,6 +33,7 @@ try {
   copyFileSync(join(edition, 'shift-reward.js'), join(stage, 'src', 'game', 'vk-shift-reward.js'));
   for (const ext of ['js', 'css']) copyFileSync(join(edition, 'hud.' + ext), join(stage, 'src', 'game', 'vk-hud.' + ext));
   copyFileSync(join(edition, 'minimap.js'), join(stage, 'src', 'game', 'vk-minimap.js'));
+  copyFileSync(join(edition, 'look.js'), join(stage, 'src', 'game', 'vk-look.js'));
   const city = join(stage, 'src', 'maps', 'seversk');
   copyFileSync(join(edition, 'map.js'), join(city, 'vk.js'));
   await prepareCity(city);
