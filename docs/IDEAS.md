@@ -81,6 +81,7 @@
 - [Интерфейс и бренд](plan/ui-brand.md)
 - [Вайлдвуд](plan/wildwood.md)
 - [Яндекс Игры](plan/yandex.md)
+- [VK Games](plan/vk-games.md)
 - [Подумать, потом, не делаем](plan/later.md)
 
 </details>

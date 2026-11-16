@@ -1,0 +1,13 @@
+{
+  "name": "bird-pizza-vk-games",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@vkontakte/vk-bridge": "3.0.2",
+    "clipper-lib": "6.4.2",
+    "vite": "6.4.3"
+  }
+}

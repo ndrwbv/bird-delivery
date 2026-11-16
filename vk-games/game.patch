@@ -1,0 +1,301 @@
+--- a/index.html
++++ b/index.html
+@@ -13,3 +13,2 @@
+   <meta name="apple-mobile-web-app-title" content="Птица Пицца">
+-  <link rel="manifest" href="./manifest.webmanifest">
+   <link rel="apple-touch-icon" href="./icon.png">
+--- a/src/game/career.js
++++ b/src/game/career.js
+@@ -36,2 +36,3 @@
+ import * as STOUR from './shifttour.js';        // первый чек смены: Толик облачками показывает, что тут где (shifttour.js)
++import { addShiftReward } from './vk-shift-reward.js';
+ import * as SSTEPS from './shiftsteps.js';      // конец смены экранами по очереди: деньги → «давай депнем?» → рейтинг → машина → чек (shiftsteps.js)
+@@ -562,2 +563,4 @@
+   buildEnd();
++  addShiftReward({ over: ov, eligible: wasOn && full && S.delivered > 0, money: A.money,
++    grant: amount => { A.addWallet(amount); A.Store.flush(); refreshEnd(); } });
+   closeSpend(); DEP.close();
+--- a/src/game/cars.js
++++ b/src/game/cars.js
+@@ -276,3 +276,3 @@
+   const add = kind === 'wings' || kind === 'gun';  // крылья и гранатомёт — один раз, цена одна (econ.js ADDON)
+-  if (!c || (kind !== 'armor' && kind !== 'engine' && !add)) return { ok: false, why: 'unknown' };
++  if (!c || (kind !== 'armor' && kind !== 'engine')) return { ok: false, why: 'unknown' };
+   if (!ownedIds().includes(id)) return { ok: false, why: 'owned' };
+--- a/src/game/daily.js
++++ b/src/game/daily.js
+@@ -109,3 +109,3 @@
+   const order = list => shuffle(list.filter(id => !last.includes(id))).concat(shuffle(list.filter(id => last.includes(id))));
+-  const calm = order(ids.filter(id => !ECON.DAILY.TASKS[id].wild)), wild = order(ids.filter(id => ECON.DAILY.TASKS[id].wild));
++  const calm = order(ids.filter(id => !ECON.DAILY.TASKS[id].wild));
+   const out = [];
+@@ -113,4 +113,3 @@
+   for (let k = 0; k < count; k++) {
+-    const w = !calm0 && Math.random() < (ECON.DAILY.WILD_P ?? 0.5);
+-    if (!take(w ? wild : calm)) take(w ? calm : wild);
++    if (!take(calm)) break;
+   }
+--- a/src/game/districts.js
++++ b/src/game/districts.js
+@@ -99,3 +99,3 @@
+    старта — cur(), вернуться можно в любую (game.js backToBase → ближайшая) */
+-export const allOpen = () => has() && opened() >= count();
++export const allOpen = () => count() > 1 && opened() >= count();
+ export const city = () => allOpen() && !!(A && +A.Store.get(KEY_C, 0));
+--- a/src/game/econ.js
++++ b/src/game/econ.js
+@@ -15,3 +15,3 @@
+    перед выпуском в Стим — ON: false (docs/IDEAS.md, трек «Стим»). */
+-export const TEST_MONEY = { ON: true, TO: 900000 };
++export const TEST_MONEY = { ON: false, TO: 900000 };
+ 
+@@ -809,3 +809,2 @@
+   },
+-  WILD_P: 0.5,                 // каждое место в списке смены — «угарное» с таким шансом (в среднем половина)
+   /* не в одну смену: первое задание и любое из остальных (одно мешает другому) */
+@@ -892,18 +891,3 @@
+ export const CAR_LIST = [
+-  { id: 'semerka', price: 0,      stars: 0,  hp: 7,  L: 3,   vmax: 44, acc: 29, handling: 3 },   // acc 34 → 29; 28.10.2026: руль 5 → 3, мягче нарастает поворот
+-  { id: 'matiz',   price: 40000,  stars: 0,  hp: 6,  L: 2,   vmax: 46.5, acc: 39.8, handling: 8 },
+-  { id: 'kopeyka', price: 88000,  stars: 0,  hp: 8,  L: 4,   vmax: 44.8, acc: 34.9, handling: 4 },
+-  { id: 'cheri',   price: 120000, stars: 0,  hp: 7,  L: 3,   vmax: 48.1, acc: 39, handling: 9 },
+-  { id: 'priora',  price: 152000, stars: 0,  hp: 8,  L: 2,   vmax: 49.8, acc: 39, handling: 6 },
+-  { id: 'buhanka', price: 240000, stars: 0,  hp: 11, L: 5,   vmax: 41.5, acc: 30.7, handling: 1 },
+-  { id: 'niva',    price: 360000, stars: 0,  hp: 9,  L: 3,   vmax: 48.1, acc: 38.2, handling: 4, offroad: true },
+-  { id: 'belgik',  price: 440000, stars: 0,  hp: 9,  L: 1.5, vmax: 50.6, acc: 41.5, handling: 6 },
+-  { id: 'volga',   price: 520000, stars: 0,  hp: 10, L: 2,   vmax: 51.5, acc: 38.2, handling: 2 },
+-  { id: 'cruze',   price: 720000, stars: 0,  hp: 9,  L: 1,   vmax: 55.6, acc: 43.2, handling: 10 },
+-  { id: 'havalka', price: 860000, stars: 3,  hp: 12, L: 1,   vmax: 51.5, acc: 38.2, handling: 3, offroad: true },
+-  { id: 'vesta',   price: 1000000, stars: 5,  hp: 10, L: 1,   vmax: 58.1, acc: 44.8, handling: 7 },
+-  { id: 'jilya',   price: 1200000, stars: 8, hp: 11, L: 0.5, vmax: 57.3, acc: 45.6, handling: 5 },
+-  { id: 'patriot', price: 1440000, stars: 12, hp: 13, L: 0.3, vmax: 56.4, acc: 41.5, handling: 2, offroad: true },
+-  // летающий электро-кабриолет (17.10.2026, автор: «летающий Тесла Роудстер»): самый дорогой, кнопка — подлёт на время (flycar.js FLY)
+-  { id: 'roadster', price: 2400000, stars: 15, hp: 9, L: 0.3, vmax: 60, acc: 50, handling: 9, fly: true },
++  { id: 'semerka', price: 0,      stars: 0,  hp: 7,  L: 3,   vmax: 44, acc: 29, handling: 3 },
+ ];
+@@ -987,3 +971,3 @@
+   //       0  1  2  3  4  5   6   7   8   9  10  11  12  13  14  15  16  17  18  19  20  21  22  23
+-  BY_HOUR: [8, 6, 5, 4, 4, 6, 10, 18, 28, 26, 22, 21, 22, 22, 21, 21, 23, 27, 28, 27, 20, 16, 13, 10],
++  BY_HOUR: [5, 4, 3, 3, 3, 4, 6, 9, 13, 13, 11, 11, 11, 11, 11, 11, 12, 13, 14, 13, 10, 8, 7, 6],
+   TOUCH_K: 0.86, STEP_S: 1.2, HIDE_R: 230,
+--- a/src/game/game.js
++++ b/src/game/game.js
+@@ -345,3 +345,3 @@
+    ключ dlv-edition больше не читаем), ?kids — детская для проверки. */
+-const ADULT = !!Platform.features.adult && !new URLSearchParams(location.search).has('kids');
++const ADULT = false;
+ const GORE_ON = ADULT;
+@@ -941,3 +941,3 @@
+ const CW = CITY.meta.size[0], CD = CITY.meta.size[1];
+-const BOUNDS = { x0: -CW / 2 + 12, x1: CW / 2 - 12, z0: -CD / 2 + 12, z1: CD / 2 - 12 };
++const BOUNDS = MAP.bounds || { x0: -CW / 2 + 12, x1: CW / 2 - 12, z0: -CD / 2 + 12, z1: CD / 2 - 12 };
+ /* Край карты — многоугольник, если он у карты есть (Северск: по забору
+@@ -8051,3 +8051,3 @@
+ function initPeople () {
+-  for (let k = 0; k < (INTRO ? 18 : 44); k++) {
++  for (let k = 0; k < 20; k++) {
+     // во вступлении лица у прохожих не грузим: в кадре их не разглядеть, а
+@@ -8117,3 +8117,3 @@
+ function initScoots () {
+-  for (let k = 0; k < 16; k++) {
++  for (let k = 0; k < 5; k++) {
+     const two = chance(0.25);
+@@ -9297,3 +9297,3 @@
+ const CAR_HEX = ['#7fa8e0', '#8fd0a4', '#e6dfd2', '#d99ab8', '#e8cf8a', '#b9a7dd', '#f2f2ee', '#3c4048', '#9aa6b8', '#c85a4f'];
+-const MODELS = ['sedan', 'sedan', 'hatch', 'hatch', 'hatch', 'smart', 'suv', 'suv', 'cn', 'cn', 'cn'];   // cn — китайцы, каждая четвёртая
++const MODELS = ['sedan'];
+ const TAXI_HEX = '#ffc400';
+@@ -9303,3 +9303,3 @@
+   const taxi = !parked && chance(night ? ECON.TRAFFIC.NIGHT_TAXI : 0.3);
+-  const model = taxi ? pick(['sedan', 'hatch', 'suv', 'cn']) : pick(MODELS);
++  const model = 'sedan';
+   // Поток — лёгкие машины (один-два меша вместо двадцати), как на парковке:
+@@ -12897,20 +12897,5 @@
+ 
+-/* ─── площадка: реклама, пауза, язык, настройки ───
+-   Всё, что зависит от Яндекса или Стима, идёт через Platform. Полноэкранная
+-   реклама — раз в AD_EVERY доставок сразу после «принять» и перед «ещё
+-   раз»; частоту сверху режет сама площадка. Видео за награду — только по
+-   кнопке в конце смены: удваивает заработанное в кошелёк (не в рекорд). */
+-const AD_EVERY = 3;
+-const EXT = { paused: false };                     // пауза от площадки: реклама, свернули вкладку
++/* Пауза при сворачивании приложения и во время рекламы за бонус. */
++const EXT = { paused: Platform.paused };
+ const isPlaying = () => ['drive', 'back', 'handover', 'side', 'loading', 'brief'].includes(S.state);
+-/* плюс не чаще раза в три минуты своей игры: заказ — короткий «уровень»,
+-   рекламу между заказами площадка терпит, но не каждые полторы минуты */
+-const AD_GAP = 180000;
+-let adLast = performance.now();
+-const adDue = () => Platform.features.ads && !S.ride && (S.done || 0) > 0 && (S.done || 0) - (S.adDone || 0) >= AD_EVERY && performance.now() - adLast > AD_GAP;
+-async function showAd () {
+-  adLast = performance.now();
+-  Platform.gameplayStop();
+-  try { await Platform.showInterstitial(); } catch (e) { console.warn('[ad]', e); }
+-}
+ const nitroKey = () => (TMODE.touchOn() ? $t('кнопку нитро') : PAD.active ? 'A' : 'Shift');
+@@ -13040,3 +13025,3 @@
+     try {
+-      await resetSingleProgress({ store: Platform.store, storage: localStorage, keep: RESET_KEEP, heroName: heroName(), requestId });
++      await resetSingleProgress({ store: Platform.store, storage: Platform.storage, keep: RESET_KEEP, heroName: heroName(), requestId });
+     } catch (e) {
+@@ -15480,4 +15465,3 @@
+   if (!picked && DISTRICTS && CITYOPEN.beforeShift(() => goRun(true, checkIn))) return;
+-  if (S.state === 'over' && Platform.features.ads && (S.delivered || 0) > 0) { S.state = 'title'; $('over').hidden = true; showAd().then(() => startRun(false, checkIn)); }
+-  else startRun(false, checkIn);
++  startRun(false, checkIn);
+ }
+@@ -16316,4 +16300,2 @@
+   S.state = 'loading';
+-  // Полноэкранная реклама (Яндекс) — раз в несколько доставок, в паузе между заказами
+-  if (adDue()) { S.adDone = S.done; showAd().then(loadPizza); return; }
+   loadPizza();
+@@ -18096,3 +18078,3 @@
+   parkingClear: pinFree, surfaceAt, setPause, acceptOrder });
+-const NO_E = /[?&]noE(&|$)/.test(location.search);   // ?noE — без леса у Ленина, змеев и качалок (сравнить кадр)
++const NO_E = true;   // Меньше фоновых аттракционов на карте VK.
+ /* змеи и дроны (kites.js): места в парках и на Ленина, люди — только рядом с камерой */
+@@ -19673,3 +19655,3 @@
+    после всей стройки, город не сдвигается */
+-LATE.add('liteTaxi', function* () { for (const m of ['sedan', 'hatch', 'suv', 'cn']) { liteTemplate(m, true); yield m; } for (const m of new Set(MODELS)) { liteTemplate(m, false); yield m; } });
++LATE.add('liteTaxi', function* () { liteTemplate('sedan', true); yield 'sedan'; liteTemplate('sedan', false); });
+ GFX.init({ resize });                             // настройки графики: дальность, окна, чёткость (gfx.js)
+--- a/src/game/garage.js
++++ b/src/game/garage.js
+@@ -250,3 +250,3 @@
+   }
+-  return h + addonActs(c) + extraActs(c);
++  return h + extraActs(c);
+ }
+--- a/src/game/gfx.js
++++ b/src/game/gfx.js
+@@ -61,3 +61,3 @@
+   { id: 'fps', label: N_('кадров в секунду'), vals: [30, 40, 60, 0] },   // 0 — без ограничения (как у экрана)
+-  { id: 'range', label: N_('дальность'), vals: [250, 370, 490] },
++  { id: 'range', label: N_('дальность'), vals: [220, 260, 320] },
+   { id: 'menu', label: N_('город за меню'), vals: [0, 30, -1] },
+@@ -72,5 +72,5 @@
+ export const PRESETS = {
+-  low: { fps: 0, range: 0, menu: 0, px: 0, win: 0, fx: 0, far: 0, aa: 0, edge: 1, shadow: 0 },   // edge: у низкой нет MSAA — мягкие края заметнее всего (телефон: +0,06 мс процессора, видеокарта ~+0,3 мс на M4)
+-  mid: { fps: 3, range: 1, menu: 1, px: 1, win: 1, fx: 1, far: 1, aa: 1, edge: 0, shadow: 0 },   // edge: Дека — проход ~0,25 мс на M4, на Деке по прикидке ×3 ≈ 0,6—0,9 мс > 0,5 — выкл (MSAA и так есть)
+-  high: { fps: 3, range: 2, menu: 2, px: 2, win: 1, fx: 1, far: 1, aa: 1, edge: 1, shadow: 1 },   // far: вдали раз в 2 кадра, как на средней (10.10.2026: на «Деке» поток −0,15 мс, люди и прохожие −0,1…0,2 мс; на средней так и было)
++  low: { fps: 0, range: 0, menu: 0, px: 0, win: 0, fx: 0, far: 0, aa: 0, edge: 0, shadow: 0 },
++  mid: { fps: 0, range: 1, menu: 0, px: 1, win: 0, fx: 0, far: 0, aa: 0, edge: 1, shadow: 0 },
++  high: { fps: 1, range: 2, menu: 0, px: 2, win: 0, fx: 0, far: 0, aa: 0, edge: 1, shadow: 0 },
+ };
+@@ -78,3 +78,3 @@
+ const NAMES = { low: N_('низкая'), mid: N_('средняя'), high: N_('высокая'), custom: N_('своя') };
+-export const DEFAULTS = { ios: 'low', phone: 'low', deck: 'mid', pc: 'high' };
++export const DEFAULTS = { ios: 'low', phone: 'low', deck: 'low', pc: 'low' };
+ 
+@@ -163,3 +163,3 @@
+ export const DETAIL = [
+-  { R: 80, small: 40, thin: 0.5, lawn: 0, meadow: 1 },     // низкая
++  { R: 64, small: 32, thin: 0.35, lawn: 0, meadow: 0 },     // низкая
+   { R: 100, small: 64, thin: 0.7, lawn: 0, meadow: 2 },    // средняя (Steam Deck)
+--- a/src/game/raisedland.js
++++ b/src/game/raisedland.js
+@@ -11,3 +11,3 @@
+ import {createLandCleaner,createLandRegionCleaner} from './landcleanpool.js';
+-export const ON = typeof location!=='undefined'&&!new URLSearchParams(location.search).has('oldland');
++export const ON = false;
+ export const LIFT=LAND_LIFT;
+--- a/src/game/realcar.js
++++ b/src/game/realcar.js
+@@ -699,3 +699,3 @@
+    стёкла трескаются с GLASS_HIT.CRACK м/с и бьются с GLASS_HIT.BREAK */
+-export const TRAFFIC = { MODELS: ['semerka'], SHARE: 0.5, WEAR: [0, 0.8] };   // «Копейка» — вышла плохо (автор 13.10), ждёт модель получше
++export const TRAFFIC = { MODELS: [], SHARE: 0, WEAR: [0, 0.8] };   // «Копейка» — вышла плохо (автор 13.10), ждёт модель получше
+ const GLASS_HIT = { CRACK: 9, BREAK: 15, BOTH: 24 };   // BOTH — подробная копия: с такого удара трескаются и остальные стёкла
+--- a/src/game/renderresolution.js
++++ b/src/game/renderresolution.js
+@@ -3,3 +3,3 @@
+ export const RESOLUTIONS = [[960,540],[1280,720],[1280,800],[1600,900],[1680,1050],[1920,1080],[1920,1200],[2560,1440],[2560,1600],0];
+-export const RESOLUTION_PRESETS = {pc:[1,3,5],deck:[0,1,2]};
++export const RESOLUTION_PRESETS = {pc:[0,1,1],deck:[0,0,1]};
+ export function migrateResolution(index,device) {
+--- a/src/game/settings.js
++++ b/src/game/settings.js
+@@ -191,2 +191,3 @@
+     h += row(t('авторы и лицензии'), t('титры ▸'), 'set-credits', focus);
++    h += '<a id="set-support" href="https://github.com/ndrwbv/bird-delivery/issues" target="_blank" rel="noopener noreferrer">' + t('Поддержка игры') + '</a>';
+     // ТЕСТ: «открыть все районы» — в релизе (BUILD_VERSION, __RELEASE__) нет, с ?debug — есть
+--- a/src/game/yardcars.js
++++ b/src/game/yardcars.js
+@@ -64,3 +64,3 @@
+   COVER: 0.05,            // под тентом
+-  MAX: 3600, MAX_TOUCH: 2200,   // потолок машин на город (страховка: в Солнечном ~3 200 / ~1 900)
++  MAX: 160, MAX_TOUCH: 100,   // потолок машин на город (страховка: в Солнечном ~3 200 / ~1 900)
+   Y: 0.1,                 // высота асфальта кармана (тротуар проезда 0,09, полотно 0,14)
+--- a/src/i18n/index.js
++++ b/src/i18n/index.js
+@@ -9,3 +9,3 @@
+ 
+-export const LANGS = ['ru', 'en', 'tr', 'de', 'es', 'pt', 'fr', 'it', 'pl', 'uk', 'kk', 'uz', 'be', 'ja', 'zh'];
++export const LANGS = ['ru'];
+ export const LANG_NAMES = {
+@@ -17,12 +17,5 @@
+ 
+-const LOADERS = import.meta.glob('./[a-z][a-z].json');
+ let LANG = 'ru', DICT = null, EN = null;
+ 
+-export async function initI18n (want) {
+-  LANG = LANGS.includes(want) ? want : 'en';
+-  const load = async l => { const f = LOADERS['./' + l + '.json']; return f ? (await f()).default : null; };
+-  if (LANG !== 'ru') {
+-    [DICT, EN] = await Promise.all([load(LANG), LANG === 'en' ? null : load('en')]);
+-    if (LANG === 'en') EN = DICT;
+-  }
++export async function initI18n () {
+   document.documentElement.lang = LANG;
+--- a/src/main.js
++++ b/src/main.js
+@@ -55,3 +55,3 @@
+   await requireSingleProgress({
+-    migrate: () => STARTUP.work('progress.migrate', () => migrateSingleProgress({ store: Platform.store })),
++    migrate: () => STARTUP.work('progress.migrate', () => migrateSingleProgress({ store: Platform.store, storage: Platform.storage })),
+     host: document.getElementById('boot'), t, pollPad, makePadMenu,
+@@ -59,3 +59,3 @@
+   // Platform modules have no game/i18n imports: bind readonly identity only after bootstrap succeeds.
+-  (Platform.leaderboard.local || Platform.leaderboard).setIdentity?.(saveId, heroName);
++  (Platform.leaderboard.local || Platform.leaderboard).setIdentity?.(() => saveId(Platform.storage), heroName);
+ }
+--- a/src/maps/index.js
++++ b/src/maps/index.js
+@@ -9,7 +9,3 @@
+ 
+-const MODE = import.meta.env.MODE, DEV = import.meta.env.DEV;
+-const ALL = {
+-  ...(MODE !== 'yandex' ? { seversk: () => import('./seversk/index.js') } : {}),
+-  ...(MODE === 'yandex' || DEV ? { moscow: () => import('./moscow/index.js') } : {}),
+-};
++const ALL = { seversk: () => import('./seversk/vk.js') };
+ export const MAP_IDS = Object.keys(ALL);
+@@ -17,4 +13,3 @@
+ export const MAP_META = {
+-  ...(MODE !== 'yandex' ? { seversk: { title: N_('Солнечный'), note: N_('закрытый город целиком: КПП, гаражи, промзона, железная дорога') } } : {}),
+-  ...(MODE === 'yandex' || DEV ? { moscow: { title: N_('Москва'), note: N_('район у Ленинской Слободы · демо') } } : {}),
++  seversk: { title: N_('Солнечный'), note: N_('район Юг') },
+ };
+--- a/src/platform/crashlog.js
++++ b/src/platform/crashlog.js
+@@ -21,3 +21,3 @@
+ const STACK = 1500;             // символов стека в записи
+-const KEY = 'dlv-crashlog';
++const KEY = 'bird-vk-crashlog';
+ const FREEZE_MS = 3000;
+@@ -153,3 +153,3 @@
+    вкладку прятали (фон) — в записи hidden: true (iOS выгружает и фоновые вкладки — не обязательно наш пик). */
+-const TKEY = 'dlv-trans';
++const TKEY = 'bird-vk-trans';
+ const TRS = {};                                    // открытые переходы: имя → когда начат (мс)
+--- a/src/platform/index.js
++++ b/src/platform/index.js
+@@ -5,7 +5,3 @@
+    Использование:  import Platform from './platform/index.js'; await Platform.init({ langs }); */
+-const mod = import.meta.env.MODE === 'yandex' ? await import('./yandex.js')
+-  : import.meta.env.MODE === 'steam' ? await (import.meta.glob('./steam.js')['./steam.js'] || (() => { throw new Error('нет src/platform/steam.js'); }))()
+-    : await import('./web.js');
+-
+-const Platform = mod.default;
++import Platform from './vk.js';
+ export default Platform;
