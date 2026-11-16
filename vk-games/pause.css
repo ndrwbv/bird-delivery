@@ -1,7 +1,9 @@
+@import './vk-paper.css';
+
 html[data-map] #pausem,
 html[data-map] #panel[data-kind="settings"] {
   box-sizing: border-box;
-  padding: var(--vk-top) var(--vk-right) var(--vk-bottom) var(--vk-left);
+  padding: var(--vk-top) var(--vk-right) calc(var(--vk-bottom) + 7px) var(--vk-left);
   background: #20150fee;
   backdrop-filter: none;
   color: var(--vk-ink);
@@ -11,6 +13,8 @@ html[data-map] #pausem {
   position: absolute;
   inset: 0;
   z-index: 28;
+  background: var(--vk-paper-dim);
+  color: var(--pp-ink);
   overflow: hidden;
 }
 html[data-map] #pausem:not([hidden]),
@@ -30,6 +34,12 @@ html[data-map] #panel[data-kind="settings"]:not([hidden]) {
   min-height: 0;
   gap: 10px;
   padding: 12px;
+}
+#pausem .vk-pause-sheet {
+  gap: clamp(9px, 1.7vh, 17px);
+  padding: clamp(12px, 2.3vh, 24px) clamp(12px, 2.1vw, 26px) clamp(13px, 1.8vh, 19px);
+}
+#panel[data-kind="settings"] .pn-box {
   color: var(--vk-ink);
   background: #2a1e18;
   border: 1px solid #685040;
@@ -48,13 +58,24 @@ html[data-map] #panel[data-kind="settings"]:not([hidden]) {
   margin: 0;
   text-align: left;
 }
-.vk-pause-head h2, #panel[data-kind="settings"] .set-head h2 {
+.vk-pause-head {
+  flex-wrap: wrap;
+  border-bottom: 1px dashed var(--pp-brown);
+  padding-block-end: 8px;
+}
+.vk-pause-head h2 {
+  margin: 0;
+  color: var(--pp-rust);
+  font: clamp(17px, 2.2vw, 27px)/1.15 var(--vk-paper-title);
+  text-transform: uppercase;
+}
+#panel[data-kind="settings"] .set-head h2 {
   margin: 0;
   color: var(--vk-ink);
   font-size: 17px;
   font-weight: 720;
 }
-#pm-time { color: var(--vk-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+#pm-time { color: var(--pp-label); font-size: 12px; font-variant-numeric: tabular-nums; }
 .vk-pause-content {
   flex: 1 1 auto;
   min-height: 0;
@@ -62,7 +83,7 @@ html[data-map] #panel[data-kind="settings"]:not([hidden]) {
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   align-content: start;
   align-items: start;
-  gap: 9px;
+  gap: 12px;
   overflow: hidden auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -73,10 +94,10 @@ html[data-map] #panel[data-kind="settings"]:not([hidden]) {
   min-width: 0;
   padding: 10px;
   margin: 0;
-  color: var(--vk-ink);
-  background: #382920;
-  border: 1px solid #624739;
-  border-radius: 7px;
+  color: var(--pp-ink);
+  background: #fff9e9;
+  border: 1px solid var(--vk-paper-line);
+  border-radius: 4px;
   box-shadow: none;
   filter: none;
   transform: none;
@@ -85,32 +106,31 @@ html[data-map] #panel[data-kind="settings"]:not([hidden]) {
 #pausem :is(#pm-order, #pm-stats)::before,
 #pausem :is(#pm-order, #pm-stats)::after { content: none; }
 .vk-pause-title { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-.vk-pause-title h3 { margin: 0 0 7px; font-size: 14px; }
-.vk-pause-title span { white-space: nowrap; color: var(--vk-muted); }
+.vk-pause-title h3 { margin: 0 0 9px; color: var(--pp-rust); font-size: 15px; }
+.vk-pause-title span { white-space: nowrap; color: var(--pp-label); }
 .vk-invoice {
   display: grid;
   grid-template-columns: minmax(58px, auto) minmax(0, 1fr);
   gap: 5px 9px;
   margin: 0;
 }
-.vk-invoice dt, .vk-pause-muted { color: var(--vk-muted); }
+.vk-invoice dt, .vk-pause-muted { color: var(--pp-label); }
 .vk-invoice dd { margin: 0; overflow-wrap: anywhere; }
-.vk-invoice b { color: var(--vk-ink); }
-.vk-invoice .vk-invoice-price { color: var(--vk-orange); font-weight: 700; }
+.vk-invoice b { color: var(--pp-ink); }
+.vk-invoice .vk-invoice-price { color: var(--pp-rust); font-weight: 700; }
 .vk-invoice-stops { margin: 0; padding-inline-start: 1.25em; }
 .vk-invoice-stops li + li { margin-top: 5px; }
-.vk-invoice-stops small { display: block; color: var(--vk-muted); font-size: inherit; }
+.vk-invoice-stops small { display: block; color: var(--pp-label); font-size: inherit; }
 .vk-invoice-stops .delivered { opacity: .64; }
-.vk-invoice-stops .current::marker { color: var(--vk-orange); }
+.vk-invoice-stops .current::marker { color: var(--pp-rust); }
 .vk-board { width: 100%; border-collapse: collapse; text-align: left; font-variant-numeric: tabular-nums; }
-.vk-board :is(th, td) { padding: 4px 5px; border-bottom: 1px solid #624739; }
-.vk-board thead th { color: var(--vk-muted); font-weight: 550; }
+.vk-board :is(th, td) { padding: 4px 5px; border-bottom: 1px solid var(--vk-paper-line); }
+.vk-board thead th { color: var(--pp-label); font-weight: 550; }
 .vk-board tbody th { font-weight: 650; overflow-wrap: anywhere; }
 .vk-board :is(th, td):nth-last-child(-n + 2) { text-align: right; white-space: nowrap; }
-.vk-board tr.me { color: var(--vk-orange); background: #503324; }
+.vk-board tr.me { color: var(--pp-rust); background: #ffead0; }
 .vk-board tr:last-child > * { border-bottom: 0; }
-.vk-pause-actions { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 6px; }
-#pausem :is(.vk-pause-actions button, #pm-cancel-order),
+.vk-pause-actions { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 7px 9px; }
 #panel[data-kind="settings"] :is(.set-close, .set-tab, .set-row button, .set-row select, .set-danger) {
   min-height: 32px;
   padding: 4px 9px;
@@ -123,17 +143,20 @@ html[data-map] #panel[data-kind="settings"]:not([hidden]) {
   font: 650 12px/1.2 system-ui, sans-serif;
   cursor: pointer;
 }
-#pausem .vk-pause-actions #pm-go {
-  background: #ffad6c;
-  color: #241810;
-  white-space: nowrap;
-  border-color: #ffad6c;
-  letter-spacing: normal;
-}
 #pausem #pm-go::before { content: none; }
-#pausem #pm-menu { margin-left: auto; }
-#pausem #pm-cancel-order { margin-top: 9px; background: transparent; color: #ffc0b1; }
-#pausem button:is(:focus-visible, .padsel),
+#pausem #pm-menu { margin-inline-start: auto; }
+#pausem #pm-cancel-order {
+  margin-top: 9px;
+  padding: 2px 0;
+  color: var(--pp-rust);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+#pausem #pm-cancel-order:focus-visible { outline: 2px solid var(--pp-rust); }
 #panel[data-kind="settings"] :is(button, select, input, a):is(:focus-visible, .padsel) {
   outline: 2px solid var(--vk-orange) !important;
   outline-offset: 1px;
@@ -201,13 +224,13 @@ html[data-map] #panel[data-kind="settings"]:not([hidden]) {
   .vk-pause-content { grid-template-columns: minmax(0, 1fr); }
   .vk-pause-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #pausem .vk-pause-actions button { min-width: 0; }
-  #pausem #pm-menu { margin-left: 0; }
+  #pausem #pm-menu { margin-inline-start: 0; }
 }
 @media (max-width: 365px) {
   #panel[data-kind="settings"] .set-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-height: 430px) {
-  .vk-pause-sheet, #panel[data-kind="settings"] .pn-box { gap: 7px; padding: 8px; }
+  #pausem .vk-pause-sheet, #panel[data-kind="settings"] .pn-box { gap: 7px; padding: 9px; }
   #pausem :is(#pm-order, #pm-stats) { padding: 7px; font-size: 12px; }
   .vk-pause-title h3 { margin-bottom: 5px; font-size: 13px; }
   #panel[data-kind="settings"] .set-list .set-row { padding-block: 2px; }

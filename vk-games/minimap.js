@@ -11,17 +11,26 @@ export const MAP_INK = {
   driverEdge: '#4c2d1e',
 };
 
-export function strokeRoute (ctx, ink, width, edge) {
+export const PAPER_MAP = {
+  paper: '#f1dfbb', water: '#a6b7ac', lot: '#e5cfac', green: '#cad1a3', forest: '#b7c691',
+  path: '#ad906b', sidewalk: '#c9ad84', mainRoad: '#fff8e4', road: '#f9ecce',
+  crossing: '#c0a179', houseFill: '#ccb28f', houseEdge: '#9a7352',
+  label: '#6b4830', rail: '#a5886d', railTie: '#f1d8b1', boundary: '#9b714f',
+  closed: '#8a6b4e38', order: '#b33524', route: '#e95424', routeEdge: '#fff8e5',
+  driver: '#543123', driverEdge: '#fff4d9',
+};
+
+export function strokeRoute (ctx, ink, width, edge, outline = MAP_INK.routeEdge) {
   ctx.lineJoin = ctx.lineCap = 'round';
   ctx.lineWidth = width + edge;
-  ctx.strokeStyle = MAP_INK.routeEdge;
+  ctx.strokeStyle = outline;
   ctx.stroke();
   ctx.lineWidth = width;
   ctx.strokeStyle = ink;
   ctx.stroke();
 }
 
-export function drawDriver (ctx, x, y, angle = 0, scale = 1) {
+export function drawDriver (ctx, x, y, angle = 0, scale = 1, ink = MAP_INK) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
@@ -32,8 +41,8 @@ export function drawDriver (ctx, x, y, angle = 0, scale = 1) {
   ctx.lineTo(0, 1.2);
   ctx.lineTo(-3, 2.5);
   ctx.closePath();
-  ctx.fillStyle = MAP_INK.driver;
-  ctx.strokeStyle = MAP_INK.driverEdge;
+  ctx.fillStyle = ink.driver;
+  ctx.strokeStyle = ink.driverEdge;
   ctx.lineWidth = 1;
   ctx.lineJoin = 'round';
   ctx.fill();

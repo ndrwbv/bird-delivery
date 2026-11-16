@@ -1,0 +1,408 @@
+--- a/index.html
++++ b/index.html
+@@ -111,10 +111,10 @@
+ 
+   <!-- ── полная карта района (только Москва): радар по клику, Tab ── -->
+   <div id="fullmap" hidden>
+-    <div class="fm-box">
++    <div class="fm-box vk-paper-frame">
+       <div class="fm-top">
+         <b data-i18n>Карта района</b><span></span>
+-        <button id="vk-map-close" type="button" data-i18n-aria="Закрыть карту" data-i18n-title="Закрыть карту">
++        <button id="vk-map-close" class="vk-paper-button" type="button" data-i18n-aria="Закрыть карту" data-i18n-title="Закрыть карту">
+           <svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+             <path d="m5 5 10 10m0-10L5 15"/>
+           </svg>
+@@ -176,7 +176,7 @@
+   <div id="pausem" class="msk-only" hidden>
+     <!-- журнал ошибок не пуст (src/platform/crashlog.js, docs/CRASHES.md) — показать и скопировать -->
+     <button id="pm-crash" type="button" hidden data-i18n>отчёт об ошибке</button>
+-    <section class="vk-pause-sheet" aria-labelledby="vk-pause-title">
++    <section class="vk-pause-sheet vk-paper-frame" aria-labelledby="vk-pause-title">
+       <header class="vk-pause-head">
+         <h2 id="vk-pause-title" data-i18n>Пауза</h2>
+         <span id="pm-time"></span>
+@@ -186,11 +186,11 @@
+         <section id="pm-stats"></section>
+       </div>
+       <div class="vk-pause-actions">
+-        <button id="pm-go" type="button" data-main data-i18n>Продолжить</button>
+-        <button id="pm-map" type="button" data-i18n>Карта района</button>
+-        <button id="pm-set" type="button" data-i18n>Настройки</button>
+-        <button id="pm-replay" type="button" data-i18n hidden>повтор последних 10 с</button>
+-        <button id="pm-menu" type="button" data-i18n>в главное меню</button>
++        <button id="pm-go" class="vk-paper-button vk-paper-primary" type="button" data-main data-i18n>Продолжить</button>
++        <button id="pm-map" class="vk-paper-button" type="button" data-i18n>Карта района</button>
++        <button id="pm-set" class="vk-paper-button" type="button" data-i18n>Настройки</button>
++        <button id="pm-replay" class="vk-paper-button" type="button" data-i18n hidden>повтор последних 10 с</button>
++        <button id="pm-menu" class="vk-paper-button" type="button" data-i18n>в главное меню</button>
+       </div>
+     </section>
+   </div>
+--- a/src/game/game.js
++++ b/src/game/game.js
+@@ -146,7 +146,8 @@
+ import * as CITYOPEN from './cityopen.js';      // карьера: все районы открыты — праздник, выбор перед сменой, «весь город»
+ import * as ORD from './orders.js';
+ import * as VKHUD from './vk-hud.js';
+-import { MAP_INK, drawDriver, strokeRoute } from './vk-minimap.js';
++import { PAPER_MAP, drawDriver, strokeRoute } from './vk-minimap.js';
++import * as VKNEIGHBORHOOD from './vk-neighborhood.js';
+ import * as HANDOFF from './handover.js';
+ import * as PAYVIS from './payfx.js';
+ import { catchPoint } from './catchpoint.js';
+@@ -2790,6 +2791,7 @@
+   const so = solid(x - 0.55, z - 0.55, x + 0.55, z + 0.55);
+   so.tree = 1;                                     // tree — удар звучит деревом (impact.js)
+   if (TREES.SHRUBS.has(kind)) so.shrub = 1;   // твёрдый куст (сирень, шиповник, акация, изгородь… — trees.js SHRUBS)
++  VKNEIGHBORHOOD.recordTree(x, z, !!so.shrub || kind === 'bush');
+   if (kind === 'hedge') so.noRing = 1;             // живая изгородь — без приствольного круга (yarddecor.js) (проверка «машина не застревает в кусте», tools/probe-checks/bush-stuck.js)
+   return true;
+ }
+@@ -6248,6 +6250,20 @@
+   if (!INTRO) tm('courts', () => COURTS.build(courtsApi()));   // теннисные и падел-корты — после горок дворов, до smashBuild (courts.js); ?nocourts — без них
+   if (!INTRO) tm('pitchnet', () => PNET.finish({ scene }));   // полотно сетки футбольных коробок — одним мешем, после дворов, до smashBuild (pitchnet.js); ?nopnet — без неё
+   if (!INTRO) tm('bollards', () => BOLL.build({ CITY, ZEBRAS, nearestRoad, roadWidth, inHouse, inBounds, groundH, curbAt, smashAdd, onPave: PAVE.onPave, introClear, startClear }));   // полусферы и столбики у зебр, магазинов и въездов — до smashBuild (bollards.js); ?nobollard — без них
++  if (!INTRO) tm('rest-areas', function* () {
++    indexSolids();
++    yield* VKNEIGHBORHOOD.buildNeighborhood({
++      benches: BENCHES, mesh: LITM, groundH, curbAt, inBounds, inHouse, nearestRoad, solidAt,
++      roadWalk: PAVE.roadWalk, onPave: PAVE.onPave,
++      parking: (x, z, r) => YCARS.blocks(x, z, r) || COURTS.blocks(x, z, r) ||
++        PZD.blocks(x, z, r) || RIVS.blocks(x, z, r) || PARKINGS.some(p => Math.hypot(p.x - x, p.z - z) < r + 4),
++      plant: (x, z, kind) => {
++        if (!tree(x, z, 0, kind)) return false;
++        gridSolid(SOLIDS[SOLIDS.length - 1]);
++        return true;
++      },
++    });
++  });
+   tm('smash', smashBuild);
+   if (RLAND.ON) LATE.add('raisedland', function* () {
+     const query17a=new URLSearchParams(location.search);
+@@ -7998,7 +8014,9 @@
+     const p = g.parent === scene ? g.position : g.parent ? g.parent.position : null;
+     if (!p) continue;
+     const u = g.userData, d2 = (p.x - cx) ** 2 + (p.z - cz) ** 2;
+-    const far = u.far ? d2 > NEAR2 : d2 > FAR2;
++    // Дальний меш собран в позе стоя. Скамейки держат сидячую позу на любой дальности.
++    const seated = u.qSeat > 0 && u.legL.rotation.x < -0.8 && u.legR.rotation.x < -0.8;
++    const far = !seated && (u.far ? d2 > NEAR2 : d2 > FAR2);
+     if (u.far === far) continue;
+     u.far = far;
+     u.lod.visible = far;
+@@ -8207,7 +8225,7 @@
+   p.x = damp(p.x, b.x, 9, dt); p.z = damp(p.z, b.z, 9, dt);
+   const r = p.grp.rotation.y, dr = Math.atan2(Math.sin(b.ry - r), Math.cos(b.ry - r));
+   p.grp.rotation.y = r + dr * Math.min(1, dt * 10);
+-  p.grp.userData.qSeat = PV.benchSeat(b);
++  p.grp.userData.qSeat = PV.benchSeatY(b) - groundH(p.x, p.z) - curbAt(p.x, p.z);
+   if (Math.hypot(p.x-b.x,p.z-b.z)<0.2) SNOW.press(b, p.x, p.z);
+ }
+ function offBench (p, ry) {
+@@ -14227,9 +14245,9 @@
+     p.forEach((q, i) => (i ? x.lineTo(fmX(q[0]), fmZ(q[1])) : x.moveTo(fmX(q[0]), fmZ(q[1]))));
+     x.lineWidth = w * FM.s; x.strokeStyle = col; x.lineCap = 'round'; x.lineJoin = 'round'; x.stroke();
+   };
+-  { const a = Math.max(0, B[0]), b = Math.max(0, B[1]); x.fillStyle = '#2c2019'; x.fillRect(a, b, Math.min(FM.bw, B[2]) - a, Math.min(FM.bh, B[3]) - b); }
++  { const a = Math.max(0, B[0]), b = Math.max(0, B[1]); x.fillStyle = PAPER_MAP.paper; x.fillRect(a, b, Math.min(FM.bw, B[2]) - a, Math.min(FM.bh, B[3]) - b); }
+   // река — по урезу рельефа, клетками сетки высот (только клетки в рамке)
+-  x.fillStyle = '#3a322e';
++  x.fillStyle = PAPER_MAP.water;
+   const wx = v => v / FM.s - FM.pad + BOUNDS.x0, wz = v => v / FM.s - FM.pad + BOUNDS.z0;
+   const i0 = Math.max(0, Math.floor((wx(B[0]) - TX0) / TG)), i1 = Math.min(TNX - 1, Math.ceil((wx(B[2]) - TX0) / TG) + 1);
+   const j0 = Math.max(0, Math.floor((wz(B[1]) - TZ0) / TG)), j1 = Math.min(TNZ - 1, Math.ceil((wz(B[3]) - TZ0) / TG) + 1);
+@@ -14238,12 +14256,12 @@
+       if (TH[j * TNX + i] >= 0) continue;
+       x.fillRect(fmX(TX0 + i * TG - TG / 2), fmZ(TZ0 + j * TG - TG / 2), TG * FM.s + px, TG * FM.s + px);
+     }
+-  for (const l of CITY.lots) if (vis(l)) poly(l.p, '#382a21');
+-  for (const g of CITY.green) if (vis(g)) poly(g.p, FOREST.isForest(g) ? '#36382a' : '#3b3528');
+-  for (const q of CITY.paths) if (vis(q)) line(q, 1.6, '#564335');
+-  for (const r of CITY.roads) if (vis(r)) line(r.p, SIDEWALK(r), '#514033');
+-  for (const r of CITY.roads) if (vis(r)) line(r.p, roadWidth(r), r.c <= 3 ? '#80634e' : '#6a5343');
+-  x.fillStyle = '#907563';
++  for (const l of CITY.lots) if (vis(l)) poly(l.p, PAPER_MAP.lot);
++  for (const g of CITY.green) if (vis(g)) poly(g.p, FOREST.isForest(g) ? PAPER_MAP.forest : PAPER_MAP.green);
++  for (const q of CITY.paths) if (vis(q)) line(q, 1.6, PAPER_MAP.path);
++  for (const r of CITY.roads) if (vis(r)) line(r.p, SIDEWALK(r), PAPER_MAP.sidewalk);
++  for (const r of CITY.roads) if (vis(r)) line(r.p, roadWidth(r), r.c <= 3 ? PAPER_MAP.mainRoad : PAPER_MAP.road);
++  x.fillStyle = PAPER_MAP.crossing;
+   for (const zb of ZEBRAS) {
+     const zx = fmX(zb.x), zz = fmZ(zb.z), m = 12 * FM.s;
+     if (zx < B[0] - m || zx > B[2] + m || zz < B[1] - m || zz > B[3] + m) continue;
+@@ -14253,8 +14271,8 @@
+   }
+   for (const b of CITY.buildings) {
+     if (!vis(b)) continue;
+-    poly(b.p, MAP_INK.houseFill);
+-    x.lineWidth = 0.85 * px; x.strokeStyle = MAP_INK.houseEdge; x.stroke();
++    poly(b.p, PAPER_MAP.houseFill);
++    x.lineWidth = 0.85 * px; x.strokeStyle = PAPER_MAP.houseEdge; x.stroke();
+   }
+   // подписи улиц: на целом городе — в метрах (мелкий город), при зуме — экранного размера,
+   // но только когда кварталы уже различимы
+@@ -14265,8 +14283,8 @@
+       const hw = n.t.length * fs * 0.4;
+       if (n.x + hw < B[0] || n.x - hw > B[2] || n.y + hw < B[1] || n.y - hw > B[3]) continue;
+       x.save(); x.translate(n.x, n.y); x.rotate(n.ang);
+-      x.lineWidth = fs / 3; x.strokeStyle = '#2c2019'; x.strokeText(n.t, 0, 0);
+-      x.fillStyle = '#cbb29d'; x.fillText(n.t, 0, 0);
++      x.lineWidth = fs / 3; x.strokeStyle = PAPER_MAP.paper; x.strokeText(n.t, 0, 0);
++      x.fillStyle = PAPER_MAP.label; x.fillText(n.t, 0, 0);
+       x.restore();
+     }
+   }
+@@ -14274,9 +14292,9 @@
+   for (const r of CITY.rails || []) {
+     if (!vis(r)) continue;
+     x.beginPath(); r.p.forEach(([a, b], i) => (i ? x.lineTo(fmX(a), fmZ(b)) : x.moveTo(fmX(a), fmZ(b))));
+-    x.lineWidth = Math.max(2 * px, 2.4 * FM.s); x.strokeStyle = '#72594a'; x.setLineDash([]); x.stroke();
++    x.lineWidth = Math.max(2 * px, 2.4 * FM.s); x.strokeStyle = PAPER_MAP.rail; x.setLineDash([]); x.stroke();
+     const dl = Math.max(4 * FM.s, 3 * px);
+-    x.lineWidth = Math.max(px, 1.2 * FM.s); x.strokeStyle = '#aa8b73'; x.setLineDash([dl, dl]); x.stroke();
++    x.lineWidth = Math.max(px, 1.2 * FM.s); x.strokeStyle = PAPER_MAP.railTie; x.setLineDash([dl, dl]); x.stroke();
+     x.setLineDash([]);
+   }
+   // граница-многоугольник: всё за забором затемняем, забор — линией
+@@ -14285,14 +14303,14 @@
+     x.beginPath(); x.rect(0, 0, FM.bw, FM.bh);
+     BORDER.forEach(([bx, bz], i) => (i ? x.lineTo(fmX(bx), fmZ(bz)) : x.moveTo(fmX(bx), fmZ(bz))));
+     x.closePath();
+-    x.fillStyle = '#211711a8'; x.fill('evenodd');
+-    x.lineWidth = Math.max(2 * px, 2 * FM.s); x.strokeStyle = '#83695a'; x.stroke();
++    x.fillStyle = PAPER_MAP.closed; x.fill('evenodd');
++    x.lineWidth = Math.max(2 * px, 2 * FM.s); x.strokeStyle = PAPER_MAP.boundary; x.stroke();
+     x.restore();
+     for (const k of CITY.kpp || []) { x.fillStyle = '#1f4f9a'; x.fillRect(fmX(k.p[0]) - 5 * px, fmZ(k.p[1]) - 5 * px, 10 * px, 10 * px); }
+   }
+   // за рамкой не проехать — затемняем
+   const pd = FM.pad * FM.s;
+-  x.fillStyle = '#21171188';
++  x.fillStyle = PAPER_MAP.closed;
+   x.fillRect(0, 0, FM.bw, pd); x.fillRect(0, FM.bh - pd, FM.bw, pd);
+   x.fillRect(0, pd, pd, FM.bh - pd * 2); x.fillRect(FM.bw - pd, pd, pd, FM.bh - pd * 2);
+ }
+@@ -14605,13 +14623,13 @@
+   if (routePts.length > 1) {
+     x.beginPath();
+     routePts.forEach((p, i) => (i ? x.lineTo(fmX(p[0]), fmZ(p[1])) : x.moveTo(fmX(p[0]), fmZ(p[1]))));
+-    strokeRoute(x, MAP_INK.route, 2.5 * u, 1.5 * u);
++    strokeRoute(x, PAPER_MAP.route, 3.2 * u, 2 * u, PAPER_MAP.routeEdge);
+   }
+   for (const walk of [routePts.offroadStart, routePts.offroad]) if (walk && walk.length > 1) {
+     x.setLineDash([Math.max(4 * u, 6 * s), Math.max(3 * u, 5 * s)]);
+     x.beginPath();
+     walk.forEach((p, i) => (i ? x.lineTo(fmX(p[0]), fmZ(p[1])) : x.moveTo(fmX(p[0]), fmZ(p[1]))));
+-    strokeRoute(x, MAP_INK.route, 2 * u, 1.3 * u);
++    strokeRoute(x, PAPER_MAP.route, 2 * u, 1.3 * u, PAPER_MAP.routeEdge);
+     x.setLineDash([]);
+   }
+   for (const g of SIG_GROUPS) {
+@@ -14635,7 +14653,7 @@
+   for (const o of COL_ON_MAP) colDot(x, fmX(o.x), fmZ(o.z), (o.hint ? 6 : 3) * u);   // находки — просто точки; подсказанная клиентом — крупнее
+   if (DISTRICTS) FM.dist.labels(x, 12 * u);         // районы: названия и «сколько смен до открытия»
+   if (PIZZA) {
+-    houseIcon(x, fmX(PIZZA.x), fmZ(PIZZA.z), 5.2 * u, MAP_INK.route, MAP_INK.driverEdge, MAP_INK.driver);
++    houseIcon(x, fmX(PIZZA.x), fmZ(PIZZA.z), 5.2 * u, PAPER_MAP.route, PAPER_MAP.driver, PAPER_MAP.driverEdge);
+   }
+   if (CAREER) AUTO.mapMark(x, fmX, fmZ, u);       // гараж Дяди Жени
+   if (CAREER) RAID.mapMark(x, fmX, fmZ, u);       // налёт на точку — мигает (raid.js)
+@@ -14644,13 +14662,13 @@
+     if (kind === 'home' && PIZZA) return;
+     x.beginPath();
+     x.arc(fmX(wx), fmZ(wz), (main ? 5 : 3.2) * u, 0, Math.PI * 2);
+-    x.fillStyle = main ? MAP_INK.route : MAP_INK.houseEdge;
++    x.fillStyle = main ? PAPER_MAP.order : PAPER_MAP.houseEdge;
+     x.fill();
+     x.lineWidth = 1.5 * u;
+-    x.strokeStyle = MAP_INK.driverEdge;
++    x.strokeStyle = PAPER_MAP.driverEdge;
+     x.stroke();
+   });
+-  drawDriver(x, fmX(V.x), fmZ(V.z), -V.h + Math.PI, 1.7 * u);
++  drawDriver(x, fmX(V.x), fmZ(V.z), -V.h + Math.PI, 1.7 * u, PAPER_MAP);
+ }
+ 
+ /* чем дерутся компании сетей в драках (crews.js): в детской версии — подушками,
+--- a/src/game/roadwear.js
++++ b/src/game/roadwear.js
+@@ -501,7 +501,7 @@
+    ранний выход, только цвет вершин). Свежий, ровный и заплатки — сразу только цвет. В заплатках,
+    старом и разбитом: пятна выцветания и зерно щебня; в старом и разбитом — трещины местами, в разбитом
+    на высокой — сетка «крокодил». Лужи на дне ям — только в дождь и вблизи ── */
+-const NEAR = [35, 50];
++const NEAR = [46, 70];
+ const CB = new THREE.Color();
+ const lin = hex => { CB.set(hex); return new THREE.Vector3(Math.round(CB.r * 255) / 255, Math.round(CB.g * 255) / 255, Math.round(CB.b * 255) / 255); };
+ const nz = k => fl(k / NZ.NC);                          // частота шума (клеток на метр) → координата текстуры
+@@ -513,6 +513,12 @@
+   wd = abs(wc - uRwT[1]); if (max(wd.r, max(wd.g, wd.b)) < 0.0022) wk = 3.0;   // старый
+   wd = abs(wc - uRwT[2]); if (max(wd.r, max(wd.g, wd.b)) < 0.0022) wk = 4.0;   // разбитый
+   wd = abs(wc - uRwT[3]); if (max(wd.r, max(wd.g, wd.b)) < 0.0022) wk = 9.0;   // дно ямы
++  if (wk < 0.0) {
++    for (int j = 0; j < 4; j++) {
++      wd = abs(wc - uRwBase[j]);
++      if (max(wd.r, max(wd.g, wd.b)) < 0.0022) wk = 1.0;
++    }
++  }
+   if (S_LAND && wk >= 0.0) {                  // S_LAND — не реквизит (seasons.js: признак в цвете вершины склейки LITM)
+     vec2 q = vSW.xz;
+     float near = 1.0 - smoothstep(${fl(NEAR[0])}, ${fl(NEAR[1])}, distance(q, cameraPosition.xz));
+@@ -522,9 +528,11 @@
+     } else if (near > 0.0) {
+       float fw = max(fwidth(q.x), fwidth(q.y));                 // метров на точку экрана
+       vec4 n0 = textureLod(uRwN, q * ${nz(0.05)} + wk * 0.31, 0.0);   // r — пятна 10—30 м, g — где трещины (~20—40 м)
+-      float amp = wk < 2.5 ? 0.08 : wk < 3.5 ? 0.13 : 0.05;
+-      float grain = (sHash(floor(q * 6.0)) - 0.5) * 0.09 * (1.0 - smoothstep(0.05, 0.13, fw));   // зерно щебня ~17 см
+-      vec3 c = diffuseColor.rgb * (1.0 + ((n0.r - 0.5) * amp * 2.0 + grain) * near);
++      float stones = textureLod(uRwN, q * ${nz(10.0)}, 0.0).a - 0.5;
++      float grain = stones * 0.34 * (1.0 - smoothstep(0.035, 0.11, fw));
++      float wear = textureLod(uRwN, q * ${nz(0.48)}, 0.0).r - 0.5;
++      float fade = (n0.r - 0.5) * (wk < 2.5 ? 0.23 : 0.35);
++      vec3 c = diffuseColor.rgb * (1.0 + (fade + wear * 0.14 + grain) * near);
+       if (wk > 2.5 && uRwLo < 0.5) {
+         float mk = smoothstep(wk > 3.5 ? 0.3 : 0.52, wk > 3.5 ? 0.45 : 0.7, n0.g);
+         if (mk > 0.0) {
+@@ -559,11 +567,12 @@
+   if (OFF) return m;
+   const prev = m.onBeforeCompile, key = m.customProgramCacheKey ? m.customProgramCacheKey() : '';
+   const uRwT = { value: [lin(WEAR.HEX.patched), lin(WEAR.HEX.old), lin(WEAR.HEX.broken), lin(POTHEX.bottom)] };
++  const uRwBase = { value: [WEAR.HEX.fresh, WEAR.HEX.smooth, ...WEAR.PATCH].map(lin) };
+   m.onBeforeCompile = (sh, r) => {
+     if (prev) prev.call(m, sh, r);
+     if (!/sHash/.test(sh.fragmentShader) || !/vSW/.test(sh.fragmentShader)) return;   // без сезонного шейдера — как было
+-    Object.assign(sh.uniforms, { uRwT, uRwLo, uRwQ, uRwRain, uRwN: { value: noiseTex() }, uRwCroc: { value: null } });
+-    sh.fragmentShader = 'uniform vec3 uRwT[4];\nuniform float uRwLo, uRwQ, uRwRain;\nuniform sampler2D uRwN, uRwCroc;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + RW_GLSL);
++    Object.assign(sh.uniforms, { uRwT, uRwBase, uRwLo, uRwQ, uRwRain, uRwN: { value: noiseTex() }, uRwCroc: { value: null } });
++    sh.fragmentShader = 'uniform vec3 uRwT[4], uRwBase[4];\nuniform float uRwLo, uRwQ, uRwRain;\nuniform sampler2D uRwN, uRwCroc;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + RW_GLSL);
+   };
+   m.customProgramCacheKey = () => key + 'wear';
+   return m;
+--- a/src/game/yardlife.js
++++ b/src/game/yardlife.js
+@@ -30,6 +30,7 @@
+    init(api) — game.js; step(dt) — каждый кадр (CL.step); scare(x, z, r) — из game.js scare.
+    ?noyl — без жизни во дворах (сравнить кадр). Отладка: __dlv.YLIFE (ST, SCENES, WALKERS, force(kind)).
+    ────────────────────────────────────────────────────────────────────────── */
++import { benchSeatY } from './propvar.js';
+ import * as THREE from '../vendor/three.module.min.js';
+ import { t, N_ } from '../i18n/index.js';
+ import { holdFixed } from './people.js';
+@@ -309,11 +310,11 @@
+   if (s.ski) { skis(grp); hold(grp, 'pole'); }
+   const hm = performance.now() - h0;
+   if (hm > ST.holdMax) ST.holdMax = hm;
+-  const p = { owner, grp, u: grp.userData, role: s.role, x: s.x, z: s.z, hx: s.x, hz: s.z, face: s.face, seat: s.seat || 0, st: 'act',
++  const p = { owner, grp, u: grp.userData, seatH: s.seatH || 0.68, role: s.role, x: s.x, z: s.z, hx: s.x, hz: s.z, face: s.face, seat: s.seat || 0, st: 'act',
+     t: rand(0.5, 4), ph: rand(0, 6), dead: 0, talk: rand(0.3, 1), k: s.k || 0, gy: ground(s.x, s.z), sc0: grp.scale.clone(), grow: 0, flee: null, fall: null };
+   grp.rotation.y = s.face;
+   grp.position.set(p.x, p.gy + (p.seat ? 0.42 : 0), p.z);
+-  if (p.seat) sitPose(p.u);
++  if (p.seat) sitPose(p);
+   A.scene.add(grp);
+   if (dist(p.x, p.z) < 140 && inView(p.x, 1, p.z, 2)) { p.grow = 0.02; grp.scale.copy(p.sc0).multiplyScalar(0.02); }
+   ST.people++; ST.spawned++;
+@@ -322,9 +323,9 @@
+ function dropPerson (p) {
+   if (!p.dead) { A.dropMesh(p.grp); p.dead = 1; ST.people--; }
+ }
+-function sitPose (u) {
++function sitPose ({ u, seatH }) {
+   u.legL.rotation.x = u.legR.rotation.x = -1.45;
+-  u.qSeat = 0.68;                                 // таз — на доске (лавочка, скамья у доминошного стола — 0,65—0,71 м; qpeople.js SIT, 0п75)
++  u.qSeat = seatH;
+   u.armL.rotation.x = u.armR.rotation.x = -0.45;
+ }
+ function standPose (u, dt, k = 6) {
+@@ -403,7 +404,7 @@
+   if (!walkTo(p, p.hx, p.hz, 1.5, dt)) { A.pushOut(p, 0.4); return false; }
+   p.x = p.hx; p.z = p.hz; p.gy = ground(p.x, p.z);
+   p.grp.rotation.y = p.face;
+-  if (p.wasSeat) { p.seat = 1; p.wasSeat = 0; sitPose(p.u); }
++  if (p.wasSeat) { p.seat = 1; p.wasSeat = 0; sitPose(p); }
+   p.grp.position.set(p.x, p.gy + (p.seat ? 0.42 : 0), p.z);
+   p.st = 'act';
+   return true;
+@@ -501,8 +502,8 @@
+   const n = chance(0.55) ? 3 : 2, cs = Math.cos(b.ry), sn = Math.sin(b.ry);
+   const offs = n === 3 ? [-0.8, 0, 0.8] : chance(0.5) ? [-0.55, 0.55] : [-0.8, 0.3];
+   for (const o of offs) {
+-    const x = b.x + o * cs, z = b.z - o * sn;
+-    sc.q.push(P0('babka', x, z, b.ry, { seat: 1, po: { fem: true, age: 'old' }, o: {} }));
++    const x = b.x + o * cs + sn * 0.06, z = b.z - o * sn + cs * 0.06;
++    sc.q.push(P0('babka', x, z, b.ry, { seat: 1, seatH: benchSeatY(b) - ground(x, z), po: { fem: true, age: 'old' } }));
+   }
+   return sc;
+ }
+@@ -960,7 +961,7 @@
+       break;
+     case 'bench':
+       for (const b of A.BENCHES) {
+-        if (b.taken || (b.prop && b.prop.down) || Math.abs(b.x - V.x) > YL.WANT || Math.abs(b.z - V.z) > YL.WANT) continue;
++        if (!b.vkRest || b.taken || (b.prop && b.prop.down) || Math.abs(b.x - V.x) > YL.WANT || Math.abs(b.z - V.z) > YL.WANT) continue;
+         if (!okDist(b.x, b.z) || !farFrom(b.x, b.z, gapK, kind) || A.nearClient(b.x, b.z, YL.CLIENT)) continue;
+         out.push(b);
+       }
+--- a/src/game/propvar.js
++++ b/src/game/propvar.js
+@@ -306,6 +306,8 @@
+    b — запись BENCHES (seatF — вид у лавочек game.js, prop.fvf — у склейки world.js / yards.js). Люди садятся на эту высоту (0п75) */
+ const SEAT_H = { classic: 0.68, slats: 0.665, broken: 0.665, plain: 0.65, park: 0.65 };
+ export const benchSeat = b => SEAT_H[(b && (b.seatF || (b.prop && b.prop.fvf))) || ''] || 0.71;
++export const benchGroundY = b => b.prop?.pivot?.position.y ?? b.y;
++export const benchSeatY = b => benchGroundY(b) + (b.prop?.pivot ? benchSeat(b) : (b.prop?.fvf ? benchSeat(b) : 0.68));
+ export const benchGeo = (sv, X, Y, Z, RY, k = 1) => quiet(() => geo(bench(kit(), { ...sv, k }), X, Y, Z, RY));
+ export const urnGeo = (sv, X, Y, Z, RY) => quiet(() => geo(urn(kit(), sv), X, Y, Z, RY));
+ export const canGeo = (sv, X, Y, Z, RY) => quiet(() => geo(can(kit(), sv), X, Y, Z, RY));
+--- a/src/game/hookah.js
++++ b/src/game/hookah.js
+@@ -17,7 +17,7 @@
+         fxAdd, puffGeo, steam, toast, Snd, CAR_L, CAR_W, nearestRoad, t */
+ 
+ import { part as fxPart } from './fxpool.js';    // частицы из общего запаса (fxpool.js)
+-import { benchSeat } from './propvar.js';        // высота сиденья лавочки — сидящие на ней (0п75)
++import { benchSeatY } from './propvar.js';        // высота сиденья лавочки — сидящие на ней (0п75)
+ import * as HITS from './hits.js';               // лавочку снесли — сидевшие падают с неё и встают (hits.js fall)
+ 
+ const SPAWN_R = 230, DROP_R = 320;
+@@ -32,7 +32,7 @@
+ 
+ export function init (api) {
+   A = api; THREE = api.THREE;
+-  const list = A.BENCHES.filter(b => hash(b.x, b.z, 7) < SHARE * 2.2)
++  const list = A.BENCHES.filter(b => b.vkRest && hash(b.x, b.z, 7) < SHARE * 2.2)
+     .sort((a, b) => hash(a.x, a.z, 3) - hash(b.x, b.z, 3));
+   for (const b of list) {
+     if (SPOTS.length >= MAX_SPOTS) break;
+@@ -107,7 +107,7 @@
+     // сидящие — лицом вперёд, как лавочка; стоящий — к кальяну
+     const h = frontOf(b, 1.05);
+     grp.rotation.y = sit ? b.ry : Math.atan2(h.x - x, h.z - z);
+-    if (sit) { grp.userData.legL.rotation.x = -1.45; grp.userData.legR.rotation.x = -1.45; grp.userData.qSeat = benchSeat(b); }   // таз — на доске (0п75)
++    if (sit) { grp.userData.legL.rotation.x = -1.45; grp.userData.legR.rotation.x = -1.45; grp.userData.qSeat = benchSeatY(b) - A.groundH(x, z) - A.curbAt(x, z); }   // таз — на доске (0п75)
+     A.scene.add(grp);
+     s.people.push(p);
+   }
+--- a/src/game/qpeople.js
++++ b/src/game/qpeople.js
+@@ -561,7 +561,7 @@
+    модели (Y — м над запястьями), не ближе ZMIN м перед осью тела (задний край — перед животом). Ходьба художника рукам
+    не машет. Так держат все: клиент у двери, на лавочке, по дороге домой, в катсценах */
+ /* сидит на лавочке (0п75): таз над доской сиденья, м; насколько сдвинут назад к спинке от середины лавочки, м */
+-export const SIT = { PAD: 0.07, BACK: 0.17 };
++export const SIT = { PAD: 0.12, BACK: 0.035 };
+ const SQ = new THREE.Quaternion();
+ export const CARRY = { ARM: -0.5, ELB: -1.0, IN: 0.1, Y: 0.035, ZMIN: 0.36 };
+ const CQL = new THREE.Quaternion().setFromEuler(new THREE.Euler(CARRY.ARM, 0, CARRY.IN)), CQR = new THREE.Quaternion().setFromEuler(new THREE.Euler(CARRY.ARM, 0, -CARRY.IN));
+--- a/src/game/wastelands.js
++++ b/src/game/wastelands.js
+@@ -785,7 +785,7 @@
+   pause(); yield 'trails'; resume();
+   // вытоптано у лавочек; лужа рядом — иногда
+   for (const b of A.BENCHES || []) {
+-    if (hash(b.x, b.z, 31) > TRAIL.BENCH) continue;
++    if (b.vkRest || hash(b.x, b.z, 31) > TRAIL.BENCH) continue;
+     const fx = Math.sin(b.ry || 0), fz = Math.cos(b.ry || 0), x = b.x + fx * 1.25, z = b.z + fz * 1.25;
+     if (onRoad(x, z, 0.3)) continue;
+     blobAt(x, z, 1.5, 0.95, Math.atan2(-fz, fx), '#9a8662', 0.0685, 13);   // под дорожками парка (0,07): на одной высоте мерцало (О3)
