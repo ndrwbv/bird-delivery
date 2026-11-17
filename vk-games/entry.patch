@@ -1,0 +1,465 @@
+--- a/src/main.js
++++ b/src/main.js
+@@ -65,9 +65,7 @@
+ const want = query.get('map') || (Platform.id === 'yandex' ? 'moscow' : 'seversk');
+ const mapId = MAP_IDS.includes(want) ? want : MAP_IDS[0];
+ const deck = Platform.steam?.deck || /steamos|steam deck/i.test(navigator.userAgent);
+-const launch = Platform.id === 'steam' && mapId === 'seversk' &&
+-  !['nocareer', 'kids', 'hellrun', 'doorpreview'].some(key => query.has(key)) &&
+-  (query.has('fastmenu') || window.__startupHost?.nativeDeckLaunch || deck && !query.has('debug') && !window.__startupHost);
++const launch = Platform.id === 'vk';
+ // This is only a cheap candidate choice. The game validates its full actual previsual key.
+ const addressCatalog17=typeof __ADDRESS_PACKAGE_CATALOG__!=='undefined'?__ADDRESS_PACKAGE_CATALOG__:null;
+ const addressBoot17=selectAddressBoot17b({mode:import.meta.env.MODE,mapId,deck:!!Platform.steam?.deck,userAgent:navigator.userAgent,
+--- a/src/game/game.js
++++ b/src/game/game.js
+@@ -146,6 +146,7 @@
+ import * as CITYOPEN from './cityopen.js';      // карьера: все районы открыты — праздник, выбор перед сменой, «весь город»
+ import * as ORD from './orders.js';
+ import * as VKHUD from './vk-hud.js';
++import './fmlegend.js';
+ import { PAPER_MAP, drawDriver, strokeRoute } from './vk-minimap.js';
+ import * as VKNEIGHBORHOOD from './vk-neighborhood.js';
+ import * as HANDOFF from './handover.js';
+@@ -8404,6 +8405,7 @@
+   });
+ }
+ function guestMove (st, x, z) {
++  if (!MAP.canDeliver(x, z)) return;
+   for (const p of st.peds) {
+     if (p.dead) continue;
+     clearGuest(p);
+@@ -8415,6 +8417,7 @@
+   }
+   st.at = null;
+   pinStop(st);
++  if (!st.at || !MAP.canDeliver(st.at.x, st.at.z)) st.at = { x, z };
+   st.addr = realAddress(x, z);
+   rememberSpot(x, z);
+   syncTarget(false);
+@@ -15254,7 +15257,7 @@
+ }
+ 
+ const elFx = $('fxs');
+-VKHUD.init($('radar'), $('hud-left'), $('hud-right'), CITY.buildings, () => setPause(true));
++VKHUD.init($('radar'), $('hud-left'), $('hud-right'), CITY.buildings, () => setPause(true), acceptOrder);
+ const TOUCH_NOS = document.querySelector('#touchpad .tp-nos');
+ let toastT = 0;
+ /* строка внизу — в общей очереди уведомлений (notifyq.js): ждёт, пока уйдёт то, что на экране; держит экран
+@@ -15342,6 +15345,7 @@
+   const time = timed && S.timeMax > 0 && Number.isFinite(S.time) ? Math.max(0, Math.ceil(S.time)) : null;
+   const firstShift = playing && CAREER && !S.ride && CAREERM.firstShift();
+   VKHUD.routeStep(V, playing, target, routePts, time, firstShift);
++  VKHUD.updateRecipient(playing && !back && S.order?.stops[S.order.idx], S.addrLine);
+ }
+ 
+ 
+@@ -15657,7 +15661,7 @@
+   $t('у него кот на клавиатуре, пицца не для кота'),
+ ];
+ 
+-let vkReadyOrder = null;
++let vkReadyOrder = null, invoiceAge = 0;
+ 
+ function showOrderCard (order) {
+   // квартира — в накладной с самого начала (домофон и подъезд берут её же: doorstep.js homeOf, docs/ORDERS.md «Домофон у подъезда»)
+@@ -15668,8 +15672,10 @@
+   // ждут, пока пустит ритм смены (rhythm.js: не на первом и последнем заказе, не в окно «покататься», одно на заказ)
+   if (CAREER && (!DOOR.DEBUG.timer.due || DIRECTOR.can('mini'))) DIRECTOR.planned(DOOR.plan(order));
+   vkReadyOrder = order;
+-}
+-const hidePhone = () => { vkReadyOrder = null; };
++  invoiceAge = 0;
++  VKHUD.showInvoice(orderInfo());
++}
++const hidePhone = () => { vkReadyOrder = null; VKHUD.hideInvoice(); };
+ 
+ /* одно уведомление за раз (notifyq.js, docs/CAREER.md «Одно уведомление за раз»): когда очередь идёт.
+    'out' — не смена (меню, чек смены): идёт, оставшееся от смены (тосты, подсказки, реплики) выбрасывается;
+@@ -15681,11 +15687,14 @@
+   return S.paused || EXT.paused || S.meal || FM.open || DLG.isOpen() || DOOR.on() || STORY.active() || FIRST.on() || REPLAY.on()
+     || (CAREER && CAREERM.padRoot()) || document.body.classList.contains('story-cut') ? 'wait' : 'ride';
+ } });
+-function briefStep () {
+-  if (S.state !== 'brief' || !S.order || S.order !== vkReadyOrder) return;
+-  if (S.paused || FM.open || DLG.isOpen() || (CAREER && CAREERM.padRoot())) return;
+-  vkReadyOrder = null;
+-  startLoad();
++function briefStep (dt) {
++  if (!vkReadyOrder) return;
++  if (S.order !== vkReadyOrder) { hidePhone(); return; }
++  if (S.paused || EXT.paused || FM.open || DLG.isOpen() || (CAREER && CAREERM.padRoot())) return;
++  if (S.state === 'brief') startLoad();
++  const moving = Math.hypot(V.vx, V.vz) > 2;
++  invoiceAge += dt;
++  if (invoiceAge >= (moving ? 1.8 : 5)) hidePhone();
+ }
+ /* ─────────────── куда везти ───────────────
+    Гость ждёт не на тротуаре у проспекта, а в глубине квартала: у подъезда,
+@@ -16011,7 +16020,12 @@
+   // Степан Тугарев — только самый первый заказ за всё время (учебный, planOrder), не каждую смену
+   const plan = CAREER ? ORD.nextPlan() : planOrder();
+   if (!plan) { backToBase(); return; }
+-  if (plan.story) { ORD.startStory(plan); return; }   // сюжетный: у двери человек из story.js
++  if (plan.story) {
++    if (ORD.startStory(plan) === false) backToBase();
++    return;
++  }
++  if (!plan.stops.length || plan.stops.some(st => !st.peds.length ||
++      st.peds.some(p => !MAP.canDeliver(p.x, p.z)))) { backToBase(); return; }
+ 
+   for (const st of plan.stops) {
+     if (st.beach) BEACH.dress(st.peds[0]);       // пляж: клиент — в купальнике (beach.js)
+@@ -16035,6 +16049,11 @@
+     pinStop(st);                                  // где ждёт — решено сейчас, пин больше не двигается
+   }
+ 
++  if (plan.stops.some(st => !st.at || !MAP.canDeliver(st.at.x, st.at.z))) {
++    for (const st of plan.stops) for (const p of st.peds) clearGuest(p);
++    backToBase();
++    return;
++  }
+   for (const st of plan.stops) rememberSpot(st.peds[0].x, st.peds[0].z);
+   // много пицц одному (12бл): изредка один клиент берёт стопку (pizzabox.js STACK); не в учебном, не сёрферу, не на пляж и фестиваль
+   for (const st of plan.stops) {
+@@ -16143,7 +16162,9 @@
+    коробка, крышка хлопает, и только тогда отпускается руль и тикает срок */
+ /* свернуть накладную (сама по времени, A / Enter, клик); пицца к этому времени уже летит или в багажнике */
+ function acceptOrder () {
+-  if (S.state === 'brief' && S.order && S.order === vkReadyOrder) briefStep();
++  if (!vkReadyOrder || S.order !== vkReadyOrder || S.paused || FM.open || DLG.isOpen()) return;
++  if (S.state === 'brief') startLoad();
++  hidePhone();
+ }
+ /* коробка из окна выдачи — в багажник; машина не останавливается и руль не блокируется */
+ function startLoad () {
+@@ -16571,7 +16592,7 @@
+ /* поручение — только в районе, где работаешь («весь город» — в любом открытом), и чтобы ближайшая
+    дорога тоже была там (а не за перекрытием, districtLocks) */
+ function errandZoneOk (x, z) {
+-  if (!inBorder(x, z)) return false;
++  if (!MAP.canDeliver(x, z, 3)) return false;
+   if (!DISTRICTS) return true;
+   const ok = i => (DIST.city() ? DIST.isOpen(i) : i === DIST.cur());
+   if (!ok(DIST.at(x, z))) return false;
+@@ -16618,21 +16639,25 @@
+   if (S.state === 'handover') S.handT = 0.2;
+ }
+ function startSide (ped, person, shop, it) {
+-  if (S.state !== 'handover' || ped.dead) { declineSide(ped); return; }
++  if (S.state !== 'handover' || ped.dead || !MAP.canDeliver(ped.x, ped.z)) { declineSide(ped); return; }
+   // забрать у человека у подъезда (errands.js): ставим его туда сейчас; не вышло — как отказ
+   const giverPed = shop.giver ? ERRS.spawnGiver(shop) : null;
+   if (shop.giver && !giverPed) { declineSide(ped); return; }
++  const at = giverPed ? pinFront(giverPed.x, giverPed.z) : { x: shop.x + shop.nx * 2, z: shop.z + shop.nz * 2 };
++  if (!MAP.canDeliver(at.x, at.z)) {
++    if (giverPed) clearGuest(giverPed);
++    declineSide(ped);
++    return;
++  }
+   S.side = { ped, person, shop, it, stage: 'shop', giverPed };
+   ERRS.hold(S.side);                              // клиент ждёт с пиццей там же, где отдал (Sd.home, пин Sd.at)
+   S.order = null;
+   S.state = 'side';
+   const who = NICK.short(person);
++  S.target = { ...at, name: shop.n, ped: giverPed };
+   if (giverPed) {
+-    const at = pinFront(giverPed.x, giverPed.z);
+-    S.target = { x: at.x, z: at.z, name: shop.n, ped: giverPed };
+     S.addrLine = shop.n + ', ' + realAddress(giverPed.x, giverPed.z);
+   } else {
+-    S.target = { x: shop.x + shop.nx * 2, z: shop.z + shop.nz * 2, name: shop.n };
+     S.addrLine = shop.n;
+   }
+   S.addr = $t('{what} для {who}', { what: it.what, who });
+@@ -18938,32 +18963,13 @@
+ /* кадр меню, пока город достраивается (latebuild.js): мир и камера стоят, город рисуется не чаще раза в 0,8 с —
+    время кадров уходит на стройку (на Деке кадр города ~35 мс). Ушли из меню (смена, гараж, катсцена) —
+    достроить сразу и дальше обычным кадром */
+-let LATE_F = 0, LATE_R = -1e9;
+-const LATE_EVERY = 800;
++let menuCameraReady = false;
+ function lateFrame (now) {
+-  // настройки, доска почёта, находки (пауза над меню) — город достраивается дальше за ними, без загрузки (автор 11.10.2026:
+-  // «захожу в настройки — опять загрузка, причём долгая»); достроить разом — только уход из меню и гараж / траты / деп
+   if (S.state !== 'title' || (CAREER && CAREERM.covered())) { LATE.flush(); return false; }
+   last = now;
+-  if (window.__boot?.launchAction === 'go') {
+-    if (!document.body.classList.contains('booting')) padStep();
+-    LATE.start();
+-    return true;
+-  }
+-  padStep();
+-  // город за дымкой (late-haze) — раз в LATE_EVERY мс: отрисовка всего города на Деке — 15—30 мс, раз в 0,2 с это было ~2 с
+-  // из 30 с достройки; появление вещей за размытием раз в 0,8 с на глаз то же
+-  if (LATE_F >= 3 && (now - LATE_R < LATE_EVERY || document.getElementById('boot')?.classList.contains('late-wait'))) return true;
+-  LATE_R = now;
+-  if (EDL.ED.cam) EDL.ED.cam(cam, 0);             // редактор города: своя камера (editlayer.js)
+-  else if (CAREER) CAREERM.menuCam(cam, PIZZA, tG);
+-  else { const a = tG * 0.16; cam.position.set(PIZZA.bx + Math.sin(a) * 64, PIZZA.by + 42 + Math.sin(a * 0.7) * 4, PIZZA.bz + Math.cos(a) * 64); cam.lookAt(PIZZA.bx, PIZZA.by + 3, PIZZA.bz); }
+-  car.position.set(V.x, V.y, V.z);
+-  car.rotation.y = V.h;
+-  try { updateEnv(0); } catch (e) { /* небо и свет (время суток стоит); что не собрано — потом */ }
+-  renderer.render(scene, cam);
+-  DYN.post();                                     // мягкие края (fxaa.js) — и в меню, пока город достраивается
+-  if (++LATE_F === 3) LATE.start();               // меню уже на экране — строим дальше
++  if (!menuCameraReady && CAREER) { CAREERM.menuCam(cam, PIZZA, tG); menuCameraReady = true; }
++  if (!document.body.classList.contains('booting')) padStep();
++  LATE.start();
+   return true;
+ }
+ function frame (now) {
+@@ -18980,7 +18986,8 @@
+   // Экран загрузки непрозрачный. Видеокарта занята передачей нового
+   // района, пока старый город скрыт и не участвует в кадре.
+   if (LAND_ENTERING) { last = now; return; }
+-  if (LATE.busy() && lateFrame(now)) return;      // город ещё достраивается за меню (latebuild.js)
++  if (LATE.busy() && lateFrame(now)) return;
++  if (S.state === 'title' && !elBig.hidden && !EDL.ED.on) { last = now; padStep(); return; }
+   if (LAND_READ17 && !LAND_READ17.ready || LAND_PACKAGE?.fatal || ADDRESS_PREPARED17?.meta().fatal) return;
+   if (LAND_STREAM && (!LAND_READ17 || LAND_READ17.ready)) CL.step('земля рядом', () => {
+     const menu=S.state==='title'||S.state==='over';
+@@ -19040,7 +19047,7 @@
+     vf = driveStep(dt);
+     deathTick(dt);
+   } else if (S.state === 'brief' || S.state === 'loading') {
+-    briefStep();
++    briefStep(dt);
+     if (dlgHold || HCAM.busy()) holdCar(dt);       // разговор поверх накладной (директор): руль из рук, машина стоит
+     startupDrivable = S.state === 'loading' && !dlgHold && !HCAM.busy();
+     vf = driveSub(dt);
+@@ -19060,6 +19067,7 @@
+     car.position.set(V.x, V.y, V.z);
+     car.rotation.y = V.h;
+   } else {
++    briefStep(dt);
+     startupDrivable = S.state === 'drive' && !DOOR.on() && !dlgHold && !HCAM.busy() && !FPD.busy() && !ST3.on();
+     if (DOOR.on() || dlgHold || HCAM.busy() || FPD.busy()) holdCar(dt);   // от первого лица к подъезду (fpdeliver.js); домофон (doorstep.js), окно разговора (dialog.js), сцена вручения (handcam.js): руль из рук, машина стоит
+     vf = driveSub(dt);
+--- a/src/game/orders.js
++++ b/src/game/orders.js
+@@ -160,7 +160,7 @@
+   // (там всё открыто — openSpot не нужен)
+   const di = DIST.has() && !DIST.city() ? DIST.cur() : -1;
+   const src = di >= 0 ? A.SPOTS.filter(s => DIST.at(s.x, s.z) === di && openSpot(s.x, s.z)) : A.SPOTS;
+-  POOL = src.map(s => ({ x: s.x, z: s.z, entr: ENTR.has(Math.round(s.x * 4) + ',' + Math.round(s.z * 4)), key: keyOf(s.x, s.z), zone: ZN.zoneAt(s.x, s.z), d: 0 }));
++  POOL = src.filter(s => A.MAP.canDeliver(s.x, s.z, 8)).map(s => ({ x: s.x, z: s.z, entr: ENTR.has(Math.round(s.x * 4) + ',' + Math.round(s.z * 4)), key: keyOf(s.x, s.z), zone: ZN.zoneAt(s.x, s.z), d: 0 }));
+   return rebase();
+ }
+ /* расстояния пула — от пиццерии, где стоишь. В режиме «весь город» вернуться можно в любую
+@@ -775,6 +775,10 @@
+   if (FORCE) { spec = FORCE; FORCE = null; }
+   else if (firstFinalComplete() || (SH.storyLast && !firstFinalPending())) return null; // оплаченную первую главу не повторяем и после перезапуска
+   else spec = Q.length ? Q.shift() : genSpec();         // собираем, когда нужен: очередь «дальше» не показываем
++  if (spec?.stops.some(stop => !A.MAP.canDeliver(stop.x, stop.z, 8))) {
++    if (spec.story) { storyCancel(spec.story); SH.storyLast = false; }
++    return null;
++  }
+   return bindSpec(spec);
+ }
+ export const storyLast = () => SH.storyLast;
+@@ -913,6 +917,7 @@
+   const sp = plan.ord, s = sp.story, stp = sp.stops[0];
+   // пин — перед дверью на свободном месте (game.js pinFront), человек сюжета — у самой двери
+   const at = A.pinFront ? A.pinFront(stp.x, stp.z) : { x: stp.x, z: stp.z };
++  if (!A.MAP.canDeliver(at.x, at.z)) { storyCancel(s); SH.storyLast = false; return false; }
+   const st = { peds: [], persons: s.person ? [s.person] : [], at, entry: s.door, key: stp.key, zone: stp.zone,
+     addr: stp.addr, note: s.note || '', reach: s.reach || 6 };
+   S.order = { kind: 'solo', tut: false, surf: false, stops: [st], idx: 0, why: plan.why, items: s.items || '1 × ' + t('пицца'), ord: sp };
+--- a/src/game/seasons.js
++++ b/src/game/seasons.js
+@@ -58,7 +58,7 @@
+ 
+ let C = null;                               // что дала игра (init)
+ const VK_SUMMER = 0.5;
+-let SEA = VK_SUMMER, FORCED = true;
++let SEA = VK_SUMMER, FORCED = false;
+ let THREE = null;
+ 
+ /* ─── кривые: сколько чего при данном сезоне ─── */
+@@ -693,6 +693,7 @@
+   index: MESH_PILE.map(m => m.geometry.userData.pileIndex).filter(Boolean) });
+ export function initSeasons (ctx) {
+   C = ctx; THREE = ctx.THREE;
++  readSaved();
+   const query = new URLSearchParams(location.search);
+   const pileCell = ctx.streamTreeMesh && query.has('debug') && query.has('deckpile128') ? 128 : CELL;
+   if (ctx.streamTreeMesh && PILE_INDEX && !EDL.ED.on && !JOINT_OFF)
+@@ -716,11 +717,11 @@
+    Заход в игру сезон не сдвигает (до 11.10.2026 — +полсмены календаря): какой был на последней смене */
+ function readSaved () {
+   const saved = C.Store.get('dlv-season', null);
+-  SEA = wrap(saved === null || saved === undefined ? 2.5 : +saved || 0);   // новичок в меню — зима (13.10.2026, «по базе зима»)
++  SEA = saved != null && Number.isFinite(+saved) ? wrap(+saved) : VK_SUMMER;
+ }
+ /** сменили профиль без перезагрузки (game.js reprofile): сезон — сохранённый у нового профиля (как при входе в игру) */
+ export function reloadSaved () { if (!C || FORCED) return; readSaved(); apply(); }
+-export function setSeason (v, forced = true) { SEA = VK_SUMMER; FORCED = true; apply(); }
++export function setSeason (v, forced = true) { SEA = Number.isFinite(+v) ? wrap(+v) : VK_SUMMER; FORCED = !!forced; apply(); }
+ export const seasonForced = () => FORCED;
+ function wrap (v) { return Math.round(((v % 4) + 4) % 4 * 1e5) / 1e5 % 4; }
+ 
+@@ -732,6 +733,7 @@
+ function apply () {
+   for (const k in K) A[k] = K[k](SEA);
+   if (VAR) for (const k in K) if (VAR[k] !== undefined) A[k] = typeof VAR[k] === 'function' ? VAR[k](A[k]) : VAR[k];
++  A.drift = A.ice = A.ny = A.mud = 0;
+   U.uHeat.value = (VAR && VAR.heat) || 0; U.uGold.value = (VAR && VAR.gold) || 0;
+   U.uSnow.value = A.snow; U.uDry.value = A.dry; U.uMud.value = A.mud; U.uFresh.value = A.fresh; U.uWet.value = A.wet;
+   U.uLeaf.value = A.leaf; U.uYellow.value = A.yellow; U.uFallen.value = A.fallen; U.uDrift.value = A.drift;
+--- a/src/game/seasoncycle.js
++++ b/src/game/seasoncycle.js
+@@ -36,7 +36,7 @@
+ import './seasoncycle.css';
+ 
+ export const CYC = {
+-  ON: false,              // в пилоте VK все смены летом
++  ON: false,              // VK выбирает простые сезоны без переходов и редких событий
+   KEY: 'dlv-cycle',       // { base: законченных смен на момент первой смены круга, seed: зерно сюрпризов }
+   LEN: { winter: 3, spring: 3, summer: 4, autumn: 3 },    // смен в сезоне
+   LEN0: { winter: 4 },    // первый год: зима на смену длиннее — Новый год встаёт после 3 смен новичка
+--- a/src/game/weather.js
++++ b/src/game/weather.js
+@@ -57,24 +57,24 @@
+ 
+ /* какой сезон выпадет на смену карьеры (в сумме 100; 11.10.2026): лето чаще — «чаще ярко-солнечно» (09.10.2026) */
+ /* 13.10.2026 (автор: «по базе делай погоду зиму»): всегда зима — жребий только на погоду в ней. Было: лето 38, осень 22, зима 18, весна 22 */
+-export const SEASON_W = { summer: 0, autumn: 0, winter: 100, spring: 0 };
++export const SEASON_W = { summer: 38, autumn: 22, winter: 18, spring: 22 };
+ /* где внутри сезона встаёт смена (seasons.js: 0—1 лето, 1—2 осень, 2—3 зима, 3—4 весна) — жребием в этих границах:
+    лето — от начала до разгара; осень — от ранней (кроны желтеют) до поздней (голые деревья, лужи) — межсезонье;
+    зима — снег лежит, гирлянды; весна — от распутицы (тает, грязь) до сирени — тоже межсезонье */
+-export const SEASON_AT = { summer: [0.12, 0.85], autumn: [1.1, 1.9], winter: [2.2, 2.82], spring: [3.1, 3.75] };
++export const SEASON_AT = { summer: [0.5, 0.5], autumn: [1.5, 1.5], winter: [2.5, 2.5], spring: [3.5, 3.5] };
+ /* шансы вариантов на смену, по сезону (в сумме 100). 11.10.2026 (сезон теперь тоже жребием): редкие — гроза, ураган,
+    снежная зима — реже (гроза 10/10/15 → 7/6/8, ураган 3/6/3 → 3/4/3, снежная зима 45 → 35), жара и золотая осень
+    чуть чаще (10 → 15, 26 → 30), затяжной дождь — обычный (было 12/8/20). До того (09.10.2026, «чаще ярко-солнечно»):
+    лето 65/10/12/10/3, осень 50/26/8/10/6, зима 55/45, весна 62/20/15/3 */
+ export const CHANCES = {
+-  summer: { clear: 62, heat: 15, rain: 13, storm: 7, hurricane: 3 },
+-  autumn: { clear: 48, golden: 30, rain: 12, storm: 6, hurricane: 4 },
+-  winter: { clear: 65, snowy: 35 },
+-  spring: { clear: 64, rain: 25, storm: 8, hurricane: 3 },
++  summer: { clear: 80, heat: 15, rain: 5 },
++  autumn: { clear: 60, golden: 35, rain: 5 },
++  winter: { clear: 100 },
++  spring: { clear: 90, rain: 10 },
+ };
+ /* первая смена новичка — разгар лета, ясно, без дождя (обучение не путается; было: первые 3 смены — лето календаря) */
+ export const NEWBIE = 1;
+-export const NEWBIE_SEA = 2.5;                    // зима (13.10.2026; было 0,4 — разгар лета)
++export const NEWBIE_SEA = 0.5;                    // первая смена VK летом
+ const LAST = 'dlv-wx-last';                    // «сезон/погода» прошлой смены карьеры: подряд не повторяем
+ /* обычная (ясная) смена: шанс, что на очередном «броске» (раз в 90—160 с) пойдёт дождь на 40—70 с.
+    Было 0,22 всегда — за 15-минутную смену (~6 бросков) дождь шёл в ~4 из 5 «ясных» смен; теперь летом ~1 из 6, весной и осенью ~1 из 2 */
+@@ -134,7 +134,7 @@
+ const WV = { k: null, t: 0, len: 0, peak: 0, gap: 0, L: 0, n: 0 };   // k — ступени волны [[с, ступень]], L — ступень сейчас (0…3)
+ let PIN = null;                                    // ?weather=blizzard / downpour, __dlv.weather.pin(3): ступень держится всё время
+ const ALIAS = { downpour: ['rain', 3] };
+-const summerWeather = id => Object.hasOwn(CHANCES.summer, id);
++const lightWeather = id => Object.values(CHANCES).some(chances => Object.hasOwn(chances, id));
+ const waved = (id = ID) => id === 'snowy' || id === 'rain';
+ const skew = ([a, b], r = Math.random()) => a + (b - a) * Math.pow(r, WAVE.SKEW);
+ /* волна: вверх по ступеням до вершины, держится, вниз до сухо; на нижних ступенях задерживается по пути */
+@@ -228,7 +228,7 @@
+   let q = new URLSearchParams(location.search).get('weather');
+   if (Object.hasOwn(ALIAS, q)) { PIN = ALIAS[q][1]; q = ALIAS[q][0]; }
+   if (q) {
+-    const requested = summerWeather(q) ? q : 'clear';
++    const requested = lightWeather(q) ? q : 'clear';
+     FORCE = requested;
+     setTimeout(() => set(requested), 0);
+   }   // ENV игры заводится позже
+@@ -249,7 +249,7 @@
+   CYCLE.clear();
+   const cyc = career ? CYCLE.shiftStart(done) : null;   // круг сезонов: шаг этой смены (null — выключен)
+   if (FORCE) id = FORCE;
+-  else if (NEW) { id = 'clear'; if (career) { SEAS.shiftSeason(cyc ? cyc.v : NEWBIE_SEA); C.Store.set(LAST, 'winter/clear'); } }
++  else if (NEW) { id = 'clear'; if (career) { SEAS.shiftSeason(cyc ? cyc.v : NEWBIE_SEA); C.Store.set(LAST, 'summer/clear'); } }
+   else if (cyc) {
+     SEAS.shiftSeason(cyc.v);
+     id = pickStep(cyc, String(C.Store.get(LAST, '') || ''), hur);
+@@ -280,7 +280,7 @@
+ }
+ /* поставить вариант сейчас */
+ function set (id, n = N) {
+-  if (!summerWeather(id)) id = 'clear';
++  if (!lightWeather(id)) id = 'clear';
+   ID = id; N = n;
+   SEAS.setVariant(OVER[id]);
+   TEMP = W.HEAT_T[0] + Math.floor(h01(n, 5) * (W.HEAT_T[1] - W.HEAT_T[0] + 1));
+@@ -299,7 +299,7 @@
+   BOLT.t = id === 'storm' || id === 'hurricane' ? rnd(2, 5) : 0;
+ }
+ export const id = () => ID;
+-export function force (v) { FORCE = summerWeather(v) ? v : null; }
++export function force (v) { FORCE = lightWeather(v) ? v : null; }
+ export const forced = () => FORCE;
+ 
+ /* Погоду игроку не называем (04.10.2026): ни подписи в начале смены, ни в накладной, итогах и чате —
+--- a/src/game/quickrun.js
++++ b/src/game/quickrun.js
+@@ -41,6 +41,8 @@
+ const KEY = 'dlv-quick';
+ const PASS = new Set(['dlv-sound', 'dlv-vol-music', 'dlv-vol-sfx', 'dlv-vol-eng', 'dlv-lang', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-ach', 'dlv-heroes', 'dlv-heroq', 'dlv-crashlog', 'dlv-hell-history', KEY]);
+ const FREEZE = new Set(['dlv-msk-xp']);
++const SEASONS = [{ id: 'now' }, { id: 'summer', v: 0.5 }, { id: 'autumn', v: 1.5 }, { id: 'winter', v: 2.5 }, { id: 'spring', v: 3.5 }];
++const SEASON_NAME = { summer: () => t('лето'), autumn: () => t('осень'), winter: () => t('зима'), spring: () => t('весна') };
+ const LEN_NAME = { short: () => t('короткая'), medium: () => t('средняя'), long: () => t('длинная') };
+ 
+ let A = null, box = null, endBox = null;
+@@ -95,18 +97,20 @@
+   try { l = (A.cars() && A.cars().list()) || []; } catch (e) { l = []; }
+   return l.filter(c => c.owned);
+ }
+-function weathers () {
++function weathers (seasonId) {
+   const W = A.weather;
+   if (!W) return [];
+-  return ['auto', ...Object.keys(W.CHANCES.summer)];
++  const tab = W.CHANCES && W.CHANCES[seasonBucket(seasonId)];
++  return ['auto', ...W.IDS.filter(id => !tab || tab[id] !== undefined)];
+ }
+ function choices () {
+   const s = saved(), cars = ownedCars(), open = DIST.has() ? DIST.opened() : 1;
+   const curCar = (cars.find(c => c.current) || cars[0] || {}).id;
++  const season = SEASONS.some(x => x.id === s.season) ? s.season : 'now';
+   return {
+     mode: A.hellAvailable && ['hell', 'afterhell'].includes(s.mode) ? s.mode : !normalAvailable() && A.hellAvailable ? 'hell' : 'normal',
+-    season: 'summer',
+-    weather: weathers().includes(s.weather) ? s.weather : 'auto',
++    season,
++    weather: weathers(season).includes(s.weather) ? s.weather : 'auto',
+     len: SHIFT.LENGTHS.some(l => l.id === s.len) ? s.len : 'medium',
+     car: cars.some(c => c.id === s.car) ? s.car : curCar,
+     dist: s.dist === 'city' && DIST.allOpen() ? 'city' : Number.isFinite(+s.dist) && +s.dist >= 0 && +s.dist < open ? +s.dist : (DIST.city() ? 'city' : DIST.cur()),
+@@ -126,8 +130,11 @@
+     f.push({ key: 'mode', label: t('режим заезда'), opts });
+   }
+   if (!hell) {
++    f.push({ key: 'season', label: t('сезон'), opts: SEASONS.map(s => s.id === 'now'
++      ? { v: 'now', name: t('как в карьере'), sub: S.name(S.value()) }
++      : { v: s.id, name: SEASON_NAME[s.id](), sub: '' }) });
+     if (A.weather) {
+-      f.push({ key: 'weather', label: t('погода'), opts: weathers().map(id => id === 'auto'
++      f.push({ key: 'weather', label: t('погода'), opts: weathers(SEL.season).map(id => id === 'auto'
+         ? { v: 'auto', name: t('как выпадет'), sub: t('по шансам сезона') }
+         : { v: id, name: A.weather.NAME[id](), sub: id === 'hurricane' ? t('уносит дома') : '' }) });
+     }
+@@ -194,6 +201,7 @@
+   const i = Math.max(0, f.opts.findIndex(o => String(o.v) === String(SEL[key])));
+   const o = f.opts[(i + d + f.opts.length) % f.opts.length];
+   SEL[key] = key === 'dist' && o.v !== 'city' ? +o.v : o.v;
++  if (key === 'season' && !weathers(SEL.season).includes(SEL.weather)) SEL.weather = 'auto';
+   blip(d > 0 ? 880 : 740);
+   if (key === 'mode') {
+     const rows = box.querySelector('.qr-fields');
+@@ -323,6 +331,8 @@
+     if (DIST.allOpen()) DIST.setCity(o.dist === 'city');
+     if (o.dist !== 'city') DIST.set(+o.dist);
+   }
++  const season = SEASONS.find(s => s.id === o.season);
++  A.seasons.set(season?.v ?? Q.sea, true);
+   if (A.weather) A.weather.force(o.weather && o.weather !== 'auto' ? o.weather : null);   // startRun → weather.shiftStart
+   A.Snd.boot && A.Snd.boot();
+   A.startRun();

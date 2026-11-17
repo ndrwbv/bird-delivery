@@ -1,4 +1,5 @@
 import { t } from '../i18n/index.js';
+import { label as recipientName } from './nicks.js';
 import { createMinimap } from './vk-minimap.js';
 import './vk-hud.css';
 
@@ -19,6 +20,7 @@ const pedalIcons = {
 let nav, updateMinimap, pause, clock, digits, payment, gain, shift, nitro, pizza;
 let shownTime, shownFirstShift = false;
 let payTimer;
+let invoice, invoiceList, recipient, recipientLabel, recipientAddress, activeStop, activeAddress;
 
 function meter (root, kind, icon, label) {
   const el = document.createElement('div');
@@ -33,7 +35,7 @@ function meter (root, kind, icon, label) {
   return el;
 }
 
-export function init (radar, left, right, buildings, onPause) {
+export function init (radar, left, right, buildings, onPause, onAccept) {
   nav = document.createElement('button');
   nav.className = 'vk-nav';
   nav.type = 'button';
@@ -52,6 +54,22 @@ export function init (radar, left, right, buildings, onPause) {
   digits = clock.lastElementChild;
   radar.append(nav);
   left.append(clock);
+
+  recipient = document.createElement('div');
+  recipient.className = 'vk-recipient';
+  recipient.hidden = true;
+  recipient.innerHTML = '<strong></strong><span></span>';
+  [recipientLabel, recipientAddress] = recipient.children;
+  left.append(recipient);
+
+  invoice = document.getElementById('phone');
+  invoiceList = document.getElementById('ph-list');
+  const accept = document.createElement('button');
+  accept.type = 'button';
+  accept.className = 'vk-paper-button vk-paper-primary vk-invoice-go';
+  accept.textContent = t('Поехали');
+  accept.addEventListener('click', onAccept);
+  invoiceList.after(accept);
 
   payment = document.createElement('div');
   payment.className = 'vk-payment';
@@ -88,6 +106,24 @@ export function init (radar, left, right, buildings, onPause) {
 
 function setText (el, value) {
   if (el.textContent !== value) el.textContent = value;
+}
+
+export function showInvoice (html) {
+  invoiceList.innerHTML = html;
+  invoice.classList.add('on');
+}
+
+export function hideInvoice () {
+  invoice.classList.remove('on');
+}
+
+export function updateRecipient (stop, address) {
+  recipient.hidden = !stop;
+  if (!stop || stop === activeStop && address === activeAddress) return;
+  activeStop = stop;
+  activeAddress = address;
+  recipientLabel.textContent = (stop.persons || []).map(person => recipientName(person, t('клиент'))).join(', ') || t('клиент');
+  recipientAddress.textContent = address || '';
 }
 
 export function routeStep (car, playing, target, route, time, firstShift) {

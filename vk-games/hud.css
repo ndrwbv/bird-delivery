@@ -19,25 +19,6 @@ body {
   --vk-danger: #ff7785;
 }
 
-#cr-menu .vk-start-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  padding-block-end: clamp(12px, 4vh, 44px);
-}
-.vk-start-actions .crm-card {
-  width: min(100%, clamp(185px, 23vw, 290px));
-  height: clamp(64px, 14vh, 104px);
-}
-.vk-start-actions .crm-cb { flex-direction: row; gap: 12px; }
-.vk-start-actions .crm-cb:is(:focus-visible, .padsel) {
-  outline: 3px solid var(--pp-yellow);
-  outline-offset: 3px;
-}
-.vk-start-options { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 0 8px; }
-.vk-start-options .pp-note { min-height: 36px; }
-
 html[data-map] body #radar {
   top: var(--vk-top);
   left: 50%;
@@ -58,9 +39,35 @@ html[data-map] body #radar {
 }
 
 html[data-map] body #radar :is(#radarc, .radar-me),
-html[data-map] body :is(#hud-left #cash, #task, #addr, #dist, #phone, #otags) {
+html[data-map] body :is(#hud-left #cash, #task, #addr, #dist, #otags) {
   display: none;
 }
+
+html[data-map] body #phone {
+  display: none;
+  box-sizing: border-box;
+  width: min(520px, var(--vk-center-width));
+  max-height: calc(100dvh - var(--vk-top) - var(--vk-bottom) - 18px);
+  overflow: auto;
+  font: 500 clamp(13px, 1.65vw, 16px)/1.35 system-ui, sans-serif;
+  touch-action: pan-y;
+}
+html[data-map] body #phone.on { display: block; }
+html[data-map] body:has(#pausem:not([hidden]), #fullmap:not([hidden])) #phone { display: none; }
+#phone .ph-top { display: none; }
+#phone .ph-main { min-width: 0; }
+#phone .vk-invoice-go { margin-top: 10px; }
+.vk-recipient {
+  width: min(190px, 28vw);
+  padding: 4px 7px;
+  color: var(--vk-ink);
+  background: var(--vk-panel);
+  border: 1px solid var(--vk-edge);
+  border-radius: 5px;
+  font: 600 11px/1.3 system-ui, sans-serif;
+}
+.vk-recipient > * { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vk-recipient span { color: var(--vk-muted); }
 
 .vk-payment {
   box-sizing: border-box;

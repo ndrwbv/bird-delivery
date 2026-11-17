@@ -1,12 +1,11 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { inDeliveryZone, playable as play } from './delivery-zone.mjs';
 
 // Keep a ring of scenery past the playable boundary so the horizon still looks natural.
-const play = { x0: 2330, x1: 3860, z0: 1335, z1: 2820 };
 const scenery = { x0: play.x0 - 200, x1: play.x1 + 200, z0: play.z0 - 200, z1: play.z1 + 200 };
 const contains = ([x, z]) => x >= scenery.x0 && x <= scenery.x1 && z >= scenery.z0 && z <= scenery.z1;
-const inside = ([x, z]) => x >= play.x0 && x <= play.x1 && z >= play.z0 && z <= play.z1;
 
 function overlaps (points) {
   if (!points.length) return false;
@@ -52,7 +51,7 @@ function cropTerrain (terrain) {
 export async function prepareCity (directory) {
   const { default: source } = await import(pathToFileURL(join(directory, 'city-data.js')).href);
   // A temporary package.json marks the archived game's .js modules as ESM before Vite loads them.
-  if (!inside(source.meta.home)) throw new Error('The pizzeria must be inside the VK district');
+  if (!inDeliveryZone(...source.meta.home)) throw new Error('The pizzeria must be inside the VK district');
   const border = [[play.x0, play.z0], [play.x1, play.z0], [play.x1, play.z1], [play.x0, play.z1]];
   const city = {
     ...source,

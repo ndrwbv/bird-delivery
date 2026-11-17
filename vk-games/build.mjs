@@ -26,10 +26,11 @@ try {
   copyFileSync(join(edition, 'package.json'), join(stage, 'package.json'));
   copyFileSync(join(edition, 'vite.config.mjs'), join(stage, 'vite.config.mjs'));
   symlinkSync(join(edition, 'node_modules'), join(stage, 'node_modules'), 'junction');
-  for (const file of ['game.patch', 'menu.patch', 'look.patch', 'neighborhood.patch', 'moderation.patch']) {
+  for (const file of ['game.patch', 'menu.patch', 'look.patch', 'neighborhood.patch', 'moderation.patch', 'entry.patch']) {
     run('git', ['apply', '--whitespace=nowarn', join(edition, file)], stage);
   }
   copyFileSync(join(edition, 'menu.js'), join(stage, 'src', 'game', 'menu.js'));
+  copyFileSync(join(edition, 'menu-start.css'), join(stage, 'src', 'game', 'vk-menu-start.css'));
   copyFileSync(join(edition, 'platform.js'), join(stage, 'src', 'platform', 'vk.js'));
   for (const name of ['cloud-save.js', 'legal.mjs', 'moderation-ui.js', 'moderation.css']) {
     copyFileSync(join(edition, name), join(stage, 'src', 'platform', 'vk-' + name));
@@ -44,6 +45,7 @@ try {
   copyFileSync(join(edition, 'look.js'), join(stage, 'src', 'game', 'vk-look.js'));
   const city = join(stage, 'src', 'maps', 'seversk');
   copyFileSync(join(edition, 'map.js'), join(city, 'vk.js'));
+  copyFileSync(join(edition, 'delivery-zone.mjs'), join(city, 'vk-delivery-zone.mjs'));
   await prepareCity(city);
 
   const assets = join(stage, 'public');
@@ -54,12 +56,16 @@ try {
     rmSync(join(assets, name), { recursive: true, force: true });
   }
   copyFileSync(join(edition, 'boot-guard.js'), join(assets, 'boot-guard.js'));
+  copyFileSync(join(edition, 'menu-city.webp'), join(assets, 'menu-city.webp'));
   writeFileSync(join(assets, 'terms.html'), legalPage(terms));
   writeFileSync(join(assets, 'privacy.html'), legalPage(privacy));
   const entry = join(stage, 'index.html');
   const error = readFileSync(join(edition, 'boot-error.html'), 'utf8');
+  const cover = readFileSync(join(edition, 'menu-cover.css'), 'utf8');
   writeFileSync(entry, readFileSync(entry, 'utf8')
-    .replace('</head>', '  <meta name="referrer" content="no-referrer">\n  <script src="./boot-guard.js"></script>\n</head>')
+    .replace('</head>', '  <meta name="referrer" content="no-referrer">\n' +
+      '  <link rel="preload" as="image" href="./menu-city.webp">\n  <style>\n' + cover + '  </style>\n' +
+      '  <script src="./boot-guard.js"></script>\n</head>')
     .replace('<body class="booting">', '<body class="booting">\n' + error));
   for (const name of ['music', 'sfx']) {
     const folder = join(assets, name);

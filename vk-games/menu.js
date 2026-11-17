@@ -1,15 +1,13 @@
 /* Главное меню VK: одна кнопка смены в исходном бумажном оформлении. */
 import { STARTUP } from './startuptrace.js';
 import './menu.css';
+import './vk-menu-start.css';
 import { t } from '../i18n/index.js';
-import * as DIST from './districts.js';
-import './fmlegend.js';
-import * as CCARD from './couriercard.js';
 import * as UPD from './update.js';
 import Platform from '../platform/index.js';
 import { showGuide } from '../platform/vk-moderation-ui.js';
 
-let A, el, go, guide, faceUrl = '';
+let A, el, go, guide, courierCard, faceUrl = '';
 const $ = id => document.getElementById(id);
 
 export function init (api) {
@@ -58,7 +56,7 @@ function activate (action) {
     A.garage(() => { show(); focus(); });
     return;
   }
-  STARTUP.request({ menuKey: 'go', district: DIST.cur() });
+  STARTUP.request({ menuKey: 'go', district: 0 });
   A.menuGo();
 }
 
@@ -95,7 +93,7 @@ export function resumeLaunch (action, ready) {
   el.inert = false;
   if (action !== 'go') { activate(action); return false; }
   if (A.canNavigate && !A.canNavigate()) return false;
-  STARTUP.request({ menuKey: 'go', district: DIST.cur() });
+  STARTUP.request({ menuKey: 'go', district: 0 });
   A.menuGo(false, ready);
   return true;
 }
@@ -118,15 +116,16 @@ export function face () {
   return faceUrl;
 }
 
-export function openStats (after) {
-  CCARD.open({ Store: A.Store, money: A.money, face: face(), onClose: () => {
+export async function openStats (after) {
+  courierCard ||= await import('./couriercard.js');
+  courierCard.open({ Store: A.Store, money: A.money, face: face(), onClose: () => {
     if (after) after(); else { show(); focus(); }
   } });
 }
 
-export const modal = () => CCARD.root() || (guide?.open ? guide : null);
+export const modal = () => courierCard?.root() || (guide?.open ? guide : null);
 export function back () {
-  if (CCARD.root()) { CCARD.close(); return true; }
+  if (courierCard?.root()) { courierCard.close(); return true; }
   if (guide?.open) { guide.close(); focus(); return true; }
   return false;
 }

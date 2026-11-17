@@ -1,0 +1,5 @@
+#boot,
+body.career #big:has(.vk-start-menu) {
+  background: linear-gradient(180deg, #3d0d0180 0%, #3d0d011a 30%, #3d0d0100 51%, #260c14d9 100%),
+    #3d0d01 url('./menu-city.webp') center / cover no-repeat;
+}
