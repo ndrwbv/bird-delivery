@@ -1,0 +1,121 @@
+{
+ "box": {
+  "min": [
+   -0.8898853063583374,
+   -4.348844981905131e-7,
+   -2.331904649734497
+  ],
+  "max": [
+   0.8898857235908508,
+   1.480064868927002,
+   1.8319669961929321
+  ]
+ },
+ "parts": [
+  {
+   "name": "wheelLF",
+   "file": "bottom.png",
+   "pivot": null,
+   "role": null,
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    0,
+    1500
+   ],
+   "uv": [
+    6000,
+    1000
+   ],
+   "idx": [
+    10000,
+    3276,
+    2
+   ]
+  },
+  {
+   "name": "glass",
+   "file": null,
+   "pivot": null,
+   "role": "glass",
+   "blend": true,
+   "alpha": 0.14,
+   "pos": [
+    16552,
+    216
+   ],
+   "uv": [
+    17416,
+    144
+   ],
+   "idx": [
+    17992,
+    198,
+    2
+   ]
+  },
+  {
+   "name": "Car_Details_0",
+   "file": "details.png",
+   "pivot": null,
+   "role": "detail",
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    18388,
+    8085
+   ],
+   "uv": [
+    50728,
+    5390
+   ],
+   "idx": [
+    72288,
+    4086,
+    2
+   ]
+  },
+  {
+   "name": "Car_Details_Transparent_0",
+   "file": "details_transparent.png",
+   "pivot": null,
+   "role": null,
+   "blend": true,
+   "alpha": 0.5,
+   "pos": [
+    80460,
+    624
+   ],
+   "uv": [
+    82956,
+    416
+   ],
+   "idx": [
+    84620,
+    360,
+    2
+   ]
+  },
+  {
+   "name": "Car_CarBody_0",
+   "file": "carbody.png",
+   "pivot": null,
+   "role": "body",
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    85340,
+    3357
+   ],
+   "uv": [
+    98768,
+    2238
+   ],
+   "idx": [
+    107720,
+    2427,
+    2
+   ]
+  }
+ ]
+}

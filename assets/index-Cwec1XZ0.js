@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./index-CaNOr7MV.js","./index-Bu0MASXH.js","./preload-helper-Ct5FWWRu.js"])))=>i.map(i=>d[i]);
+import{_ as s}from"./preload-helper-Ct5FWWRu.js";import{N as o}from"./index-Bu0MASXH.js";const t={seversk:()=>s(()=>import("./index-CaNOr7MV.js"),__vite__mapDeps([0,1,2]),import.meta.url)},a=Object.keys(t),n={seversk:{title:o("Солнечный"),note:o("закрытый город целиком: КПП, гаражи, промзона, железная дорога")}};async function c(e){return(await(t[e]||t[a[0]])()).default}export{a as M,n as a,c as l};

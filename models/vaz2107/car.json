@@ -1,0 +1,305 @@
+{
+ "box": {
+  "min": [
+   -0.8898853063583374,
+   -4.348844981905131e-7,
+   -2.331904649734497
+  ],
+  "max": [
+   0.8898857235908508,
+   1.480064868927002,
+   1.8319669961929321
+  ]
+ },
+ "parts": [
+  {
+   "name": "Car_Interior_0",
+   "file": "interior.png",
+   "pivot": null,
+   "role": null,
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    0,
+    1911
+   ],
+   "uv": [
+    7644,
+    1274
+   ],
+   "idx": [
+    12740,
+    2649,
+    2
+   ]
+  },
+  {
+   "name": "wheelLF",
+   "file": "bottom.png",
+   "pivot": [
+    0.72,
+    0.29,
+    1.206
+   ],
+   "role": null,
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    18040,
+    2250
+   ],
+   "uv": [
+    27040,
+    1500
+   ],
+   "idx": [
+    33040,
+    2013,
+    2
+   ]
+  },
+  {
+   "name": "wheelRF",
+   "file": "bottom.png",
+   "pivot": [
+    -0.72,
+    0.29,
+    1.206
+   ],
+   "role": null,
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    37068,
+    2166
+   ],
+   "uv": [
+    45732,
+    1444
+   ],
+   "idx": [
+    51508,
+    1929,
+    2
+   ]
+  },
+  {
+   "name": "wheelLB",
+   "file": "bottom.png",
+   "pivot": [
+    0.72,
+    0.29,
+    -1.206
+   ],
+   "role": null,
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    55368,
+    2217
+   ],
+   "uv": [
+    64236,
+    1478
+   ],
+   "idx": [
+    70148,
+    1977,
+    2
+   ]
+  },
+  {
+   "name": "wheelRB",
+   "file": "bottom.png",
+   "pivot": [
+    -0.72,
+    0.29,
+    -1.206
+   ],
+   "role": null,
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    74104,
+    2181
+   ],
+   "uv": [
+    82828,
+    1454
+   ],
+   "idx": [
+    88644,
+    1944,
+    2
+   ]
+  },
+  {
+   "name": "Car_Bottom_0",
+   "file": "bottom.png",
+   "pivot": null,
+   "role": null,
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    92532,
+    4737
+   ],
+   "uv": [
+    111480,
+    3158
+   ],
+   "idx": [
+    124112,
+    2244,
+    2
+   ]
+  },
+  {
+   "name": "winF",
+   "file": null,
+   "pivot": null,
+   "role": null,
+   "blend": true,
+   "alpha": 0.14,
+   "pos": [
+    128600,
+    105
+   ],
+   "uv": [
+    129020,
+    70
+   ],
+   "idx": [
+    129300,
+    144,
+    2
+   ]
+  },
+  {
+   "name": "winB",
+   "file": null,
+   "pivot": null,
+   "role": null,
+   "blend": true,
+   "alpha": 0.14,
+   "pos": [
+    129588,
+    105
+   ],
+   "uv": [
+    130008,
+    70
+   ],
+   "idx": [
+    130288,
+    144,
+    2
+   ]
+  },
+  {
+   "name": "winL",
+   "file": null,
+   "pivot": null,
+   "role": null,
+   "blend": true,
+   "alpha": 0.14,
+   "pos": [
+    130576,
+    96
+   ],
+   "uv": [
+    130960,
+    64
+   ],
+   "idx": [
+    131216,
+    108,
+    2
+   ]
+  },
+  {
+   "name": "winR",
+   "file": null,
+   "pivot": null,
+   "role": null,
+   "blend": true,
+   "alpha": 0.14,
+   "pos": [
+    131432,
+    96
+   ],
+   "uv": [
+    131816,
+    64
+   ],
+   "idx": [
+    132072,
+    108,
+    2
+   ]
+  },
+  {
+   "name": "Car_Details_0",
+   "file": "details.png",
+   "pivot": null,
+   "role": "detail",
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    132288,
+    8442
+   ],
+   "uv": [
+    166056,
+    5628
+   ],
+   "idx": [
+    188568,
+    4335,
+    2
+   ]
+  },
+  {
+   "name": "Car_Details_Transparent_0",
+   "file": "details_transparent.png",
+   "pivot": null,
+   "role": null,
+   "blend": true,
+   "alpha": 0.5,
+   "pos": [
+    197240,
+    624
+   ],
+   "uv": [
+    199736,
+    416
+   ],
+   "idx": [
+    201400,
+    360,
+    2
+   ]
+  },
+  {
+   "name": "Car_CarBody_0",
+   "file": "carbody.png",
+   "pivot": null,
+   "role": "body",
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    202120,
+    6393
+   ],
+   "uv": [
+    227692,
+    4262
+   ],
+   "idx": [
+    244740,
+    6174,
+    2
+   ]
+  }
+ ]
+}
