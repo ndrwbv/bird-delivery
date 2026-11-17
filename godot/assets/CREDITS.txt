@@ -1,0 +1,14 @@
+Город основан на данных © OpenStreetMap contributors (ODbL).
+https://www.openstreetmap.org/copyright
+
+Модель «Семёрки» основана на Old Car - VAZ 2107 by Arkady Gribachev (CC BY 4.0).
+Модель адаптирована для Godot и перекрашена.
+https://sketchfab.com/3d-models/old-car-vaz-2107-91270dab9d1a47c7ba7ffaaf8c8b0beb
+https://creativecommons.org/licenses/by/4.0/
+
+Модели и анимации прохожих: Quaternius (CC0). https://quaternius.com/
+
+Модели кустов: Colorful Bushes by rubberduck (CC0).
+Рисованная листва: Sinestesia (CC0). Модели адаптированы по форме и цвету.
+https://opengameart.org/content/colorful-bushes
+https://opengameart.org/content/cool-leaves-textures
