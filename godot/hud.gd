@@ -2,15 +2,18 @@ extends CanvasLayer
 
 const DISTRICT_MAP := preload("res://district_map.gd")
 const MAP_CAR := preload("res://map_car.gd")
-const INK := Color("#352416")
-const CREAM := Color("#3d281a")
-const ACCENT := Color("#853d15")
-const SOFT := Color("#755338")
+const PIXEL_FONT := preload("res://retro/PressStart2P-Regular.ttf")
+const INK := Color("#171818")
+const CREAM := Color("#f3dfb2")
+const ACCENT := Color("#f5ae66")
+const SOFT := Color("#c0af8c")
 
 var screen: Control
 var district_map: Control
 var map_car: Control
 var mission: Label
+var graphics: Label
+var preset := "PS1"
 var address: Label
 var range_label: Label
 var speed: Label
@@ -32,6 +35,12 @@ func configure(data: Dictionary) -> void:
 	screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+	graphics = _label(screen,"",11,CREAM,Vector2(25,26))
+	graphics.add_theme_font_override("font",PIXEL_FONT)
+	graphics.add_theme_color_override("font_outline_color",INK)
+	graphics.add_theme_constant_override("outline_size",6)
+	set_graphics_profile(preset)
+
 	var order_card := _panel(Vector2(344, 130))
 	_anchor(order_card, Vector2(1,0), Vector2(-368,24))
 	var stripe := ColorRect.new()
@@ -39,7 +48,8 @@ func configure(data: Dictionary) -> void:
 	stripe.position = Vector2(0, 16)
 	stripe.size = Vector2(3, 100)
 	order_card.add_child(stripe)
-	mission = _label(order_card, "СОЛНЕЧНЫЙ  /  ЮГ", 13, SOFT, Vector2(19, 10))
+	mission = _label(order_card, "СОЛНЕЧНЫЙ  /  ЮГ", 9, SOFT, Vector2(19, 13))
+	mission.add_theme_font_override("font",PIXEL_FONT)
 	address = _label(order_card, "", 25, CREAM, Vector2(19, 31))
 	range_label = _label(order_card, "", 15, ACCENT, Vector2(20, 70))
 	wallet = _label(order_card,"Баланс  0 ₽",14,SOFT,Vector2(20,98))
@@ -55,10 +65,12 @@ func configure(data: Dictionary) -> void:
 
 	var dash := _panel(Vector2(134, 89))
 	_anchor(dash, Vector2.ONE, Vector2(-158,-113))
-	speed = _label(dash, "000", 39, CREAM, Vector2(0, 1))
+	speed = _label(dash, "000", 30, CREAM, Vector2(0, 17))
+	speed.add_theme_font_override("font",PIXEL_FONT)
 	speed.size.x = 134
 	speed.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var unit := _label(dash, "КМ/Ч", 13, SOFT, Vector2(0, 61))
+	var unit := _label(dash, "КМ/Ч", 10, SOFT, Vector2(0, 62))
+	unit.add_theme_font_override("font",PIXEL_FONT)
 	unit.size.x = 134
 	unit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
@@ -74,7 +86,7 @@ func configure(data: Dictionary) -> void:
 func set_order(index: int, order: Dictionary, from_home: bool) -> void:
 	homebound = false
 	wallet.text = "Баланс  %d ₽" % balance
-	mission.text = "СОЛНЕЧНЫЙ  /  ЮГ      •      ЗАКАЗ %d ИЗ 3" % (index+1)
+	mission.text = "СОЛНЕЧНЫЙ  /  ЮГ  •  ЗАКАЗ %d ИЗ 3" % (index+1)
 	address.text = order.name
 	district_map.set_route(order.from_home if from_home else order.route, order.stop)
 	last_meters = -1
@@ -129,7 +141,13 @@ func update_drive(at: Vector2, forward: Vector2, kmh: float, meters: float, hint
 		_update_controls()
 
 
+func set_graphics_profile(value: String) -> void:
+	preset = value
+	graphics.text = "%s  /  %s" % [preset,"VIEW" if using_pad else "F6"]
+
+
 func _update_controls() -> void:
+	set_graphics_profile(preset)
 	if on_foot:
 		controls.text = "Стик  бежать      X  к пиццерии" if using_pad else "WASD  бежать      R  к пиццерии"
 	elif using_pad:
@@ -141,10 +159,10 @@ func _update_controls() -> void:
 func _panel(dimensions: Vector2) -> Panel:
 	var panel := Panel.new()
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("#f6e7cc")
-	style.border_color = Color("#a98761")
+	style.bg_color = Color("#222522ef")
+	style.border_color = Color("#dbb06f")
 	style.set_border_width_all(1)
-	style.set_corner_radius_all(4)
+	style.set_corner_radius_all(0)
 	panel.add_theme_stylebox_override("panel", style)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.size = dimensions

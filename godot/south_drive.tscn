@@ -1,24 +1,17 @@
-[gd_scene load_steps=23 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="Script" path="res://south_drive.gd" id="1"]
-[ext_resource type="PackedScene" path="res://assets/south-landscape.glb" id="2"]
+[ext_resource type="PackedScene" path="res://assets/south-retro-city.glb" id="2"]
 [ext_resource type="PackedScene" path="res://assets/south_collision.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://assets/semerka.glb" id="4"]
 [ext_resource type="Script" path="res://vehicle.gd" id="5"]
 [ext_resource type="Script" path="res://camera_rig.gd" id="6"]
 [ext_resource type="Shader" path="res://contact_shadow.gdshader" id="7"]
-[ext_resource type="Script" path="res://hud.gd" id="8"]
 
 [ext_resource type="Shader" path="res://sky.gdshader" id="9"]
 [ext_resource type="PackedScene" path="res://assets/south-occluders.glb" id="10"]
 [ext_resource type="Script" path="res://south_atmosphere.gd" id="11"]
-[ext_resource type="PackedScene" path="res://assets/south-grass.glb" id="12"]
-
-[ext_resource type="PackedScene" path="res://assets/south-verge.glb" id="13"]
-
-[ext_resource type="PackedScene" path="res://assets/south-crowns.glb" id="14"]
-[ext_resource type="PackedScene" path="res://assets/south-understory.glb" id="15"]
-[ext_resource type="PackedScene" path="res://assets/south-curb-growth.glb" id="16"]
+[ext_resource type="PackedScene" path="res://assets/south-retro-vegetation.glb" id="12"]
 
 [sub_resource type="ShaderMaterial" id="SkyMaterial"]
 shader = ExtResource("9")
@@ -38,9 +31,9 @@ fog_sky_affect = 0.0
 fog_mode = 1
 fog_light_color = Color(0.74, 0.82, 0.81, 1)
 fog_density = 0.73
-fog_depth_curve = 1.45
-fog_depth_begin = 195.0
-fog_depth_end = 590.0
+fog_depth_curve = 1.15
+fog_depth_begin = 84.0
+fog_depth_end = 310.0
 
 [sub_resource type="ConvexPolygonShape3D" id="CarHull"]
 points = PackedVector3Array(-0.76, 0.08, -2.38, 0.76, 0.08, -2.38, 0.92, 0.08, -2.09, 0.92, 0.08, 2.03, 0.77, 0.08, 2.26, -0.77, 0.08, 2.26, -0.92, 0.08, 2.03, -0.92, 0.08, -2.09, -0.76, 1.45, -2.38, 0.76, 1.45, -2.38, 0.92, 1.45, -2.09, 0.92, 1.45, 2.03, 0.77, 1.45, 2.26, -0.77, 1.45, 2.26, -0.92, 1.45, 2.03, -0.92, 1.45, -2.09)
@@ -69,22 +62,14 @@ shadow_normal_bias = 0.78
 directional_shadow_mode = 1
 directional_shadow_split_1 = 0.32
 directional_shadow_blend_splits = true
-directional_shadow_max_distance = 105.0
+directional_shadow_max_distance = 74.0
 directional_shadow_fade_start = 0.74
 
 [node name="City" parent="." instance=ExtResource("2")]
 
-[node name="Verge" parent="." instance=ExtResource("13")]
-
-[node name="Crowns" parent="." instance=ExtResource("14")]
-
 [node name="Occluders" parent="." instance=ExtResource("10")]
 
-[node name="Grass" parent="." instance=ExtResource("12")]
-
-[node name="Understory" parent="." instance=ExtResource("15")]
-
-[node name="CurbGrowth" parent="." instance=ExtResource("16")]
+[node name="RetroVegetation" parent="." instance=ExtResource("12")]
 
 [node name="Atmosphere" type="Node" parent="."]
 script = ExtResource("11")
@@ -117,5 +102,3 @@ near = 0.22
 far = 1000.0
 script = ExtResource("6")
 
-[node name="HUD" type="CanvasLayer" parent="."]
-script = ExtResource("8")

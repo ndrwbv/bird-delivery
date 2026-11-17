@@ -1,6 +1,8 @@
 shader_type spatial;
 render_mode cull_disabled, diffuse_lambert, specular_disabled;
 
+#include "res://retro/geometry.gdshaderinc"
+
 #include "res://material_grade.gdshaderinc"
 #include "res://street_light.gdshaderinc"
 
@@ -11,6 +13,8 @@ varying vec3 actor_world;
 void vertex() {
 	paint = COLOR.rgb;
 	actor_world = (MODEL_MATRIX*vec4(VERTEX,1.0)).xyz;
+	vec4 retro_clip = PROJECTION_MATRIX*MODELVIEW_MATRIX*vec4(VERTEX,1.0);
+	POSITION = retro_project(retro_clip,VIEWPORT_SIZE);
 }
 
 void fragment() {

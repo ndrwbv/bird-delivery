@@ -1,5 +1,5 @@
 shader_type sky;
-render_mode use_debanding;
+
 
 uniform vec3 sun_vector = vec3(-0.63,0.49,0.60);
 uniform float daylight = 0.0;
@@ -22,7 +22,7 @@ vec2 cumulus(vec2 p, float spread) {
 	float tail = oval(p,vec2(0.60,0.01),vec2(0.30,0.19));
 	float outline = min(min(min(base,left),min(mid,right)),tail);
 	outline += sin(p.x*33.0+p.y*20.0)*sin(p.y*44.0-p.x*17.0)*0.015;
-	float body = 1.0-smoothstep(-0.006,0.015,outline);
+	float body = 1.0-smoothstep(-0.009,0.010,outline);
 	float lobes = min(min(left,mid),right);
 	float shade = 1.0-smoothstep(-0.15,0.02,p.y-p.x*0.07+sin(p.x*15.0)*0.078);
 	shade = mix(shade,0.75,(1.0-smoothstep(-0.05,0.09,lobes))*smoothstep(0.0,0.25,-p.y)*0.6);
@@ -32,8 +32,8 @@ vec2 cumulus(vec2 p, float spread) {
 void sky() {
 	vec3 d = normalize(EYEDIR);
 	float elevation = max(0.0,d.y);
-	vec3 rim = mix(vec3(0.41,0.65,0.90),vec3(0.67,0.65,0.76),daylight);
-	vec3 upper = mix(vec3(0.16,0.39,0.76),vec3(0.12,0.24,0.53),daylight);
+	vec3 rim = mix(vec3(0.71,0.72,0.61),vec3(0.83,0.66,0.56),daylight);
+	vec3 upper = mix(vec3(0.28,0.50,0.67),vec3(0.24,0.32,0.53),daylight);
 	vec3 color = mix(rim,upper,smoothstep(-0.04,0.54,elevation));
 	float toward_sun = max(0.0,dot(d,normalize(sun_vector)));
 	color += vec3(1.0,0.75,0.46)*(0.13*pow(toward_sun,8.0)+0.37*pow(toward_sun,160.0)+0.72*smoothstep(0.9995,0.99991,toward_sun));

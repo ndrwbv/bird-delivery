@@ -43,6 +43,12 @@ func configure(vehicle: CharacterBody3D, view: Camera3D, paint: ShaderMaterial, 
 		_make_rain()
 
 
+func set_retro_profile(ps2: bool) -> void:
+	environment.fog_depth_begin = 117.0 if ps2 else 63.0
+	environment.fog_depth_end = 410.0 if ps2 else 273.0
+	environment.fog_density = 0.68 if ps2 else 0.89
+
+
 func _process(delta: float) -> void:
 	elapsed = minf(elapsed+delta,SHIFT_SECONDS)
 	_apply_sun()
@@ -72,7 +78,7 @@ func _apply_sun() -> void:
 	sun.light_color = Color("#ffe5bd").lerp(Color("#ffad78"),warm).lerp(Color("#b8d2ff"),dark)
 	environment.ambient_light_color = Color("#b4c5e3").lerp(Color("#8da6cf"),dark)
 	environment.ambient_light_energy = lerpf(lerpf(0.30,0.22,clouds),0.42,dark)
-	environment.fog_light_color = Color("#9eb9e7").lerp(Color("#252f43"),dark).lerp(Color("#8898a2"),wet*0.65)
+	environment.fog_light_color = Color("#b7ad8c").lerp(Color("#374257"),dark).lerp(Color("#8898a2"),wet*0.65)
 	sky.set_shader_parameter(&"sun_vector",direction)
 	sky.set_shader_parameter(&"daylight",day)
 	sky.set_shader_parameter(&"darkness",dark)

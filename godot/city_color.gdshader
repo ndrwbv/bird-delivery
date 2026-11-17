@@ -1,6 +1,8 @@
 shader_type spatial;
 render_mode cull_disabled, diffuse_lambert, specular_disabled;
 
+#include "res://retro/geometry.gdshaderinc"
+
 #include "res://material_grade.gdshaderinc"
 #include "res://street_light.gdshaderinc"
 
@@ -32,6 +34,8 @@ void vertex() {
 	}
 	paint = COLOR;
 	world = (MODEL_MATRIX * vec4(VERTEX,1.0)).xyz;
+	vec4 retro_clip = PROJECTION_MATRIX*MODELVIEW_MATRIX*vec4(VERTEX,1.0);
+	POSITION = retro_project(retro_clip,VIEWPORT_SIZE);
 }
 
 void fragment() {
@@ -49,7 +53,7 @@ void fragment() {
 		vec3 bark = mix(vec3(0.17,0.080,0.032),vec3(0.51,0.31,0.15),smoothstep(0.09,0.49,value));
 		color = mix(color,bark,0.56*cool);
 		vec2 grain_uv = vec2(world.x*2.4+world.z*3.7,world.y*0.57);
-		float grain = noise2(grain_uv)+0.35*noise2(grain_uv*vec2(2.6,1.8));
+		float grain = noise2(floor(grain_uv*3.0)/3.0);
 		color *= 0.93+detail*(grain-0.5)*0.30;
 	}
 	float grass = smoothstep(0.022,0.105,color.g-max(color.r,color.b))*smoothstep(0.53,0.91,level);
@@ -75,7 +79,7 @@ void fragment() {
 		float gray = dot(color,vec3(0.23,0.63,0.14));
 		float neutral = 1.0-smoothstep(0.03,0.085,max(color.r,max(color.g,color.b))-min(color.r,min(color.g,color.b)));
 		float pavement = neutral*smoothstep(0.03,0.085,gray)*(1.0-smoothstep(0.32,0.51,gray));
-		vec3 slate = mix(vec3(0.078,0.044,0.062),vec3(0.175,0.102,0.128),smoothstep(0.055,0.28,gray));
+		vec3 slate = mix(vec3(0.095,0.081,0.094),vec3(0.17,0.139,0.144),smoothstep(0.055,0.28,gray));
 		color = mix(color,slate,pavement*0.90);
 		float walk = neutral*smoothstep(0.19,0.50,gray);
 		color *= mix(vec3(1.0),vec3(1.0,0.86,0.73),walk*0.42);
@@ -98,7 +102,7 @@ void fragment() {
 		float runoff = noise2(wall*vec2(3.1,0.19))*0.70+noise2(wall*vec2(8.8,0.41))*0.30;
 		float streak = smoothstep(0.52,0.78,runoff)*(1.0-smoothstep(0.24,2.34,3.15-story));
 		float damp = smoothstep(0.52,0.82,noise2(wall*vec2(0.48,0.67)))*(1.0-smoothstep(0.04,0.80,story));
-		float plaster = noise2(wall*7.5)*0.62+noise2(wall*27.0)*0.38;
+		float plaster = noise2(floor(wall*23.0)/3.0)*0.72+noise2(wall*2.2)*0.28;
 		float crisp = 1.0-smoothstep(0.015,0.073,length(fwidth(wall)));
 		float stone = dot(color,vec3(0.24,0.64,0.12));
 		vec3 sand = vec3(stone*1.19,stone*0.86,stone*0.49);

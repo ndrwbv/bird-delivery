@@ -1,0 +1,27 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://retro/retro_display.gd" id="1"]
+[ext_resource type="PackedScene" path="res://south_drive.tscn" id="2"]
+
+[ext_resource type="Script" path="res://hud.gd" id="3"]
+
+[node name="RetroDisplay" type="SubViewportContainer"]
+texture_filter = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+stretch = true
+stretch_shrink = 3
+script = ExtResource("1")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+script = ExtResource("3")
+
+[node name="World" type="SubViewport" parent="."]
+own_world_3d = true
+size = Vector2i(426, 266)
+render_target_update_mode = 4
+
+[node name="SouthDrive" parent="World" instance=ExtResource("2")]

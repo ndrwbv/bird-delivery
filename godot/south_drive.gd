@@ -2,16 +2,12 @@ extends Node3D
 
 const DATA_PATH := "res://assets/south.json"
 const RESIDENTIAL_WINDOW := preload("res://residential_window.gdshader")
+const HUD := preload("res://hud.gd")
 const STREET_LIGHTING := preload("res://street_lighting.gd")
 const LANDSCAPE := preload("res://landscape.gdshader")
 const CITY_COLOR := preload("res://city_color.gdshader")
 const ACTOR_COLOR := preload("res://actor_color.gdshader")
 const TEXTURED_CITY := preload("res://textured_city.gdshader")
-const CROWN_COLOR := preload("res://crown_core.gdshader")
-const LEAVES := preload("res://district_leaves.gd")
-const GRASS_COLOR := preload("res://grass.gdshader")
-const SHRUB_COLOR := preload("res://shrub.gdshader")
-const SHRUB_LEAVES := preload("res://assets/shrub-leaves.png")
 const TERRAIN := preload("res://terrain_height.gd")
 const WALKER := preload("res://pedestrian.gd")
 const COURIER := preload("res://courier_on_foot.gd")
@@ -37,10 +33,9 @@ const ACTORS := [
 
 @onready var car: CharacterBody3D = $Car
 @onready var chase: Camera3D = $Chase
-@onready var hud: CanvasLayer = $HUD
+@onready var hud: CanvasLayer = get_node_or_null("../../HUD")
 
 var map_data: Dictionary
-var leaves := LEAVES.new()
 var terrain := TERRAIN.new()
 var street_lights := STREET_LIGHTING.new()
 var ground_material := ShaderMaterial.new()
@@ -70,6 +65,9 @@ var last_input_pad := false
 
 
 func _ready() -> void:
+	if hud == null:
+		hud = HUD.new()
+		add_child(hud)
 	map_data = JSON.parse_string(FileAccess.get_file_as_string(DATA_PATH))
 	var ground: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/south-ground.json"))
 	terrain.setup(ground,FileAccess.get_file_as_bytes("res://assets/south-ground.bin"))
@@ -92,8 +90,6 @@ func _ready() -> void:
 	street_lights.bind(paint)
 	furniture.setup(impact_ground,paint,street_lights.scales)
 	car.damage.floor = impact_ground
-	add_child(leaves)
-	leaves.setup(chase,_v2(map_data.spawn))
 	var city_paint := _configure_materials()
 	$Atmosphere.configure(car,chase,city_paint,ground_material,window_material,street_lights)
 	_make_people()
@@ -371,32 +367,13 @@ func _configure_materials() -> ShaderMaterial:
 	flat_material.set_shader_parameter(&"flat_city",true)
 	ground_material.shader = LANDSCAPE
 	window_material.shader = RESIDENTIAL_WINDOW
-	var grass_material := ShaderMaterial.new()
-	grass_material.shader = GRASS_COLOR
-	var crown := ShaderMaterial.new()
-	crown.shader = CROWN_COLOR
-	var wood := ShaderMaterial.new()
-	wood.shader = CITY_COLOR
-	wood.set_shader_parameter(&"wood_grain",true)
-	for material in [city_material,prop_material,flat_material,ground_material,grass_material,wood]:
+	for material in [city_material,prop_material,flat_material,ground_material]:
 		street_lights.bind(material)
 	var texture_cache: Dictionary = {}
-	for block: MeshInstance3D in $City.get_children()+$Verge.get_children()+$Crowns.get_children():
+	for block: MeshInstance3D in $City.get_children():
 		var paint: StandardMaterial3D = block.mesh.surface_get_material(0)
 		var prop_mesh := paint.resource_name.begins_with("Prop")
-		var leaf := paint.resource_name.begins_with("Foliage")
-		var trunk := paint.resource_name.begins_with("Wood")
-		var verge := paint.resource_name.begins_with("VergeLeaves")
-		var solid_crown := paint.resource_name.begins_with("CrownCore")
-		if solid_crown:
-			block.material_override = crown
-		elif verge:
-			block.material_override = leaves.verge_paint
-		elif leaf:
-			block.hide()
-		elif trunk:
-			block.material_override = wood
-		elif paint.resource_name.begins_with("PropColor"):
+		if paint.resource_name.begins_with("PropColor"):
 			block.material_override = prop_material
 		elif paint.resource_name.begins_with("Landscape"):
 			block.material_override = ground_material
@@ -418,28 +395,15 @@ func _configure_materials() -> ShaderMaterial:
 					replacement.set_shader_parameter(&"prop_mask",furniture.mask_texture)
 				texture_cache[paint] = replacement
 			block.material_override = texture_cache[paint]
-		var casts_shadow := prop_mesh or trunk or verge or solid_crown
-		block.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if casts_shadow else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		block.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if prop_mesh else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	for block: MeshInstance3D in $Occluders.get_children():
 		block.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
-	var shrub := ShaderMaterial.new()
-	shrub.shader = SHRUB_COLOR
-	shrub.set_shader_parameter(&"leaves",SHRUB_LEAVES)
-	for block: MeshInstance3D in $Understory.get_children():
-		block.material_override = shrub
-		block.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		block.visibility_range_end = 113.0
-		block.visibility_range_end_margin = 12.0
-	for block: MeshInstance3D in $CurbGrowth.get_children():
-		block.material_override = flat_material
-		block.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		block.visibility_range_end = 52.0
-		block.visibility_range_end_margin = 8.0
-	for block: MeshInstance3D in $Grass.get_children():
-		block.material_override = grass_material
-		block.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		block.visibility_range_end = 75.0
-		block.visibility_range_end_margin = 10.0
+	var plants := ShaderMaterial.new()
+	plants.shader = ACTOR_COLOR
+	street_lights.bind(plants)
+	for block: MeshInstance3D in $RetroVegetation.get_children():
+		block.material_override = plants
+		block.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	return city_material
 
 
@@ -539,7 +503,7 @@ func _capture_reference(file: String) -> void:
 func _capture_view(file: String) -> void:
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png(file)
+	get_tree().root.get_texture().get_image().save_png(file)
 
 
 func _v2(values: Array) -> Vector2:

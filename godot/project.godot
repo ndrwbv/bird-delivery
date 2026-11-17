@@ -1,9 +1,9 @@
 config_version=5
 
 [application]
-config/name="Птица Пицца — Юг"
+config/name="Птица Пицца — Юг Retro"
 config/icon="res://assets/icon.png"
-run/main_scene="res://south_drive.tscn"
+run/main_scene="res://retro/retro_display.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 boot_splash/show_image=false
 boot_splash/bg_color=Color(0.09, 0.13, 0.12, 1)
@@ -23,14 +23,31 @@ common/physics_interpolation=true
 [rendering]
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-anti_aliasing/quality/msaa_3d=2
-lights_and_shadows/directional_shadow/size=2048
-textures/default_filters/use_nearest_mipmap_filter=false
+anti_aliasing/quality/msaa_3d=0
+lights_and_shadows/directional_shadow/size=1024
+textures/default_filters/use_nearest_mipmap_filter=true
 textures/vram_compression/import_etc2_astc=true
 textures/vram_compression/import_s3tc_bptc=true
 environment/defaults/default_clear_color=Color(0.72, 0.80, 0.77, 1)
 
+[shader_globals]
+
+retro_snap_amount={
+"type": "float",
+"value": 0.82
+}
+retro_affine_amount={
+"type": "float",
+"value": 0.78
+}
+
 [input]
+
+retro_profile={
+"deadzone":0.5,
+"events":[Object(InputEventKey,"physical_keycode":4194337), Object(InputEventJoypadButton,"button_index":4)]
+}
+
 
 accelerate={
 "deadzone":0.08,

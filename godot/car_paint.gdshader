@@ -1,22 +1,29 @@
 shader_type spatial;
 render_mode cull_disabled, diffuse_lambert, specular_schlick_ggx;
 
+#include "res://retro/geometry.gdshaderinc"
+
 #include "res://car_surface.gdshaderinc"
 
-uniform sampler2D body_texture : source_color, filter_linear_mipmap;
+uniform sampler2D body_texture : source_color, filter_nearest_mipmap;
 uniform vec4 enamel : source_color = vec4(0.86,0.79,0.67,1.0);
 uniform bool body_panel = true;
+
+varying vec3 affine_uv;
 
 void vertex() {
 	panel = VERTEX;
 	section = clamp(int(UV2.x*16.0),0,12);
 	pose_surface(VERTEX,NORMAL,section);
+	vec4 retro_clip = PROJECTION_MATRIX*MODELVIEW_MATRIX*vec4(VERTEX,1.0);
+	POSITION = retro_project(retro_clip,VIEWPORT_SIZE);
+	affine_uv = retro_uv_vertex(UV,retro_clip.w);
 }
 
 void fragment() {
 	float stage = section_pose[section].w;
 	if (section > 0 && section <= 8 && stage >= 3.0) discard;
-	vec3 color = texture(body_texture,UV).rgb*enamel.rgb;
+	vec3 color = texture(body_texture,retro_uv_fragment(UV,affine_uv)).rgb*enamel.rgb;
 	float bumper = 0.0;
 	if (body_panel) {
 		color *= vec3(1.04,0.995,0.914);

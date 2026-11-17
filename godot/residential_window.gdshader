@@ -1,6 +1,8 @@
 shader_type spatial;
 render_mode unshaded, cull_disabled;
 
+#include "res://retro/geometry.gdshaderinc"
+
 #include "res://material_grade.gdshaderinc"
 
 uniform float dusk = 0.0;
@@ -8,6 +10,8 @@ varying vec4 paint;
 
 void vertex() {
 	paint = COLOR;
+	vec4 retro_clip = PROJECTION_MATRIX*MODELVIEW_MATRIX*vec4(VERTEX,1.0);
+	POSITION = retro_project(retro_clip,VIEWPORT_SIZE);
 }
 
 float line(float position, float center, float width, float feather) {
@@ -108,7 +112,7 @@ void fragment() {
 		float glancing = pow(1.0-abs(ray.z),4.0);
 		reflection *= 1.0-0.73*dusk;
 		vec3 inside = mix(color*0.23,color*0.44,lit);
-		if (interior > 0.01) inside = mix(inside,room(UV,UV2,ray,seed,lit),interior);
+		if (interior > 0.01 && retro_affine_amount < 0.1) inside = mix(inside,room(UV,UV2,ray,seed,lit),interior);
 		float edges = min(min(UV.x,1.0-UV.x),min(UV.y,1.0-UV.y));
 		float jamb = 1.0-smoothstep(0.018,0.10,edges);
 		color = mix(inside*(1.0-0.57*jamb),reflection,(0.16+glancing*0.51)*(1.0-lit*0.64));
