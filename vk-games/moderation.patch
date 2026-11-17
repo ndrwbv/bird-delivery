@@ -1,0 +1,73 @@
+--- a/src/game/career.js
++++ b/src/game/career.js
+@@ -513,12 +513,12 @@
+    [X] депнуть (взрослая), [B] в меню. Отрисовка и движение — shiftend.js.
+    held — уже подождали Толика: сообщение, что пришло под конец смены (похвала за последний заказ, вычет за
+    опоздание), сначала показывается крупно в чате и уменьшается, только потом этот экран (≤ 6 с) */
+-export function showEnd (why, whyText, held) {
++export function showEnd (why, whyText, held, receipt = true) {
+   if (!A) return;
+   const S = A.S;
+   lunchOff();
+   if (QR.on()) { quickEnd(why, whyText); return; }
+-  if (!held && SH.on && CHAT.busy()) { CHAT.idle(() => { if (A.S.state === 'over') showEnd(why, whyText, true); }); return; }
++  if (receipt && !held && SH.on && CHAT.busy()) { CHAT.idle(() => { if (A.S.state === 'over') showEnd(why, whyText, true); }); return; }
+   CHAT.clear();
+   const wasOn = SH.on;
+   if (wasOn) { SH.endH = hour(); watchMoney(S); }
+@@ -552,6 +552,7 @@
+     fire(endCbs, { why, money: S.money || 0, delivered: S.delivered || 0, hits: SH.hits, fine: SH.fine, full, mood: SH.mood });
+   }
+   A.Store.flush();
++  if (!receipt) return;
+ 
+   const ov = $('over');
+   ov.classList.add('cr');
+--- a/src/game/game.js
++++ b/src/game/game.js
+@@ -15417,7 +15417,7 @@
+   };
+   requestAnimationFrame(step);
+ }
+-function showOver (why, victims) {
++function showOver (why, victims, receipt = true) {
+   HANDOFF.cancel();
+   Platform.store.flush && Platform.store.flush();       // итоги смены — в облако сразу
+   Platform.gameplayStop();
+@@ -15426,7 +15426,7 @@
+   elBig.hidden = true;
+   closePanel();
+   // карьера: свой экран итогов — цифры смены, гараж, донаты, слот-машина (career.js)
+-  if (CAREER) { CAREERM.showEnd(why, (OVER_WHY[why] || (() => $t(OVER_TITLE[why] || why)))(victims || [])); return; }
++  if (CAREER) { CAREERM.showEnd(why, (OVER_WHY[why] || (() => $t(OVER_TITLE[why] || why)))(victims || []), false, receipt); return; }
+   const lost = why !== 'смена окончена';
+   $('ov-t').textContent = lost ? $t('ты проиграл') : $t('смена закончена');
+   $('ov-t').classList.toggle('win', !lost);
+@@ -17343,7 +17343,7 @@
+   touchReset();                                   // пауза (и снята) — пальцы отпущены: зажатое до паузы не тянется дальше (0п44)
+ }
+ /* выйти в меню посреди смены: заработанное уже в кошельке, итоги — как в конце */
+-function endShift (why) {
++function endShift (why, toMenu = false) {
+   HANDOFF.cancel();
+   CREWR.hide();
+   CL.transFor('конец смены', 4000);              // метка перехода (crashlog.js, 0п48): чек смены, меню
+@@ -17355,7 +17355,8 @@
+   marker.visible = false;
+   hidePhone(); clearGate();
+   if (S.ride) { S.state = 'title'; S.ride = false; S.free = false; $('menu').hidden = true; showTitle(); }
+-  else { S.state = 'over'; showOver(typeof why === 'string' ? why : 'смена окончена', []); }   // why — «время» из career.js (полночь)
++  else { S.state = 'over'; showOver(typeof why === 'string' ? why : 'смена окончена', [], !toMenu); }
++  if (toMenu && S.state === 'over') $('ov-menu').click();
+   Platform.gameplayStop();
+   clearRivals();
+ }
+@@ -17363,7 +17364,7 @@
+   $('pm-go').addEventListener('click', () => setPause(false));
+   $('pm-map').addEventListener('click', () => { setPause(false); setFullMap(true, true); });
+   $('pm-order').addEventListener('click', event => { if (event.target.closest('#pm-cancel-order')) cancelPausedOrder(); });
+-  $('pm-menu').addEventListener('click', endShift);
++  $('pm-menu').addEventListener('click', () => endShift('смена окончена', true));
+   $('pm-set').addEventListener('click', () => {
+     elPanel.hidden = false;
+     SET.render();

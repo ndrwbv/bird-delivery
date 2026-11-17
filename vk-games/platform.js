@@ -1,10 +1,12 @@
 import bridge from '@vkontakte/vk-bridge';
 import { decode, hardenPage, localBoard, pauseHub } from './common.js';
+import { connectSave, createStorage, vkRequest } from './vk-cloud-save.js';
+import { chooseSave, confirmConsent, loadingError, syncStatus } from './vk-moderation-ui.js';
 
 const hub = pauseHub();
-const viewerId = new URLSearchParams(location.search).get('vk_user_id');
-const prefix = /^\d+$/.test(viewerId ?? '') ? `bird-vk:${viewerId}:` : 'bird-vk:local:';
-const storage = createStorage(prefix);
+let storage;
+let cloud;
+let consentScope;
 const store = {
   get (key, fallback) {
     try {
@@ -18,36 +20,8 @@ const store = {
       else storage.setItem(key, JSON.stringify(value));
     } catch { /* A blocked or full browser store must not interrupt a shift. */ }
   },
-  flush () {},
+  flush () { cloud?.flush(); },
 };
-
-function createStorage (prefix) {
-  let local;
-  try {
-    local = window.localStorage;
-    const probe = `${prefix}available`;
-    local.setItem(probe, '1');
-    local.removeItem(probe);
-  } catch {
-    local = null;
-  }
-  const memory = new Map();
-  const keys = () => !local ? Array.from(memory.keys()) : Array.from({ length: local.length }, (_, index) => local.key(index))
-    .filter(key => key?.startsWith(prefix)).map(key => key.slice(prefix.length));
-  return {
-    get length () { return keys().length; },
-    key (index) { return keys()[index] ?? null; },
-    getItem (key) { return local ? local.getItem(prefix + key) : memory.get(key) ?? null; },
-    setItem (key, value) {
-      if (local) local.setItem(prefix + key, value);
-      else memory.set(key, String(value));
-    },
-    removeItem (key) {
-      if (local) local.removeItem(prefix + key);
-      else memory.delete(key);
-    },
-  };
-}
 
 function deadline (promise, ms) {
   let timer;
@@ -92,7 +66,7 @@ const Platform = {
   lang: 'ru',
   langChosen: true,
   features: { ads: false, leaderboard: 'local', externalLinks: false, nameInput: false, gore: false, adult: false, quit: false },
-  storage,
+  get storage () { return storage; },
   store,
   player: { name: '', avatar: '', authorized: false, async auth () { return false; } },
   leaderboard: localBoard(store),
@@ -101,21 +75,51 @@ const Platform = {
     hardenPage();
     lockPageZoom();
     hub.watchVisibility();
-    if (!bridge.isEmbedded() && !bridge.isWebView()) return;
+    const params = new URLSearchParams(location.search);
+    const embedded = bridge.isEmbedded() || bridge.isWebView();
+    const inVK = embedded || params.has('vk_app_id') || params.has('sign');
+    const viewer = params.get('vk_user_id');
+    consentScope = inVK ? (/^[0-9]{1,20}$/.test(viewer ?? '') ? viewer : null) : 'local';
+    const consent = await confirmConsent(consentScope, inVK);
+    if (!inVK) { storage = createStorage('bird-vk:local:'); return; }
 
     bridge.subscribe(({ detail }) => {
       if (detail.type === 'VKWebAppViewHide') hub.pause('vk');
       if (detail.type === 'VKWebAppViewRestore') hub.resume('vk');
     });
     try {
-      const response = await deadline(bridge.send('VKWebAppInit'), 2500);
-      Platform.features.ads = response?.result === true &&
-        (await deadline(bridge.supportsAsync('VKWebAppShowNativeAds'), 1000)) === true;
-    } catch {
-      // The game can start when opened directly from its host or when the bridge is unavailable.
+      const bridgeReady = embedded ? deadline(bridge.send('VKWebAppInit'), 4000).catch(() => null) : null;
+      let launch = params;
+      if (!launch.has('sign') && embedded) {
+        const data = (await bridgeReady)?.result && await deadline(bridge.send('VKWebAppGetLaunchParams'), 2000);
+        if (!data?.sign) throw Object.assign(new Error('No VK launch parameters'), { status: 401 });
+        launch = new URLSearchParams(Object.entries(data).filter(([key]) => key === 'sign' || key.startsWith('vk_')));
+      }
+      const session = await vkRequest('session', 'POST', { launch: launch.toString(), consent });
+      cloud = await connectSave(session, chooseSave, syncStatus);
+      storage = cloud.storage;
+      Platform.player.authorized = true;
+      if ((await bridgeReady)?.result) {
+        Platform.features.ads = (await deadline(bridge.supportsAsync('VKWebAppShowNativeAds'), 1500).catch(() => false)) === true;
+      }
+    } catch (error) {
+      const message = error.status === 401 ? 'Не удалось подтвердить вход. Закройте игру и снова откройте её из ВКонтакте.'
+        : error.status === 503 ? 'Вход из ВКонтакте пока недоступен. Попробуйте позже.'
+          : 'Не удалось загрузить сохранение из ВКонтакте. Проверьте соединение и попробуйте ещё раз.';
+      loadingError(message);
+      throw error;
     }
   },
 
+  async removeData () {
+    if (cloud) await cloud.remove();
+    else for (const key of storage.keys()) storage.removeItem(key);
+    try {
+      if (consentScope) localStorage.removeItem('bird-vk:accepted:' + consentScope);
+      localStorage.removeItem('bird-vk-crashlog');
+      localStorage.removeItem('bird-vk-trans');
+    } catch { /* Storage may be unavailable. */ }
+  },
   ready () {},
   setLang () {},
   gameplayStart () {},

@@ -1,0 +1,22 @@
+<style>
+  #vk-load-error {
+    position: fixed; z-index: 10000; inset: 0; display: grid; place-items: center;
+    box-sizing: border-box; padding: 24px; text-align: center;
+    background: #391407; color: #fff2d6; font: 17px/1.5 system-ui, sans-serif;
+  }
+  #vk-load-error[hidden] { display: none; }
+  #vk-load-error div { max-width: 29rem; }
+  #vk-load-error h1 { font-size: 1.5rem; }
+  #vk-load-error button {
+    min-height: 42px; padding: 5px 14px; border: 2px solid #2b1709; border-radius: 4px;
+    background: #ffcf88; color: #33210d; font: inherit; font-weight: 700; cursor: pointer;
+  }
+</style>
+<div id="vk-load-error" role="alert" hidden>
+  <div>
+    <h1>Птица Пицца</h1>
+    <p id="vk-load-message"></p>
+    <button type="button">Попробовать ещё раз</button>
+  </div>
+</div>
+<noscript>Для Птицы Пиццы нужен JavaScript. Включите его и обновите страницу.</noscript>

@@ -35,7 +35,8 @@ body {
   outline: 3px solid var(--pp-yellow);
   outline-offset: 3px;
 }
-.vk-start-garage { min-height: 36px; }
+.vk-start-options { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 0 8px; }
+.vk-start-options .pp-note { min-height: 36px; }
 
 html[data-map] body #radar {
   top: var(--vk-top);

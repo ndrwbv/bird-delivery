@@ -6,15 +6,14 @@ import * as DIST from './districts.js';
 import './fmlegend.js';
 import * as CCARD from './couriercard.js';
 import * as UPD from './update.js';
-import * as STORYTEST from './storytest.js';
+import Platform from '../platform/index.js';
+import { showGuide } from '../platform/vk-moderation-ui.js';
 
-let A, el, go, garage, debug, faceUrl = '';
+let A, el, go, guide, faceUrl = '';
 const $ = id => document.getElementById(id);
 
 export function init (api) {
   A = api;
-  STORYTEST.setMenuShift(() => (A.menuStoryGo || A.menuGo)());
-  STORYTEST.onPanelChange(updateDebug);
 }
 
 function build () {
@@ -32,36 +31,35 @@ function build () {
           <i class="crm-ico" aria-hidden="true">▶</i><b></b>
         </button>
       </div>
-      <button type="button" class="vk-start-garage pp-note" data-a="garage"></button>
+      <div class="vk-start-options">
+        <button type="button" class="pp-note" data-a="garage">Гараж</button>
+        <button type="button" class="pp-note" data-a="settings">Настройки</button>
+        <button type="button" class="pp-note" data-a="guide">Как играть</button>
+      </div>
     </div>
-    <div class="crm-meta"><button type="button" class="crm-debug" hidden></button><div class="crm-ver"></div></div>
+    <div class="crm-meta"><div class="crm-ver"></div></div>
   `;
   go = el.querySelector('[data-a="go"]');
-  garage = el.querySelector('[data-a="garage"]');
-  debug = el.querySelector('.crm-debug');
-  debug.hidden = !new URLSearchParams(location.search).has('debug');
-  go.addEventListener('click', () => activate('go'));
-  garage.addEventListener('click', () => activate('garage'));
-  debug.addEventListener('click', () => { if (!modal() || STORYTEST.panelRoot()) STORYTEST.togglePanel(); });
+  for (const button of el.querySelectorAll('button[data-a]')) {
+    button.addEventListener('click', () => activate(button.dataset.a));
+  }
   $('big').append(el);
 }
 
 function activate (action) {
-  if (A.launchSelect) { A.launchSelect(action); return; }
   if ((A.canNavigate && !A.canNavigate()) || modal()) return;
+  if (action === 'guide') {
+    guide = showGuide(() => Platform.removeData());
+    return;
+  }
+  if (A.launchSelect) { A.launchSelect(action); return; }
+  if (action === 'settings') { A.openSettings(); return; }
   if (action === 'garage') {
     A.garage(() => { show(); focus(); });
     return;
   }
   STARTUP.request({ menuKey: 'go', district: DIST.cur() });
   A.menuGo();
-}
-
-function updateDebug () {
-  if (!debug || debug.hidden) return;
-  const open = STORYTEST.panelOpen();
-  debug.textContent = open ? t('Дебаг оверлей: скрыть') : t('Дебаг оверлей: показать');
-  debug.setAttribute('aria-expanded', String(open));
 }
 
 export function show () {
@@ -74,10 +72,8 @@ export function show () {
     return line;
   }));
   go.querySelector('b').textContent = t('на смену');
-  garage.textContent = t('гараж');
   const version = UPD.version();
   el.querySelector('.crm-ver').textContent = version ? t('версия {v}', { v: String(version).replace(/^v(?=\d)/, '') }) : '';
-  updateDebug();
 }
 
 export function launchMenu ({ Store, pollPad }) {
@@ -128,10 +124,10 @@ export function openStats (after) {
   } });
 }
 
-export const modal = () => CCARD.root() || (A?.S?.state === 'title' ? STORYTEST.panelRoot() : null);
+export const modal = () => CCARD.root() || (guide?.open ? guide : null);
 export function back () {
   if (CCARD.root()) { CCARD.close(); return true; }
-  if (STORYTEST.panelRoot()) { STORYTEST.togglePanel(false); focus(); return true; }
+  if (guide?.open) { guide.close(); focus(); return true; }
   return false;
 }
 
