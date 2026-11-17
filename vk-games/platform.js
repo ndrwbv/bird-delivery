@@ -78,17 +78,18 @@ const Platform = {
     const params = new URLSearchParams(location.search);
     const embedded = bridge.isEmbedded() || bridge.isWebView();
     const inVK = embedded || params.has('vk_app_id') || params.has('sign');
+    if (embedded) bridge.subscribe(({ detail }) => {
+      if (detail.type === 'VKWebAppViewHide') hub.pause('vk');
+      if (detail.type === 'VKWebAppViewRestore') hub.resume('vk');
+    });
+    // VK needs the Init message before the player can interact with our consent dialog.
+    const bridgeReady = embedded ? deadline(bridge.send('VKWebAppInit'), 4000).catch(() => null) : null;
     const viewer = params.get('vk_user_id');
     consentScope = inVK ? (/^[0-9]{1,20}$/.test(viewer ?? '') ? viewer : null) : 'local';
     const consent = await confirmConsent(consentScope, inVK);
     if (!inVK) { storage = createStorage('bird-vk:local:'); return; }
 
-    bridge.subscribe(({ detail }) => {
-      if (detail.type === 'VKWebAppViewHide') hub.pause('vk');
-      if (detail.type === 'VKWebAppViewRestore') hub.resume('vk');
-    });
     try {
-      const bridgeReady = embedded ? deadline(bridge.send('VKWebAppInit'), 4000).catch(() => null) : null;
       let launch = params;
       if (!launch.has('sign') && embedded) {
         const data = (await bridgeReady)?.result && await deadline(bridge.send('VKWebAppGetLaunchParams'), 2000);
