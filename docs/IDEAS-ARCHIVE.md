@@ -4565,4 +4565,4 @@ VK 0.23 разрешает прокрутку и отменяет масштаб
 
 </details>
 
-**Журнал 17.11.2026.** Код VK 0.29 подготовлен к проверке внутри VK. Выкладка через [Slotik](https://slotik.tech/bird-pizza/index.html).
+**Журнал 17.11.2026.** VK 0.29 опубликована через `ndrwbv/reverse-proxy` на [Slotik](https://slotik.tech/bird-pizza/index.html). Сервер настроен для [приложения 54901710](https://vk.ru/app54901710). Страница, сценарий загрузки и документы проверены по HTTPS. Вход и ролик внутри VK в [ВК51](plan/vk-games.md#vk51).
