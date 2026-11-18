@@ -1,5 +1,6 @@
 extends Node3D
 
+const SOUND := preload("res://semerka_motor_audio.gd")
 const THUNDER := "res://assets/weather/thunder.wav"
 var enabled := false
 var hurricane := false
@@ -36,7 +37,7 @@ func configure(id: String, seed_value: int) -> void:
 	_pulses.clear()
 	_bolt.hide()
 	_sound.stop()
-	if enabled and not _sound.stream:
+	if enabled and not _sound.stream and not SOUND.dummy_driver():
 		if ResourceLoader.exists(THUNDER) and (not FileAccess.file_exists(THUNDER) or FileAccess.file_exists(THUNDER+".import")):
 			_sound.stream = ResourceLoader.load(THUNDER) as AudioStream
 		else:

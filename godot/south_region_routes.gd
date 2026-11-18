@@ -29,6 +29,7 @@ func setup(region: Dictionary, core: Dictionary) -> void:
 	var node_ids: Dictionary = {}
 	var edges: Dictionary = {}
 	var incoming: Dictionary = {}
+	var flow: Dictionary = {}
 	_building_cells = _footprints(region.get("buildings", []))
 	for road: Dictionary in region.get("roads", []):
 		var previous := -1
@@ -47,12 +48,18 @@ func setup(region: Dictionary, core: Dictionary) -> void:
 				var direction := int(road.get("oneway", 0))
 				if direction >= 0:
 					_link(previous, id, incoming)
+					if int(road["class"]) <= 5:
+						flow[Vector2i(previous,id)] = true
 				if direction <= 0:
 					_link(id, previous, incoming)
+					if int(road["class"]) <= 5:
+						flow[Vector2i(id,previous)] = true
 				edges[Vector2i(mini(previous, id), maxi(previous, id))] = true
 			previous = id
 	if edges.is_empty():
 		return
+	for reverse: Vector2i in preload("res://south_dead_ends.gd").reverse_edges(flow):
+		_link(reverse.x, reverse.y, incoming)
 	# Anchor both traversals at the actual depot driveway, including one-way streets.
 	var spawn := _vec(core.spawn)
 	var deliveries: Array = core.get("deliveries", [])

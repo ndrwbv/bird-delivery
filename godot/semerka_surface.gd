@@ -1,6 +1,7 @@
 extends RefCounted
 
 # Shared live inputs for winterroads.js / snow.grip (all are fractions).
+var winter := preload("res://south_winter_road.gd").new()
 var wind := Vector2.ZERO
 var snow := 0.0
 var snow_cover := 1.0
@@ -25,6 +26,7 @@ var _grip_timer := 0.0
 
 
 func setup(region: Dictionary) -> void:
+	winter.setup(Vector2(region.origin[0],region.origin[1]))
 	_streams.clear()
 	var beach_data: Array = region.get("beach",[])
 	if beach_data.size() >= 2:

@@ -141,12 +141,33 @@ func abort() -> void:
 func show_records(career_best: Dictionary = {}) -> void:
 	paper.records(career_best,int(state.get_value("quick","best",0)),int(state.get_value("quick","best_delivered",0)))
 
-func _store() -> void:
-	if temporary or not writable:
-		return
+func snapshot_progress() -> Dictionary:
+	return {"best":int(state.get_value("quick","best",0)),"best_delivered":int(state.get_value("quick","best_delivered",0)),
+		"runs":int(state.get_value("quick","runs",0)),"history":Dictionary(state.get_value("hell","history",{})).duplicate(true)}
+
+func replace_progress(saved: Dictionary, memory_only := false) -> bool:
+	if running:
+		return false
+	var before := state
+	state = ConfigFile.new()
+	state.set_value("quick","best",maxi(0,int(saved.get("best",0))))
+	state.set_value("quick","best_delivered",maxi(0,int(saved.get("best_delivered",0))))
+	state.set_value("quick","runs",maxi(0,int(saved.get("runs",0))))
+	state.set_value("hell","history",Dictionary(saved.get("history",{})).duplicate(true))
+	if memory_only or _store():
+		return true
+	state = before
+	return false
+
+func _store() -> bool:
+	if temporary:
+		return true
+	if not writable:
+		return false
 	var pending := SAVE + ".tmp"
 	var error := state.save(pending)
 	if error == OK:
 		error = DirAccess.rename_absolute(ProjectSettings.globalize_path(pending),ProjectSettings.globalize_path(SAVE))
 	if error != OK:
 		push_warning("Could not save quick-run results: " + error_string(error))
+	return error == OK

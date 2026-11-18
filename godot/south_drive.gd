@@ -46,6 +46,7 @@ const ACTORS := [
 var map_data: Dictionary
 var leaves := LEAVES.new()
 var terrain: RefCounted
+var strip := preload("res://delivery_route_strip.gd").new()
 var region_world := REGION_WORLD.new()
 var region_routes := REGION_ROUTES.new()
 var region_map := REGION_MAP.new()
@@ -76,7 +77,18 @@ var shift := SHIFT.new()
 var profile := preload("res://career_profile.gd").new()
 var career: RefCounted
 var quick_runs := preload("res://quick_runs.gd").new()
+var beach := preload("res://south_beach.gd").new()
 var book := preload("res://south_order_book.gd").new()
+var achievements := preload("res://local_achievements.gd").new()
+var audio := preload("res://game_audio.gd").new()
+var events := preload("res://south_events.gd").new()
+var hud_elapsed := 0.0
+var rescues := 0
+var manifest := preload("res://order_manifest.gd").new()
+var staff := preload("res://south_staff_ride.gd").new()
+var crew := preload("res://south_crew.gd").new()
+var recipient_book := preload("res://delivery_recipients.gd").new()
+var garage := preload("res://semerka_garage.gd").new()
 var choices := preload("res://shift_choices.gd").new()
 var menu := preload("res://game_menu.gd").new()
 var papers := preload("res://shift_papers.gd").new()
@@ -103,7 +115,6 @@ var depot := Vector3.ZERO
 var marker: Node3D
 var marker_label: Label3D
 var stop := Vector3.ZERO
-var can_deliver := false
 var last_input_pad := false
 
 
@@ -115,11 +126,19 @@ func _ready() -> void:
 	var detail := TERRAIN.new()
 	detail.setup(ground,FileAccess.get_file_as_bytes("res://assets/south-ground.bin"))
 	region_data = JSON.parse_string(FileAccess.get_file_as_string("res://assets/south-region.json"))
+	# X operates the optional flight kit; the prototype also bound it to a reset.
+	for binding: InputEvent in InputMap.action_get_events(&"reset_car"):
+		if binding is InputEventJoypadButton and binding.button_index == JOY_BUTTON_X:
+			InputMap.action_erase_event(&"reset_car",binding)
 	add_child(region_world)
 	region_world.setup(region_data, map_data.bounds, detail, car)
 	terrain = region_world.ground
+	add_child(strip)
+	strip.setup(terrain)
 	region_routes.setup(region_data, map_data)
 	book.setup(region_data, map_data, region_routes)
+	add_child(beach)
+	beach.setup(terrain,book,region_data,car)
 	map_data.deliveries = []
 	var temporary := false
 	for arg in OS.get_cmdline_user_args():
@@ -160,7 +179,9 @@ func _ready() -> void:
 	_make_people()
 	_make_entrances()
 	add_child(traffic)
-	traffic.setup(terrain,_v2(map_data.spawn))
+	traffic.setup(terrain,_v2(map_data.spawn),region_data,car,_person.bind(actor_paint))
+	add_child(crew)
+	crew.setup(traffic,_v2(map_data.spawn))
 	var pickups := PICKUPS.new()
 	add_child(pickups)
 	pickups.setup(terrain,car,_v2(map_data.spawn),region_data)
@@ -192,6 +213,14 @@ func _ready() -> void:
 	add_child(region_map)
 	region_map.setup(region_data, map_data, region_routes)
 	region_map.waypoint_changed.connect(_set_waypoint)
+	add_child(achievements)
+	achievements.setup(adult, temporary)
+	achievements.bind_vehicle(car)
+	add_child(audio)
+	audio.setup(car)
+	add_child(events)
+	events.setup(car,terrain,traffic,region_data,profile,_person.bind(actor_paint))
+	events.road_thump.connect(func(k:float): audio.cue("thud",car.position,k))
 	add_child(quick_runs)
 	quick_runs.setup(car, terrain, region_data, traffic)
 	quick_runs.repeat_requested.connect(_repeat_quick)
@@ -199,16 +228,39 @@ func _ready() -> void:
 	quick_runs.menu_requested.connect(_main_menu)
 	add_child(papers)
 	papers.setup(region_data, map_data)
-	papers.next_shift_requested.connect(_start_shift)
+	papers.next_shift_requested.connect(_enter_career)
 	papers.free_drive_requested.connect(_free_drive)
 	add_child(clock_hud)
 	add_child(choices)
+	add_child(recipient_book)
+	add_child(staff)
+	staff.setup(car,terrain,book,recipient_book,actor_paint,_v2(map_data.dispatch.door))
+	staff.route_changed.connect(_staff_route)
+	staff.notice.connect(clock_hud.notice)
+	staff.money_earned.connect(_staff_pay)
+	staff.stars_earned.connect(_staff_stars)
+	staff.finished.connect(func(_ok:bool): _finish_shift(true))
+	add_child(garage)
+	garage.setup(car,adult)
+	garage.closed.connect(_garage_closed)
+	garage.next_shift_requested.connect(_enter_career)
+	papers.set_spending_enabled(adult)
+	papers.garage_requested.connect(_open_garage)
+	papers.bet_requested.connect(_open_bet)
+	papers.main_menu_requested.connect(_leave_receipt)
 	add_child(menu)
 	menu.setup()
 	menu.bind_map(region_map)
+	menu.bind_audio(audio)
+	menu.bind_achievements(achievements)
+	menu.bind_profile(profile,achievements,quick_runs)
+	menu.profile_changed.connect(_profile_changed)
+	menu.visibility_changed.connect(_audio_context)
+	region_map.visibility_changed.connect(_audio_context)
 	menu.bind_graphics(chase, $Sun)
 	var threshold := _v2(map_data.dispatch.door)
 	menu.set_shift_location(Vector3(threshold.x, terrain.at(threshold.x,threshold.y),threshold.y), depot)
+	menu.garage_requested.connect(_open_garage)
 	menu.quick_requested.connect(_start_quick)
 	menu.records_requested.connect(_records)
 	menu.set_available_modes(PackedStringArray(["normal","hell","afterhell"]))
@@ -237,7 +289,7 @@ func _input(event: InputEvent) -> void:
 		last_input_pad = true
 	elif event is InputEventKey and event.pressed:
 		last_input_pad = false
-	if visitor.active() or papers.blocking() or menu.active() or choices.visible or quick_runs.results_open():
+	if visitor.active() or papers.blocking() or menu.active() or choices.visible or quick_runs.results_open() or garage.active() or achievements.active():
 		return
 	if event.is_action_pressed(&"district_map"):
 		_open_map()
@@ -249,8 +301,67 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+func _audio_context() -> void:
+	var scene := "drive"
+	if menu.active():
+		scene = "drive" if playing or free_roam else "menu"
+	elif visitor.active():
+		scene = "interior"
+	elif papers.blocking() or quick_runs.results_open():
+		scene = "shiftend"
+	audio.set_context(scene,$Atmosphere.night > .5,get_tree().paused)
+	audio.set_environment($Atmosphere.season,$Atmosphere.weather,$Atmosphere.night,$Atmosphere.precipitation.rain,$Atmosphere.holiday)
+
+
+func _staff_pay(amount: int) -> void:
+	shift.pay += amount
+	shift.money += amount
+	profile.data.wallet = int(profile.data.wallet) + amount
+	hud.show_payment(amount,int(profile.data.wallet))
+	_checkpoint()
+
+
+func _staff_stars(count: int) -> void:
+	profile.data.stars = int(profile.data.stars)+count
+	_checkpoint()
+
+
+func _staff_route(at: Vector2, address: String, route: Array) -> void:
+	waypoint = {}
+	gps_stop = [at.x,at.y]
+	gps_path = route
+	hud.set_navigation(route,gps_stop)
+	strip.set_route(route,false,bool(profile.data.get("road_path",true)))
+	hud.mission.text = "РАЗВОЗ СМЕНЫ"
+	hud.address.text = address
+	hud.homebound = false
+	marker.position = Vector3(at.x,terrain.at(at.x,at.y)+.1,at.y)
+	marker_label.text = address
+	marker.show()
+
+
 func _open_map() -> void:
 	region_map.open_at(Vector2(car.position.x, car.position.z), waypoint, gps_path, gps_stop)
+
+
+func _open_garage() -> void:
+	garage.open(career)
+
+
+func _open_bet() -> void:
+	garage.open_bet(career,shift.number,shift.money)
+
+
+func _garage_closed() -> void:
+	if papers.blocking():
+		papers.refresh_balance(int(career.data.wallet))
+	else:
+		_main_menu()
+
+
+func _leave_receipt() -> void:
+	papers.dismiss()
+	_main_menu()
 
 
 func _start_quick(id: String) -> void:
@@ -282,10 +393,31 @@ func _records() -> void:
 
 func _enter_career() -> void:
 	profile = career
+	if int(profile.data.shifts) >= 1 and not profile.data.has("road_path"):
+		papers.dismiss()
+		choices.selected.connect(_road_preference, CONNECT_ONE_SHOT)
+		choices.offer("Ирина Сергеевна", "Оставить путь на дороге?", ["Оставить","Убрать"])
+	else:
+		_start_shift()
+
+
+func _road_preference(index: int) -> void:
+	profile.data.road_path = index == 0
+	profile.save()
 	_start_shift()
 
 
+func _profile_changed() -> void:
+	profile = career
+	car.apply_equipment(garage.loadout(career))
+	_main_menu()
+
+
 func _main_menu() -> void:
+	staff.clear()
+	crew.clear()
+	achievements.set_records(career.data,int(quick_runs.state.get_value("quick","best",0)))
+	events.finish()
 	quick_runs.abort()
 	profile = career
 	playing = false
@@ -298,9 +430,46 @@ func _main_menu() -> void:
 
 func _drowned() -> void:
 	if playing:
-		_finish_shift(false, "dead")
+		_offer_rescue()
 	elif free_roam:
 		_reset_car()
+
+
+func _offer_rescue() -> void:
+	if choices.visible:
+		return
+	var done := int(profile.data.shifts)
+	var sale := rescues == 0 and done >= int(profile.data.get("last_rescue_sale", -3)) + 3
+	var cost := 1000 if sale else 3000 * int(pow(2, rescues))
+	var prompt := "Семёрка разбита. В кошельке %d ₽" % int(profile.data.wallet)
+	if int(profile.data.wallet) < cost:
+		choices.selected.connect(func(_index: int): _finish_shift(false,"dead"), CONNECT_ONE_SHOT)
+		choices.offer("Пиццерия",prompt,["Закончить смену"],4.0,0)
+	else:
+		choices.selected.connect(_rescue_picked.bind(cost,sale), CONNECT_ONE_SHOT)
+		choices.offer("Пиццерия",prompt,["Воскреснуть за %d ₽" % cost,"Закончить смену"],9.0,1)
+
+
+func _rescue_picked(index: int, cost: int, sale: bool) -> void:
+	if index != 0:
+		_finish_shift(false,"dead")
+		return
+	profile.data.wallet = int(profile.data.wallet) - cost
+	if sale:
+		profile.data.last_rescue_sale = int(profile.data.shifts)
+	rescues += 1
+	var safe := region_routes.route_between(Vector2(car.position.x,car.position.z),_v2(map_data.spawn))
+	var at := _v2(safe[0]) if not safe.is_empty() else _v2(map_data.spawn)
+	if car.sinking >= 0 or car.surface.water_depth > .15:
+		at = _v2(map_data.spawn)
+	car.park(at,car.rotation.y)
+	car.hearts = car.hearts_max
+	car.damage.repair()
+	health_before = car.hearts
+	tire_tracks.break_tracks()
+	chase.reset_view()
+	hud.show_payment(0,int(profile.data.wallet))
+	_checkpoint()
 
 
 func _quit_from_menu() -> void:
@@ -311,6 +480,8 @@ func _quit_from_menu() -> void:
 
 func _physics_process(delta: float) -> void:
 	if not playing:
+		if free_roam:
+			events.step(delta,true,shift.hour())
 		if free_roam and Input.is_action_just_pressed(&"reset_car"):
 			_reset_car()
 		return
@@ -328,6 +499,10 @@ func _physics_process(delta: float) -> void:
 		arrival.step(delta)
 		return
 	shift.tick(delta)
+	traffic.clock_hour = shift.hour()
+	if not quick_runs.active():
+		crew.step(delta,not profile.data.gennady_paid,_v2(current.stop) if not current.is_empty() else Vector2.INF)
+	events.step(delta, not dispatch.active() and not papers.active(), traffic.clock_hour)
 	$Atmosphere.set_clock(shift.env_time)
 	if not late_charges.is_empty() and shift.elapsed >= float(late_charges[0].due):
 		var notice: Dictionary = late_charges.pop_front()
@@ -339,9 +514,17 @@ func _physics_process(delta: float) -> void:
 	if car.hearts < health_before:
 		shift.hits += 1
 	health_before = car.hearts
-	clock_hud.update_clock(shift.number, shift.clock_text(), shift.deadline, not dispatch.active() and (back_to_depot or not shift.settled), ceili(car.hearts))
+	hud_elapsed += delta
+	if hud_elapsed >= .12:
+		hud_elapsed = 0
+		_audio_context()
+		clock_hud.update_clock(shift.number, shift.clock_text(), shift.deadline, not dispatch.active() and (back_to_depot or not shift.settled), ceili(car.hearts))
 	if car.hearts <= 0:
-		_finish_shift(false, "dead")
+		_offer_rescue()
+		return
+	if staff.step(delta,not back_to_depot,Vector2(car.position.x-depot.x,car.position.z-depot.z).length() <= SHIFT.DEPOT_RADIUS):
+		return
+	if not playing:
 		return
 	if Input.is_action_just_pressed(&"reset_car"):
 		_reset_car()
@@ -408,6 +591,7 @@ func _meal_picked(index: int) -> void:
 
 
 func _start_shift() -> void:
+	manifest = preload("res://order_manifest.gd").new()
 	late_charges.clear()
 	papers.dismiss()
 	clock_hud.show()
@@ -420,14 +604,21 @@ func _start_shift() -> void:
 	playing = true
 	shift = quick_runs.make_shift() if quick_runs.active() else SHIFT.new()
 	shift.begin(profile)
+	staff.begin(shift.number,int(profile.data.seed))
+	beach.begin(shift.number,int(profile.data.seed))
+	rescues = 0
+	achievements.begin_shift()
+	events.begin_shift(shift.number,shift.duration,false,quick_runs.active())
 	if quick_runs.active():
 		shift.pace = "normal"
 		$Atmosphere.start_quick(quick_runs.conditions.season,quick_runs.conditions.weather,int(profile.data.seed))
 	else:
 		shift.pace = ["generous","normal","tight"][session_shifts % 3]
 		session_shifts += 1
-		$Atmosphere.start_career(shift.number,int(profile.data.seed),session_shifts == 1)
+		$Atmosphere.start_career(shift.number,int(profile.data.seed),not events.can_event("hurricane"))
 		profile.data.season = $Atmosphere.season
+		crew.begin(profile.data,shift.number,clampi(1 + shift.tier,1,5))
+	car.apply_equipment(garage.loadout(profile))
 	car.begin_shift(shift.number, shift.pace, profile.data.get("engine", {}))
 	if not quick_runs.active() and shift.number == 1 and profile.data.gennady_paid:
 		var chapter: Dictionary = profile.data.get("final_summary", {})
@@ -449,14 +640,19 @@ func _start_shift() -> void:
 
 func _issue_order() -> void:
 	var final_due: bool = shift.number == 1 and not profile.data.gennady_paid and shift.duration - shift.elapsed < SHIFT.FINAL_WINDOW
-	var order := book.next_order(shift.orders == 0, final_due, profile.data.recent, shift.level, shift.orders+1)
+	var order := {}
+	if not final_due and shift.orders > 0:
+		order = beach.order_if_due(shift.orders+1,shift.hour(),events.tension,$Atmosphere)
+	if order.is_empty():
+		order = book.next_order(shift.orders == 0, final_due, profile.data.recent, shift.level, shift.orders+1)
 	if order.is_empty():
 		push_error("В районе отсутствует доступный путь из пиццерии и обратно")
 		_finish_shift(false)
 		return
+	manifest.prepare(order, shift, book)
 	car.engine.begin_order()
-	shift.accept(order)
-	order.tutorial = shift.orders == 1 and int(profile.data.xp) == 0
+	shift.accept(order, manifest)
+	order.quick = quick_runs.active()
 	_activate_order(order)
 	profile.remember(order.name)
 	_show_invoice()
@@ -469,9 +665,11 @@ func _activate_order(order: Dictionary) -> void:
 	map_data.deliveries.append(order)
 	destination = map_data.deliveries.size() - 1
 	current = order
+	recipient_book.prepare(order,profile.data,shift.number,shift.orders,adult)
 	if quick_runs.active():
 		quick_runs.protect_order(order)
 	story_order = bool(order.get("story", false))
+	events.order(shift.orders,shift.duration-shift.elapsed,_v2(order.stop),story_order)
 	back_to_depot = false
 	ending_after_return = story_order
 	waypoint = {}
@@ -482,11 +680,24 @@ func _activate_order(order: Dictionary) -> void:
 	if story_order:
 		visitor.prepare()
 	else:
-		var door := _make_entrance(order)
+		var door: Node3D
 		var customer := _make_customer(order)
-		entrances.append(door)
+		if order.get("beach",false):
+			beach.place(customer,order)
+		else:
+			door = _make_entrance(order)
+			entrances.append(door)
 		customers.append(customer)
 		delivery.play_order(customer, door)
+		for i in range(1, int(order.get("people",1))):
+			var group_member := order.duplicate()
+			var front := _v2(order.entrance.front)
+			var side := Vector2(-front.y,front.x) * (1.05 * ceilf(i / 2.0) * (1.0 if i%2 else -1.0))
+			var spot := _v2(order.customer) + side
+			group_member.customer = [spot.x,spot.y]
+			var person := _make_customer(group_member, i)
+			customers.append(person)
+			delivery.add_recipient(person)
 	hud.set_order(shift.orders - 1, order, true)
 	_set_waypoint({}, [])
 
@@ -504,13 +715,15 @@ func _remove_order() -> void:
 
 
 func _show_invoice() -> void:
-	var recipient := "Геннадий" if story_order else ("Степан Тугарев" if shift.orders == 1 and int(profile.data.xp) == 0 else "Клиент у подъезда")
-	invoice = {"number": shift.orders, "recipient": recipient, "address": current.name, "items": "Пицца Пеперони" if story_order else "Пицца",
-		"fee": shift.fee, "route": current.from_home, "stop": current.stop, "clock": shift.clock_text(), "pad": last_input_pad,
+	var person: Dictionary = current.recipients[0]
+	var recipient := str(person.label)
+	invoice = {"number": shift.orders, "recipient": recipient, "address": current.name, "items": manifest.invoice_items(current), "kind": manifest.kind, "avatar": recipient_book.portrait(person),
+		"fee": manifest.total_fee, "route": current.from_home, "stop": current.stop, "clock": shift.clock_text(), "pad": last_input_pad,
 		"health": "♥ %d/%d" % [ceili(car.hearts), ceili(car.hearts_max)], "balance": profile.data.wallet, "flat": 10 if story_order else 0}
 	if story_order:
 		invoice.entrance = 1
 		invoice.floor = 3
+	audio.cue("order")
 	papers.show_invoice(invoice)
 
 
@@ -526,9 +739,28 @@ func _pay_for_order() -> void:
 			cold += .2
 		if car.damage.stage[8] >= 3:
 			cold += .25
-	shift.settle((story_order or delivery.tips_allowed) and cold < .25, false, story_order)
-	if shift.deadline <= 0 and not story_order and not current.get("tutorial",false):
+	var late := shift.deadline <= 0
+	for customer in customers:
+		if customer.has_method("set_delivery_result"):
+			customer.set_delivery_result(late, not delivery.tips_allowed, cold >= .25, cold >= .6)
+	manifest.all_on_time = manifest.all_on_time and not late
+	if manifest.kind == "urgent" and late:
+		shift.refuse_urgent()
+	else:
+		shift.settle((story_order or delivery.tips_allowed) and cold < .25, false, story_order)
+		if manifest.kind == "multi" and manifest.remaining.is_empty() and manifest.all_on_time:
+			var extra := roundi(manifest.total_fee * .1)
+			shift.pay += extra
+			shift.money += extra
+			shift.latest_payment += extra
+			profile.data.wallet = int(profile.data.wallet) + extra
+	if shift.deadline <= 0 and not story_order and manifest.kind != "urgent" and not current.get("tutorial",false):
 		late_charges.append({"due": shift.elapsed + 6.0, "amount": maxi(150, roundi(shift.fee * .12 / 10) * 10)})
+	if not (manifest.kind == "urgent" and late):
+		events.delivered()
+		achievements.deliver({"n":shift.people, "on_time":not late, "left": shift.deadline / maxf(1.0, shift.issued_deadline), "free": bool(current.get("tutorial", false)),
+			"last":manifest.remaining.is_empty(), "stops":manifest.stops, "bundle":manifest.kind == "multi", "all_on_time": manifest.all_on_time,
+			"urgent":manifest.kind == "urgent", "hour": shift.hour(), "semerka":true})
 	last_tip = shift.tips - tips_before
 	if story_order:
 		var chapter := {}
@@ -540,13 +772,16 @@ func _pay_for_order() -> void:
 
 
 func _show_payment() -> void:
+	audio.cue("coin",car.position)
 	papers.dismiss()
 	clock_hud.show_pay(shift.latest_payment - last_tip, last_tip, shift.deadline <= 0, int(profile.data.wallet))
 
 
 func _enter_apartment() -> void:
+	audio.cue("door-open")
 	var amount := roundi(shift.fee * .45) if shift.deadline <= 0 else shift.fee
 	visitor.start(amount, adult, shift.deadline <= 0)
+	_audio_context()
 
 
 func _stairs_tick(delta: float) -> void:
@@ -562,8 +797,25 @@ func _story_completed() -> void:
 	arrival.walk_out()
 
 
+func _set_bundle_leg(order: Dictionary) -> void:
+	var here := Vector2(car.position.x,car.position.z)
+	var leg: Array = region_routes.route_between(here,_v2(order.stop))
+	order.from_home = leg
+	order.route = leg
+	shift.next_stop(order)
+	_activate_order(order)
+	profile.remember(order.name)
+	clock_hud.panel.hide()
+	clock_hud.notice("Следующий адрес   %s" % order.name)
+	_checkpoint()
+
+
 func _begin_return(failed: bool) -> void:
 	if back_to_depot:
+		return
+	if not failed and not manifest.remaining.is_empty():
+		var next := manifest.take_next(0)
+		_set_bundle_leg(next)
 		return
 	back_to_depot = true
 	delivery.done = false
@@ -591,6 +843,8 @@ func _finish_shift(full: bool, kind := "quit") -> void:
 	if not playing:
 		return
 	playing = false
+	events.finish()
+	staff.clear()
 	car.active_shift = false
 	profile.data.erase("final_summary")
 	profile.data.engine = car.engine.snapshot()
@@ -603,7 +857,17 @@ func _finish_shift(full: bool, kind := "quit") -> void:
 		quick_runs.finish(shift, "time" if full else kind)
 		profile = career
 		return
+	achievements.finish_shift({"full":full, "delivered":shift.delivered, "hits":shift.hits})
+	var ranking := crew.finish(profile.data,full,shift.delivered,shift.money)
+	var win := int(ranking.get("win",0))
+	shift.money += win
+	profile.data.wallet = int(profile.data.wallet) + win
 	var receipt := shift.finish(full)
+	receipt.win = win
+	receipt.rank = int(ranking.get("rank",1))
+	receipt.rating = "%d место" % int(ranking.get("career_rank",1))
+	receipt.rows = ranking.get("rows",[])
+	crew.clear()
 	_show_receipt(receipt)
 
 
@@ -612,11 +876,16 @@ func _show_receipt(receipt: Dictionary) -> void:
 	marker.hide()
 	clock_hud.hide()
 	papers.show_receipt(receipt)
+	_audio_context()
 
 
 func _free_drive() -> void:
 	playing = false
+	staff.clear()
+	crew.clear()
 	free_roam = true
+	events.begin_shift(0,0,true)
+	car.apply_equipment(garage.loadout(profile))
 	car.begin_shift(0,"normal",profile.data.get("engine",{}))
 	profile.save()
 	papers.dismiss()
@@ -632,6 +901,7 @@ func _free_drive() -> void:
 
 func _vehicle_contact(contact: KinematicCollision3D, approach: float, motion: Vector3) -> float:
 	var collider := contact.get_collider() as Node3D
+	audio.impact("metal" if collider is NPC_CAR else "wall",approach,contact.get_position())
 	if collider is NPC_CAR:
 		var impact: float = approach+maxf(0.0,collider.pace*(-collider.basis.z).dot(contact.get_normal()))
 		car.collision_damage(impact,true,contact.get_position(),contact.get_normal())
@@ -687,6 +957,8 @@ func _people_contact(start: Vector3, stop_at: Vector3, motion: Vector3) -> void:
 		var result: int = person.impact(sample.speed,direction,active_client,sample.offset,sample.lift)
 		if active_client:
 			delivery.customer_hit(result)
+		if result == WALKER.Hit.DOWN and traffic.has_method("report_incident"):
+			traffic.report_incident(Vector2(person.position.x, person.position.z))
 		if result >= WALKER.Hit.FALL:
 			car.person_bump()
 			if adult and result == WALKER.Hit.DOWN:
@@ -717,6 +989,13 @@ func _process(delta: float) -> void:
 
 
 func _set_waypoint(place: Dictionary, path: Array) -> void:
+	if playing and not back_to_depot and not shift.settled and not place.is_empty() and not manifest.remaining.is_empty():
+		for i in manifest.remaining.size():
+			if manifest.remaining[i].name == place.get("name",""):
+				var next: Dictionary = manifest.remaining[i]
+				manifest.remaining[i] = current
+				_set_bundle_leg(next)
+				return
 	waypoint = place
 	last_gps_at = Vector2(car.position.x, car.position.z)
 	if not place.is_empty():
@@ -730,6 +1009,7 @@ func _set_waypoint(place: Dictionary, path: Array) -> void:
 			gps_stop = map_data.deliveries[destination].stop
 		gps_path = [] if gps_stop.is_empty() else region_routes.route_between(last_gps_at, _v2(gps_stop))
 	hud.set_navigation(gps_path, gps_stop if not gps_path.is_empty() else [])
+	strip.set_route(gps_path,back_to_depot,playing and bool(profile.data.get("road_path",true)))
 
 
 func _update_gps(at: Vector2, delta: float) -> void:
@@ -753,6 +1033,7 @@ func _update_gps(at: Vector2, delta: float) -> void:
 	if not path.is_empty():
 		gps_path = path
 		hud.set_navigation(gps_path, gps_stop)
+		strip.set_route(gps_path,back_to_depot,playing and bool(profile.data.get("road_path",true)))
 
 
 func _delivery_hint() -> String:
@@ -900,9 +1181,10 @@ func _make_people() -> void:
 		_person(i,_v2(spec[0]),_v2(spec[1]),spec[2],actor_paint)
 
 
-func _make_customer(order: Dictionary) -> Node3D:
+func _make_customer(order: Dictionary, index := 0) -> Node3D:
 	var wait := _v2(order.customer)
-	var customer := _person(shift.orders+2,wait,wait,0.0,actor_paint)
+	var person: Dictionary = order.recipients[index]
+	var customer := _person(int(person.model),wait,wait,0.0,recipient_book.clothing(person,actor_paint))
 	var street := _v2(order.stop) - wait
 	customer.rotation.y = atan2(street.x,street.y)
 	customer.set_active(true)

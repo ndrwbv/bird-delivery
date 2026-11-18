@@ -7,11 +7,15 @@ render_mode cull_disabled, diffuse_lambert, specular_disabled;
 #include "res://street_light.gdshaderinc"
 
 uniform bool flat_city = false;
+uniform bool change_shirt = false;
+uniform vec3 original_shirt;
+uniform vec3 new_shirt;
 varying vec3 paint;
 varying vec3 actor_world;
 
 void vertex() {
 	paint = COLOR.rgb;
+	if (change_shirt && distance(paint,original_shirt) < 0.012) paint = new_shirt;
 	actor_world = (MODEL_MATRIX*vec4(VERTEX,1.0)).xyz;
 }
 

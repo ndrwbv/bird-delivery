@@ -12,6 +12,8 @@ var env_time := T0
 var day_end := .82875
 var slow := .65
 var sun_rate := 0.0
+const UNLOCK_AT := [4,9,14,20,26,33,40]
+var tier := 0
 var level := 1
 var orders := 0
 var delivered := 0
@@ -20,12 +22,14 @@ var money := 0
 var pace := "normal"
 var lunch_tips := false
 var meal_taken := false
+var people := 1
 var fee := 0
 var tips := 0
 var pay := 0
 var penalties := 0
 var hits := 0
 var hits_at_start := 0
+var issued_deadline := 0.0
 var deadline := 0.0
 var settled := false
 var return_fined := false
@@ -36,6 +40,9 @@ var latest_payment := 0
 func begin(career: RefCounted) -> void:
 	profile = career
 	number = int(profile.data.shifts) + 1
+	for threshold in UNLOCK_AT:
+		if int(profile.data.get("counted",0)) >= threshold:
+			tier += 1
 	var daytime := number >= 2 and (number - 2) % 3 == 0
 	day_end = .60 if daytime else .82875
 	slow = .85 if daytime else (.65 if number <= 3 else (1.0 if number <= 8 else 1.3))
@@ -54,10 +61,10 @@ func begin(career: RefCounted) -> void:
 
 func tick(delta: float) -> void:
 	elapsed += delta
-	if elapsed >= duration and elapsed - delta < duration:
+	if elapsed + .000001 >= duration and elapsed - delta + .000001 < duration:
 		env_time = day_end
 		return
-	if elapsed >= duration:
+	if elapsed + .000001 >= duration:
 		if day_end < .62:
 			env_time = minf(.615, env_time + delta * .15 / (480.0 * slow))
 		else:
@@ -69,28 +76,57 @@ func tick(delta: float) -> void:
 		env_time += delta * sun_rate * tempo
 
 
-func clock_text() -> String:
+func hour() -> float:
 	var t := env_time + 1.0 if env_time < T0 else env_time
 	for i in range(1, HOURS.size()):
 		var a: Vector2 = HOURS[i-1]
 		var b: Vector2 = HOURS[i]
 		if t <= b.x:
-			var minutes := floori(lerpf(a.y,b.y,inverse_lerp(a.x,b.x,t)) * 60.0 + .0001) % 1440
-			return "%02d:%02d" % [minutes / 60, minutes % 60]
-	return "09:00"
+			return lerpf(a.y,b.y,inverse_lerp(a.x,b.x,t))
+	return 9.0
 
 
-func accept(order: Dictionary) -> void:
+func clock_text() -> String:
+	var minutes := floori(hour() * 60.0 + .0001) % 1440
+	return "%02d:%02d" % [minutes / 60, minutes % 60]
+
+
+func quote(order: Dictionary) -> int:
+	var xp := int(profile.data.xp)
+	var courier_level := 1 + int(xp >= 3) + int(xp >= 8) + int(xp >= 15) + int(xp >= 25)
+	var factor := 1.0 + .03 * courier_level
+	if order.get("kind","solo") == "urgent":
+		factor *= 2.5
+	var base := roundi((640 + 1.12 * float(order.meters)) * factor / 10.0) * 10
+	var extras := maxi(0, int(order.get("people",1)) - 1)
+	base += extras * roundi(640 * factor / 10) * 10
+	return roundi(base * (1.0 + .05*tier) * (1.1 if pace == "tight" else 1.0) / 10.0) * 10
+
+
+func next_stop(order: Dictionary) -> void:
+	fee = quote(order)
+	people = int(order.get("people",1))
+	settled = false
+	hits_at_start = hits
+	latest_payment = 0
+
+
+func accept(order: Dictionary, manifest: RefCounted = null) -> void:
 	orders += 1
-	var distance := float(order.meters)
-	fee = roundi((640.0 + 1.12 * distance) * (1.0 + .03 * level) / 10.0) * 10
-	if pace == "tight":
-		fee = roundi(fee * 1.1 / 10) * 10
+	next_stop(order)
+	var distance := float(manifest.total_meters) if manifest else float(order.meters)
+	var count := int(manifest.stops) if manifest else 1
 	var wave := floori((orders - 1) / 3.0)
 	var slack := lerpf(maxf(1.3, 2.0 - .18 * wave), maxf(1.12, 1.32 - .05 * wave), ((orders - 1) % 3) * .5) - .03 * (level - 1)
 	var skill_time := lerpf(1.2, 1.0, clampf(float(profile.data.skill) / 5.0, 0, 1))
-	deadline = maxf(16, distance / 19.0 * slack + 9.0) * skill_time * (1.25 if pace == "generous" else (.92 if pace == "tight" else 1.0))
+	deadline = maxf(16, distance / 19.0 * slack + 5.0 + count*4)
+	if manifest and manifest.kind == "urgent":
+		deadline = maxf(20, distance/22.0 + 6)
+	elif count > 1:
+		deadline = maxf(deadline * manifest.time_factor, distance / 19.0 * 1.05 + 5 + count*4)
+	deadline *= (1.0 if order.get("story",false) else skill_time) * (1.25 if pace == "generous" else (.92 if pace == "tight" else 1.0))
 	settled = false
+	issued_deadline = deadline
 	return_fined = false
 	hits_at_start = hits
 	depot_time = -1.0
@@ -113,7 +149,7 @@ func settle(tips_allowed: bool, failed: bool, story: bool) -> void:
 			chance += .2
 			multiplier *= 1.3
 		var tip := roundi(fee * randf_range(.1, .4) * multiplier / 10.0) * 10 if tips_allowed and not late and not story and randf() < chance else 0
-		delivered += 1
+		delivered += people
 		pay += base
 		tips += tip
 		latest_payment = base + tip
@@ -124,6 +160,15 @@ func settle(tips_allowed: bool, failed: bool, story: bool) -> void:
 		profile.data.skill = clampf(float(profile.data.skill) + (-2.5 if late else gain), 0, 10)
 		if story:
 			profile.data.gennady_paid = true
+
+
+func refuse_urgent() -> void:
+	if settled:
+		return
+	settled = true
+	missed += 1
+	fine(maxi(400,roundi(fee * .3 / 10) * 10))
+	profile.data.skill = maxf(0, float(profile.data.skill) - 3)
 
 
 func fine(amount: int) -> void:
@@ -142,11 +187,14 @@ func wait_for_dispatch(delta: float, near: bool) -> bool:
 
 
 func finish(full: bool) -> Dictionary:
-	var bonus := 1500 + 300 * delivered if full else 0
+	var bonus := roundi((1500 + 300 * delivered) * (1.0 + .05*tier) / 10) * 10 if full else 0
 	var stars := 1 if full and delivered > 0 and hits == 0 else 0
 	profile.data.wallet = int(profile.data.wallet) + bonus
 	profile.data.stars = int(profile.data.stars) + stars
 	profile.data.shifts = number
+	if delivered >= 3:
+		profile.data.counted = int(profile.data.get("counted",0)) + 1
+	profile.data.deliveries = int(profile.data.get("deliveries",0)) + delivered
 	var receipt := {"shift_number": number, "delivered": delivered, "missed": missed, "pay": pay,
 		"tips": tips, "bonus": bonus, "penalties": penalties, "earned": money + bonus, "balance": profile.data.wallet,
 		"hits": hits, "stars": stars, "reason": "Время смены вышло" if full else "Смена окончена", "minutes": floori(elapsed / 60)}

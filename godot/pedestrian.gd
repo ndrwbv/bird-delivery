@@ -25,6 +25,11 @@ var shape_node: CollisionShape3D
 var camera: Camera3D
 var received_box: Node3D
 var entrance: Node3D
+var after_mood := "happy"
+var door_wait := -1.0
+var entry_remaining := 25.0
+var next_emote := 0.0
+var received := false
 var hit_points := 3
 var stunned := 0.0
 var knockdown := 0.0
@@ -88,39 +93,91 @@ func set_active(enabled: bool) -> void:
 	player.active = enabled
 
 
+func set_delivery_result(late: bool, bumped: bool, cold: bool, cold_upset: bool) -> void:
+	after_mood = "angry" if late or bumped or cold_upset else ("ok" if cold else "happy")
+
+
+func box_caught() -> float:
+	if not received:
+		received = true
+		if after_mood != "ok":
+			_emote(5 if after_mood == "happy" else 3)
+	return 1.5 if after_mood == "angry" else 3.0
+
+
+func _emote(count: int) -> void:
+	for i in count:
+		var mark := Label3D.new()
+		mark.text = "♥" if after_mood == "happy" else "!"
+		mark.modulate = Color("#f16b72") if after_mood == "happy" else Color("#f29249")
+		mark.outline_size = 3
+		mark.pixel_size = 0.0055
+		mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		mark.no_depth_test = true
+		add_child(mark)
+		mark.position = Vector3((float(i)/maxi(count-1,1)-0.5)*0.68,1.97+0.08*(i%2),0)
+		var flight := create_tween().bind_node(mark)
+		flight.set_parallel(true)
+		flight.tween_property(mark,"position:y",mark.position.y+0.40,0.9)
+		flight.tween_property(mark,"modulate:a",0.0,0.60).set_delay(0.30)
+		flight.chain().tween_callback(mark.queue_free)
+
+
 func go_inside(box: Node3D, door: Node3D) -> void:
 	received_box = box
 	entrance = door
-	entrance.set_open(true)
-	collider.collision_layer = 0
+	door_wait = -1.0
+	entry_remaining = 25.0
+	next_emote = randf_range(0.6,1.2)
 	player.get_animation("carry_walk").loop_mode = Animation.LOOP_LINEAR
-	player.play("carry_walk",0.14,0.95)
+	player.play("carry_walk",0.14,1.4 if after_mood == "angry" else 0.95)
 	grip.support_on_left(false)
 
 
 func _enter_building(delta: float) -> void:
-	var goal: Vector3 = entrance.passage()
+	entry_remaining -= delta
+	var sill: Vector3 = entrance.passage()
+	var outside: Vector3 = sill + entrance.global_basis.z * 1.74
+	var crossing := door_wait >= 0.0
+	var goal := sill if crossing else outside
 	var direction := goal-position
 	direction.y = 0.0
-	rotation.y = lerp_angle(rotation.y,atan2(direction.x,direction.z),1.0-exp(-15.0*delta))
-	position = position.move_toward(goal,1.62*delta)
-	if position.distance_squared_to(goal) < 0.0064:
-		entrance.set_open(false)
+	if direction.length_squared()>0.0001:
+		rotation.y = lerp_angle(rotation.y,atan2(direction.x,direction.z),1.0-exp(-15.0*delta))
+	if crossing and door_wait < 0.35:
+		door_wait += delta
+		return
+	var speed := (2.4 if crossing else 2.8) if after_mood=="angry" else (1.4 if crossing else 1.5)
+	position = position.move_toward(goal,speed*delta)
+	if after_mood=="angry" and not crossing:
+		next_emote -= delta
+		if next_emote<=0.0:
+			_emote(1)
+			next_emote = randf_range(1.3,2.2)
+	if not crossing and position.distance_squared_to(goal)<0.36:
+		door_wait = 0.0
+		entrance.begin_entry()
+		collider.collision_layer = 0
+		return
+	if (crossing and position.distance_squared_to(goal)<0.0225) or entry_remaining<=0:
+		if crossing:
+			entrance.end_entry()
 		entrance = null
-		received_box.queue_free()
+		if is_instance_valid(received_box):
+			received_box.queue_free()
 		received_box = null
 		set_active(false)
 
 
 func _physics_process(delta: float) -> void:
-	if is_instance_valid(entrance):
-		_enter_building(delta)
-		return
 	if recovery > 0.0:
 		_recover(delta)
 		return
 	if defeated or knockdown > 0.0 or stunned > 0.0 or ragdoll != null:
 		_react(delta)
+		return
+	if is_instance_valid(entrance):
+		_enter_building(delta)
 		return
 	if not walker:
 		return

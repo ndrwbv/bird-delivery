@@ -5,10 +5,12 @@ signal free_drive_requested
 signal quick_requested(mode: String)
 signal resume_requested
 signal finish_shift_requested
+signal garage_requested
 signal records_requested
 signal map_requested
 signal quit_requested
 signal main_menu_requested
+signal profile_changed
 signal cancel_order_requested
 
 const PREFS := "user://game_settings.cfg"
@@ -59,6 +61,12 @@ var stick_direction := Vector2i.ZERO
 var tab_buttons: Array[Button] = []
 var textures: Dictionary[String, Texture2D] = {}
 var shift_location: Dictionary = {}
+var profile_tool: Node
+var achievement_board: CanvasLayer
+var game_audio: Node
+var music_row := HBoxContainer.new()
+var music_name := Button.new()
+var music_toggle := Button.new()
 var _configured := false
 var driving_camera: Camera3D
 var sunlight: DirectionalLight3D
@@ -70,7 +78,7 @@ func setup() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 6
 	hide()
-	for key: String in ["aurora","pizza-game","quick","map","settings","controls","end","resume","depot-map","honor"]:
+	for key: String in ["aurora","pizza-game","quick","map","settings","controls","end","resume","depot-map","honor","garage-game"]:
 		var path := ART + key + ".webp"
 		if ResourceLoader.exists(path) and FileAccess.file_exists(path + ".import"):
 			textures[key] = load(path)
@@ -121,6 +129,16 @@ func setup() -> void:
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar_row.add_child(spacer)
+	bar_row.add_child(music_row)
+	music_row.add_child(music_name)
+	music_row.add_child(music_toggle)
+	music_name.flat = true
+	music_toggle.flat = true
+	music_name.focus_mode = Control.FOCUS_NONE
+	music_toggle.focus_mode = Control.FOCUS_NONE
+	music_name.pressed.connect(func(): if game_audio: game_audio.next_track())
+	music_toggle.pressed.connect(func(): if game_audio: game_audio.toggle_music())
+	_update_music_strip()
 	bar_row.add_child(_label("Женя",15,INK))
 	layout.add_child(stage)
 	stage.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -128,6 +146,48 @@ func setup() -> void:
 	layout.add_child(base)
 	base.add_child(dock)
 	dock.add_theme_constant_override("separation",0)
+
+func bind_profile(owner: RefCounted, honors: CanvasLayer, modes: Node) -> void:
+	if profile_tool:
+		return
+	profile_tool = preload("res://profile_transfer.gd").new()
+	add_child(profile_tool)
+	profile_tool.bind(owner,honors,modes)
+	profile_tool.updated.connect(_refresh_profile)
+	profile_tool.changed.connect(func():
+		completed_shifts = int(owner.data.shifts)
+		profile_changed.emit()
+	)
+
+func _refresh_profile() -> void:
+	if active() and current_page == "profile":
+		_show_page("profile")
+
+func bind_achievements(board: CanvasLayer) -> void:
+	achievement_board = board
+	board.closed.connect(func():
+		if active(): _show_page(current_page)
+	)
+	if active(): _show_page(current_page)
+
+func bind_audio(player: Node) -> void:
+	game_audio = player
+	if not player.track_changed.is_connected(_track_changed):
+		player.track_changed.connect(_track_changed)
+	_update_music_strip()
+
+func _track_changed(_title: String) -> void:
+	_update_music_strip()
+
+func _update_music_strip() -> void:
+	music_row.visible = is_instance_valid(game_audio) and current_page != "language"
+	if music_row.visible:
+		music_name.text = "♫  " + game_audio.title() + "  ▸"
+		music_toggle.text = tr("вкл" if game_audio.music_off else "выкл")
+
+func _click() -> void:
+	if game_audio:
+		game_audio.cue("ui-click")
 
 func bind_graphics(camera: Camera3D, sun: DirectionalLight3D) -> void:
 	driving_camera = camera
@@ -206,6 +266,7 @@ func _open(page: String) -> void:
 
 func _show_page(page: String) -> void:
 	current_page = page
+	_update_music_strip()
 	_clear(stage)
 	_clear(dock)
 	focus_default = null
@@ -220,6 +281,7 @@ func _show_page(page: String) -> void:
 		"quick": _quick_page()
 		"settings": _settings_page()
 		"credits": _credits_page()
+		"profile": _profile_page()
 	if is_instance_valid(focus_default):
 		focus_default.grab_focus.call_deferred()
 
@@ -265,7 +327,11 @@ func _start_dock() -> void:
 	focus_default = _tile("на смену","pizza-game",_show_page.bind("district"))
 	if not _available_quick().is_empty():
 		_tile("быстрый заезд","quick",_show_page.bind("quick"))
+	if garage_requested.has_connections():
+		_tile("гараж","garage-game",_leave.bind(garage_requested))
 	_tile("покататься","map",_leave.bind(free_drive_requested))
+	if achievement_board:
+		_tile("доска почёта","honor",achievement_board.show_board)
 	if records_requested.has_connections():
 		_tile("таблица рекордов","honor",_leave.bind(records_requested))
 	_tile("настройки","settings",_settings.bind(0))
@@ -444,6 +510,8 @@ func _settings_page() -> void:
 		0:
 			_field(card,"курьер",tr("Женя"))
 			_field(card,"район",tr("Юг"))
+			if profile_tool and not pause_menu:
+				_button(card,"сохранение карьеры",_show_page.bind("profile"))
 			_button(card,"авторы и лицензии",_show_page.bind("credits"))
 		1: _graphics(card)
 		2: _sound(card)
@@ -497,10 +565,6 @@ func _apply_saved() -> void:
 			_apply_graphic(key,prefs.get_value("graphics",key))
 	if not get_viewport().size_changed.is_connected(_apply_resolution):
 		get_viewport().size_changed.connect(_apply_resolution)
-	if prefs.has_section_key("sound","mute"):
-		AudioServer.set_bus_mute(0,bool(prefs.get_value("sound","mute")))
-	if prefs.has_section_key("sound","volume"):
-		_volume(float(prefs.get_value("sound","volume")))
 
 func _set_graphic(key: String, value: Variant) -> void:
 	prefs.set_value("graphics","preset",3)
@@ -530,18 +594,27 @@ func _apply_resolution() -> void:
 		get_viewport().scaling_3d_scale = clampf(minf(float(target.x)/window_size.x,float(target.y)/window_size.y),0.25,2.0)
 
 func _sound(card: Container) -> void:
-	_option(card,"звук",["выкл","вкл"],int(not AudioServer.is_bus_mute(0)),func(i: int):
-		AudioServer.set_bus_mute(0,i == 0)
-		_save("sound","mute",i == 0)
+	if not game_audio:
+		return
+	_option(card,"звук",["выкл","вкл"],int(not game_audio.muted),func(i: int): game_audio.set_muted(i == 0))
+	for key: String in ["Music","Effects","Motor"]:
+		_sound_slider(card,key,{"Music":"музыка","Effects":"звуки","Motor":"мотор"}[key])
+	_button(card,"следующий трек",game_audio.next_track)
+	_button(card,"музыка вкл" if game_audio.music_off else "музыка выкл",func():
+		game_audio.toggle_music()
+		_settings(2)
 	)
+
+func _sound_slider(card: Container, key: String, title: String) -> void:
 	var row := HBoxContainer.new()
 	card.add_child(row)
-	row.add_child(_label("общая громкость",16,INK))
+	var label := _label(title,16,INK)
+	label.custom_minimum_size.x = 120
+	row.add_child(label)
 	var slider := HSlider.new()
-	slider.min_value = 0
 	slider.max_value = 100
-	slider.step = 10
-	slider.value = clampf(db_to_linear(AudioServer.get_bus_volume_db(0))*100.0,0,100)
+	slider.step = 1
+	slider.value = float(game_audio.levels[key])
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(slider)
@@ -549,17 +622,58 @@ func _sound(card: Container) -> void:
 	percent.custom_minimum_size.x = 58
 	row.add_child(percent)
 	slider.value_changed.connect(func(v: float):
-		_volume(v)
+		game_audio.set_level(key,v)
 		percent.text = "%d %%" % roundi(v)
-		_save("sound","volume",v)
 	)
-
-func _volume(percent: float) -> void:
-	AudioServer.set_bus_volume_db(0,linear_to_db(maxf(0.00001,clampf(percent,0,100)/100.0)))
+	if key != "Music":
+		slider.drag_ended.connect(func(changed: bool):
+			if changed: game_audio.cue("engine-crank" if key == "Motor" else "coin")
+		)
 
 func _controls(card: Container) -> void:
 	for line: Array in [["газ","W / ↑","RT"],["тормоз","S / ↓","LT"],["руль","A D / ← →","L"],["ручник","Space","B"],["нитро","Shift / N","RB"],["карта","Tab","Y"],["пауза","Esc / P","Menu"]]:
 		_field(card,line[0],line[1]+"     ·     "+line[2])
+
+func _profile_page() -> void:
+	var card := _sheet(stage,"сохранение карьеры",690)
+	var owner: RefCounted = profile_tool.profile
+	_field(card,"Юг",tr("Смена")+" "+str(int(owner.data.shifts)+1)+"    "+_cash(owner.data.wallet))
+	_field(card,"Номер сохранения",str(owner.data.save_id))
+	if owner.recovery == "backup":
+		card.add_child(_wrapped(tr("Основной файл повреждён. Загружена предыдущая исправная запись."),16))
+	elif owner.recovery == "damaged":
+		card.add_child(_wrapped(tr("Основной и резервный файлы повреждены. Выберите исправную копию или начните заново."),16))
+	if not profile_tool.status.is_empty():
+		card.add_child(_wrapped(tr(profile_tool.status),16))
+	if profile_tool.busy():
+		return
+	if owner.data.has("pending_transfer"):
+		focus_default = _button(card,"завершить перенос",profile_tool.apply,true)
+	elif profile_tool.action == "":
+		focus_default = _button(card,"Выбрать копию папки Steam",profile_tool.choose.bind(true))
+		_button(card,"Выбрать копию JSON",profile_tool.choose.bind(false))
+		if owner.has_reserve():
+			_button(card,"Вернуть сохранение до последнего изменения",profile_tool.ask.bind("restore"))
+		if owner.recovery == "backup":
+			_button(card,"Восстановить основной файл",profile_tool.ask.bind("repair"))
+		_button(card,"Сбросить карьеру",profile_tool.ask.bind("reset"))
+	else:
+		match profile_tool.action:
+			"import":
+				var source: Dictionary = profile_tool.preview.career
+				_field(card,"Копия Steam",tr("Смена")+" "+str(int(source.shifts)+1)+"    "+_cash(source.wallet))
+				_field(card,"Семёрка",tr("броня")+" "+str(int(source.semerka.armor))+"    "+tr("мотор")+" "+str(int(source.semerka.engine)))
+				_field(card,"достижения",str(profile_tool.preview.awards.got.size()))
+				card.add_child(_wrapped(tr("Заменить текущую карьеру этой копией? Предыдущее сохранение можно вернуть."),16))
+			"reset":
+				card.add_child(_wrapped(tr("Начать карьеру с первой смены и нулевой копилкой? Достижения и настройки сохранятся."),16))
+			"restore":
+				card.add_child(_wrapped(tr("Вернуть карьеру и рекорд быстрого заезда из предыдущей копии?"),16))
+			"repair":
+				card.add_child(_wrapped(tr("Восстановить основной файл из исправной записи? Повреждённый файл будет сохранён отдельно."),16))
+		focus_default = _button(card,"Отмена",profile_tool.cancel,true)
+		_button(card,"Подтвердить",profile_tool.apply)
+	_button(card,"назад",_back)
 
 func _credits_page() -> void:
 	var card := _sheet(stage,"авторы и лицензии",680)
@@ -573,7 +687,7 @@ func _save(section: String, key: String, value: Variant) -> void:
 		push_warning("Menu settings: " + error_string(error))
 
 func _input(event: InputEvent) -> void:
-	if not active() or (is_instance_valid(map_overlay) and map_overlay.visible):
+	if not active() or (profile_tool and profile_tool.dialog) or (achievement_board and achievement_board.active()) or (is_instance_valid(map_overlay) and map_overlay.visible):
 		return
 	var pad := event is InputEventJoypadButton or event is InputEventJoypadMotion
 	if pad != pad_active and (pad or event is InputEventKey or event is InputEventMouseButton):
@@ -626,6 +740,14 @@ func _back() -> void:
 		"district","quick": _show_page("start")
 		"settings": _show_page("pause" if pause_menu else "start")
 		"credits": _settings(0)
+		"profile":
+			if profile_tool.dialog:
+				profile_tool.dialog.hide()
+				profile_tool._close_picker()
+			elif not profile_tool.action.is_empty():
+				profile_tool.cancel()
+			else:
+				_settings(0)
 
 func _leave(request: Signal) -> void:
 	dismiss()
@@ -671,6 +793,7 @@ func _tile(title: String, art: String, action: Callable) -> Button:
 	name_label.offset_top = -36
 	name_label.offset_left = 3
 	name_label.offset_right = -3
+	b.pressed.connect(_click)
 	b.pressed.connect(action)
 	return b
 
@@ -724,6 +847,7 @@ func _button(parent: Container, title: String, cb: Callable, emphasis := false) 
 	for tone in ["font_color","font_hover_color","font_pressed_color","font_focus_color","font_hover_pressed_color"]:
 		button.add_theme_color_override(tone,INK)
 	button.add_theme_font_size_override("font_size",16)
+	button.pressed.connect(_click)
 	button.pressed.connect(cb)
 	parent.add_child(button)
 	return button

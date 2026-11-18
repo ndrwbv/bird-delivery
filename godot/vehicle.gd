@@ -34,6 +34,9 @@ var engine := ENGINE.new()
 var surface := SURFACE.new()
 var motor_audio := MOTOR_AUDIO.new()
 var starter := STARTER.new()
+var armor_level := 0
+var tuned_speed := MAX_SPEED
+var equipment := preload("res://semerka_addons.gd").new()
 var hearts_max := 7.0
 var bonus_heart := false
 var nitro_efficiency := 1.0
@@ -70,8 +73,10 @@ var wheel_rest: Array[Vector3] = []
 
 
 func _ready() -> void:
+	add_child(equipment)
+	equipment.setup(self)
 	add_child(motor_audio)
-	engine.started.connect(motor_audio.starter.play.bind(0.0))
+	engine.started.connect(motor_audio.play_starter)
 	var layer := CanvasLayer.new()
 	layer.layer = 6
 	add_child(layer)
@@ -104,16 +109,27 @@ func _ready() -> void:
 		wheel_rest.append(wheel.position)
 
 
+func apply_equipment(loadout: Dictionary) -> void:
+	var old_max := hearts_max
+	armor_level = clampi(int(loadout.get("armor",0)),0,3)
+	hearts_max = 7.0 + armor_level + (1.0 if bonus_heart else 0.0)
+	hearts = clampf(hearts + (hearts_max - old_max),0,hearts_max)
+	tuned_speed = MAX_SPEED*(1.0 + .04*clampi(int(loadout.get("engine",0)),0,3))
+	damage.paint_body(Color.from_string(str(loadout.get("paint","#ebe6d8")),Color("#ebe6d8")))
+	equipment.configure(bool(loadout.get("wings",false)),bool(loadout.get("gun",false)))
+
+
 func begin_shift(number: int, pace: String, engine_state: Dictionary = {}) -> void:
 	if not engine_state.is_empty():
 		engine.restore(engine_state)
 	engine.begin_shift(number)
-	motor_audio.starter.play()
+	motor_audio.play_starter()
 	active_shift = true
 	bonus_heart = false
 	sinking = -1.0
 	surface.ice_load = 0.0
-	hearts_max = 7.0
+	hearts_max = 7.0 + armor_level
+	equipment.reset_drive(true)
 	hearts = hearts_max
 	nitro = 1.0 if pace == "generous" and number > 0 else 0.5
 	nitro_efficiency = 1.0
@@ -124,6 +140,7 @@ func begin_shift(number: int, pace: String, engine_state: Dictionary = {}) -> vo
 
 
 func park(at: Vector2, yaw: float) -> void:
+	equipment.reset_drive(false)
 	sinking = -1.0
 	surface.ice_load = 0.0
 	position = Vector3(at.x, terrain.at(at.x, at.y) + 0.04, at.y)
@@ -157,6 +174,7 @@ func _physics_process(delta: float) -> void:
 		visual.rotation.x = lerpf(visual.rotation.x,-0.38,1.0-exp(-delta))
 		return
 	var driving := active_shift and not controls_locked and hearts > 0.0
+	equipment.tick(delta,driving)
 	var throttle := driving and Input.get_action_raw_strength(&"accelerate") > 0.154
 	var brake := driving and Input.get_action_raw_strength(&"reverse") > 0.154
 	var stick := Input.get_action_raw_strength(&"steer_right")-Input.get_action_raw_strength(&"steer_left") if driving else 0.0
@@ -180,6 +198,12 @@ func _physics_process(delta: float) -> void:
 	var lateral := right.dot(velocity)
 	var old_speed := speed
 	surface.step(position,terrain,delta)
+	surface.winter.sample(position,Vector2(forward.x,forward.z),terrain,surface.snow,delta,
+		not airborne and surface.wade <= 0.0 and not surface.ice,wheel_rest)
+	surface.loose_snow = surface.winter.result.x
+	surface.grit = surface.winter.result.y
+	surface.rut = surface.winter.result.z
+	surface.snow_cover = surface.winter.result.w
 	if driving and not airborne and ((not surface.frozen and surface.water_depth > (0.75 if surface.wading_beach else 0.15)) or surface.breaks_ice(delta,speed,position.y)):
 		sinking = 0.0
 		motor_audio.step(delta,engine,false,false)
@@ -201,15 +225,15 @@ func _physics_process(delta: float) -> void:
 		longitudinal += 55.0 * delta
 	boost_active = burning
 	if throttle and not airborne and not engine.dead:
-		longitudinal += ACCELERATION*maxf(0.25,1.0-longitudinal/MAX_SPEED)*(1.0-0.5*minf(1.0,sand))*(1.0-0.3*snow)*delta
+		longitudinal += ACCELERATION*maxf(0.25,1.0-longitudinal/tuned_speed)*(1.0-0.5*minf(1.0,sand))*(1.0-0.3*snow)*delta
 	if brake:
 		var retard := BRAKES*(1.0-road_wet*0.25) if longitudinal > 0.4 else (0.0 if engine.dead else ACCELERATION*0.5)
 		longitudinal -= retard*delta
 	if engine.dead:
 		longitudinal -= longitudinal*0.55*delta
-	longitudinal = clampf(longitudinal, -MAX_REVERSE, MAX_SPEED + 14.0)
-	if not burning and longitudinal > MAX_SPEED:
-		longitudinal -= (longitudinal - MAX_SPEED) * 1.4 * delta
+	longitudinal = clampf(longitudinal, -MAX_REVERSE, tuned_speed + 14.0)
+	if not burning and longitudinal > tuned_speed:
+		longitudinal -= (longitudinal - tuned_speed) * 1.4 * delta
 	longitudinal -= longitudinal * 0.3 * delta
 	if surface.wade > 0.0 and not airborne:
 		longitudinal -= longitudinal*5.0*minf(1.4,surface.wade/0.45)*delta
@@ -269,7 +293,7 @@ func _physics_process(delta: float) -> void:
 	var wheel_spin := snow*3.0 if throttle and not engine.dead else 0.0
 	_update_wheels(delta,-basis.z.dot(actual)+wheel_spin)
 	var load_motor := not engine.dead and (throttle or burning)
-	engine.gearbox(delta,longitudinal,MAX_SPEED,load_motor,brake,burning,airborne)
+	engine.gearbox(delta,longitudinal,tuned_speed,load_motor,brake,burning,airborne)
 	motor_audio.step(delta,engine,load_motor,active_shift and not controls_locked and hearts > 0.0)
 	shield_aura.visible = shield_time > 0.0 and (shield_time > 2.0 or floori(shield_time*6.0)%2 == 0)
 	damage.bounce_parts(position,rotation.y,delta)
@@ -336,7 +360,7 @@ func _drive_motion(delta: float) -> void:
 			motion.y = 0.0
 			if approach > 3.0:
 				yaw_rate *= 0.48
-	if person_handler.is_valid() and (position-start).length_squared() > 0.0001:
+	if not airborne and person_handler.is_valid() and (position-start).length_squared() > 0.0001:
 		person_handler.call(start,position,approach_velocity)
 
 
@@ -344,7 +368,7 @@ func _update_wheels(delta: float, rolling: float) -> void:
 	var support: Array[float] = []
 	for i in wheels.size():
 		var sample := position + basis * wheel_rest[i]
-		sample.y = terrain.wheel_height(sample.x, sample.z, position.y)
+		sample.y = terrain.wheel_height(sample.x, sample.z, position.y)+surface.winter.support[i]
 		if surface.ice_height > -INF:
 			sample.y = maxf(sample.y,surface.ice_height)
 		elif surface.wade > 0.0:
@@ -354,7 +378,7 @@ func _update_wheels(delta: float, rolling: float) -> void:
 	var average := (support[0]+support[1]+support[2]+support[3])*0.25
 	var pitch := atan2((support[0]+support[1]-support[2]-support[3])*0.5, WHEELBASE)
 	var roll := atan2((support[1]+support[3]-support[0]-support[2])*0.5, TRACK)
-	if delta > 0.0:
+	if delta > 0.0 and not equipment.height_step(delta,average):
 		suspension_velocity += ((average+0.035-position.y)*142.0 - suspension_velocity*19.0)*delta
 		position.y = clampf(position.y + suspension_velocity*delta, average-0.10, average+0.23)
 		var blend := 1.0-exp(-8.0*delta)

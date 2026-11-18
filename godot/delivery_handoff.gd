@@ -29,6 +29,7 @@ var paid := false
 
 var view := HANDOFF_CAMERA.new()
 var box_model: Node3D
+var queue: Array[Node3D] = []
 var flying_box: Node3D
 var elapsed := 0.0
 var flight_from := Vector3.ZERO
@@ -48,6 +49,7 @@ func setup(vehicle: CharacterBody3D, _person: CharacterBody3D, camera: Camera3D,
 
 func play_order(receiver: Node3D, entrance: Node3D, arrival_radius := ARRIVAL_RADIUS) -> void:
 	_clear_presentation()
+	queue.clear()
 	target = receiver
 	door = entrance
 	reach = arrival_radius
@@ -62,6 +64,10 @@ func play_order(receiver: Node3D, entrance: Node3D, arrival_radius := ARRIVAL_RA
 	failed = false
 	tips_allowed = true
 	stage = Stage.DRIVING
+
+
+func add_recipient(person: Node3D) -> void:
+	queue.append(person)
 
 
 func reset_order() -> bool:
@@ -150,6 +156,19 @@ func _present_box(delta: float) -> void:
 	if flight_time >= 0.0 and not caught:
 		_step_flight(flight_time, delta)
 	if flight_time >= FLIGHT_TIME + LOWER_TIME:
+		while not queue.is_empty():
+			var next: Node3D = queue.pop_front()
+			if not is_instance_valid(next) or next.defeated:
+				continue
+			target = next
+			flying_box = box_model.duplicate()
+			add_child(flying_box)
+			launched = false
+			caught = false
+			reaching = false
+			elapsed = PIN_TIME
+			view.start(target)
+			return
 		car.damage.trunk_open = 0.0
 		stage = Stage.CASH
 		elapsed = 0.0
@@ -189,7 +208,7 @@ func _give_box() -> void:
 	var held := flying_box
 	flying_box = null
 	# After the catch the customer holds the box independently of the on-screen payment.
-	var delay := 3.0 if tips_allowed else 1.5
+	var delay: float = target.box_caught()
 	get_tree().create_timer(delay, false, true).timeout.connect(_leave_with_box.bind(target, door, held))
 
 

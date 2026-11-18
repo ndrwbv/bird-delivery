@@ -614,6 +614,8 @@ func _lamp_amount(t: float) -> float:
 	return 0.78 + 0.22*smoothstep(1.93,2.41,t)
 
 func _sound(id: String) -> void:
+	if catalog.silent:
+		return
 	sounds.stream = room.sound_clip(id)
 	sounds.pitch_scale = randf_range(150.0,200.0)/175.0 if id == "step" else 1.0
 	sounds.play()

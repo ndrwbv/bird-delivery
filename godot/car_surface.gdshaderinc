@@ -3,6 +3,7 @@ uniform vec4 dent_forces[8];
 uniform vec4 section_pose[13];
 uniform vec4 section_hinge[13];
 uniform vec2 access_open = vec2(0.0);
+uniform vec3 passenger_open = vec3(0.0);
 uniform vec4 blood_marks[12];
 uniform int blood_count = 0;
 uniform vec4 soot_marks[2];
@@ -35,6 +36,9 @@ void pose_surface(inout vec3 vertex, inout vec3 normal, int part) {
 	vec3 angle = pose.w > 0.5 ? pose.xyz : vec3(0.0);
 	if (part == 2) angle.x += access_open.x;
 	if (part == 3) angle.y += access_open.y;
+	if (part == 4) angle.y -= passenger_open.z;
+	if (part == 5) angle.y += passenger_open.x;
+	if (part == 6) angle.y += passenger_open.y;
 	if (pose.w < 3.0 && part <= 8 && dot(angle,angle) > 0.000001) {
 		vec3 pivot = section_hinge[part].xyz;
 		vertex = pivot+rot(vertex-pivot,angle);

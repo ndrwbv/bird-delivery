@@ -15,7 +15,6 @@ var address: Label
 var range_label: Label
 var speed: Label
 var wallet: Label
-var order_count := 0
 var balance := 0
 var controls: Label
 var last_kmh := -1
@@ -31,7 +30,6 @@ var _navigation_active := false
 
 
 func configure(data: Dictionary, region: Dictionary = {}) -> void:
-	order_count = data.deliveries.size()
 	screen = Control.new()
 	add_child(screen)
 	screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -153,9 +151,9 @@ func update_drive(at: Vector2, forward: Vector2, kmh: float, meters: float, hint
 
 func _update_controls() -> void:
 	if on_foot:
-		controls.text = "Стик  бежать      X  к пиццерии" if using_pad else "WASD  бежать      R  к пиццерии"
+		controls.text = "Стик  бежать      X  крылья" if using_pad else "WASD  бежать      R  к пиццерии"
 	elif using_pad:
-		controls.text = "RT / LT  газ и тормоз      Стик  руль      X  к пиццерии"
+		controls.text = "RT / LT  газ и тормоз      Стик  руль      X  крылья"
 	else:
 		controls.text = "WASD  ехать      ПРОБЕЛ  ручник      R  к пиццерии"
 	controls.text += "      Y  карта" if using_pad else "      Tab  карта"

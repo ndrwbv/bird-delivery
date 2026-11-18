@@ -100,6 +100,13 @@ func _configure_mesh(mesh: MeshInstance3D, glass: bool, pane: int) -> void:
 	materials.append(shader)
 
 
+func paint_body(tint: Color) -> void:
+	for i in meshes.size():
+		if meshes[i].name == &"Car_CarBody_0":
+			materials[i].set_shader_parameter(&"enamel",tint)
+			return
+
+
 func repair() -> void:
 	score.fill(0.0)
 	wanted.fill(0)

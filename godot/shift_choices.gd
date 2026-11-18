@@ -5,6 +5,8 @@ var shade := ColorRect.new()
 var card := PanelContainer.new()
 var body := VBoxContainer.new()
 var buttons: Array[Button] = []
+var remaining := -1.0
+var default_answer := -1
 var previous_pause := false
 var previous_focus: WeakRef
 var consumed_physics_frame := -2
@@ -31,7 +33,9 @@ func _ready() -> void:
 	hide()
 
 
-func offer(person: String, question: String, answers: Array) -> void:
+func offer(person: String, question: String, answers: Array, timeout := -1.0, on_timeout := -1) -> void:
+	remaining = timeout
+	default_answer = on_timeout
 	if not visible:
 		previous_pause = get_tree().paused
 		var focused := get_viewport().gui_get_focus_owner()
@@ -55,6 +59,13 @@ func offer(person: String, question: String, answers: Array) -> void:
 		buttons[i].focus_neighbor_bottom = buttons[i].get_path_to(buttons[(i+1)%buttons.size()])
 	show()
 	buttons[0].grab_focus()
+
+
+func _process(delta: float) -> void:
+	if visible and remaining >= 0 and default_answer >= 0:
+		remaining -= delta
+		if remaining <= 0:
+			_pick(default_answer)
 
 
 func _line(value: String, size_px: int, color: Color) -> void:

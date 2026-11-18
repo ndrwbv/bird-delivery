@@ -3,6 +3,9 @@ extends CanvasLayer
 signal invoice_accepted
 signal next_shift_requested
 signal free_drive_requested
+signal garage_requested
+signal bet_requested
+signal main_menu_requested
 
 enum Page { CLOSED, INVOICE, RECEIPT }
 
@@ -102,6 +105,11 @@ var wallet_value: Label
 var rows := VBoxContainer.new()
 var bottom := HBoxContainer.new()
 var receipt_buttons: Array[Button] = []
+var garage_button: Button
+var bet_button: Button
+var back_button: Button
+var adult_spending := false
+var returning_from_spending := false
 var bold := SystemFont.new()
 var print_tween: Tween
 var printing := false
@@ -171,6 +179,23 @@ func accept_invoice() -> void:
 		invoice_accepted.emit()
 
 
+func set_spending_enabled(adult: bool) -> void:
+	adult_spending = adult
+
+
+func refresh_balance(amount: int) -> void:
+	if page != Page.RECEIPT:
+		return
+	wallet_value.text = _money(amount)
+	bet_button.visible = adult_spending and amount >= 50 and bet_requested.has_connections()
+	garage_button.visible = garage_requested.has_connections()
+	back_button.text = tr("в меню") if main_menu_requested.has_connections() else tr("Свободная езда")
+	if returning_from_spending:
+		returning_from_spending = false
+		input_after = Time.get_ticks_msec() + 180
+		receipt_buttons[0].grab_focus.call_deferred()
+
+
 func show_receipt(receipt: Dictionary) -> void:
 	dismiss()
 	page = Page.RECEIPT
@@ -179,7 +204,7 @@ func show_receipt(receipt: Dictionary) -> void:
 	receipt_head.text = tr("ЧЕК СМЕНЫ · ЮГ") + "     № %04d" % int(receipt.shift_number)
 	reason_label.text = str(receipt.get("reason", ""))
 	reason_label.visible = not reason_label.text.is_empty()
-	wallet_value.text = _money(int(receipt.balance))
+	refresh_balance(int(receipt.balance))
 	for old in rows.get_children():
 		rows.remove_child(old)
 		old.queue_free()
@@ -198,6 +223,8 @@ func show_receipt(receipt: Dictionary) -> void:
 		_receipt_row(tr("Звёзды"), str(receipt.stars), INK)
 	if receipt.has("rank"):
 		_receipt_row(tr("Место в смене"), str(receipt.rank), INK)
+	if int(receipt.get("win",0)) > 0:
+		_receipt_row(tr("Первое место на смене"), "+" + _money(int(receipt.win)),GREEN)
 	if receipt.has("rating"):
 		_receipt_row(tr("Рейтинг"), str(receipt.rating), INK)
 	var earned := int(receipt.earned)
@@ -214,6 +241,7 @@ func dismiss() -> void:
 		print_tween.kill()
 		print_tween = null
 	printing = false
+	returning_from_spending = false
 	page = Page.CLOSED
 	hide()
 	phone.hide()
@@ -239,7 +267,7 @@ func _layout() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not active():
+	if not active() or returning_from_spending:
 		return
 	if page == Page.INVOICE:
 		if get_tree().paused:
@@ -265,9 +293,17 @@ func _input(event: InputEvent) -> void:
 		_finish_print(true)
 	elif Time.get_ticks_msec() < input_after:
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(&"ui_cancel"):
+	elif event.is_action_pressed(&"ui_cancel") or (event is InputEventJoypadButton and event.button_index == JOY_BUTTON_B):
 		get_viewport().set_input_as_handled()
 		_leave_receipt(false)
+	elif (event is InputEventKey and event.physical_keycode == KEY_Y) or (event is InputEventJoypadButton and event.button_index == JOY_BUTTON_Y):
+		if garage_button.visible:
+			get_viewport().set_input_as_handled()
+			_spending(garage_requested)
+	elif (event is InputEventKey and event.physical_keycode == KEY_X) or (event is InputEventJoypadButton and event.button_index == JOY_BUTTON_X):
+		if bet_button.visible:
+			get_viewport().set_input_as_handled()
+			_spending(bet_requested)
 
 
 func _set_drive_hint() -> void:
@@ -363,12 +399,21 @@ func _build_receipt() -> void:
 	bottom.add_theme_constant_override("separation", 12)
 	column.add_child(bottom)
 	var again := _button(bottom, tr("На новую смену"), Color("#865237"), Color.WHITE)
-	var roam := _button(bottom, tr("Свободная езда"), Color("#ecdbc1"), INK)
+	garage_button = _button(bottom,tr("гараж"),Color("#ecdbc1"),INK)
+	bet_button = _button(bottom,tr("депнуть"),Color("#f0d0b5"),INK)
+	back_button = _button(bottom,tr("в меню"),Color("#ecdbc1"),INK)
 	again.pressed.connect(_leave_receipt.bind(true))
-	roam.pressed.connect(_leave_receipt.bind(false))
-	again.focus_neighbor_right = again.get_path_to(roam)
-	roam.focus_neighbor_left = roam.get_path_to(again)
-	receipt_buttons = [again, roam]
+	garage_button.pressed.connect(_spending.bind(garage_requested))
+	bet_button.pressed.connect(_spending.bind(bet_requested))
+	back_button.pressed.connect(_leave_receipt.bind(false))
+	receipt_buttons = [again,garage_button,bet_button,back_button]
+
+
+func _spending(request: Signal) -> void:
+	if page == Page.RECEIPT and not printing and not returning_from_spending and Time.get_ticks_msec() >= input_after:
+		returning_from_spending = true
+		release_focus()
+		request.emit()
 
 
 func _receipt_row(key: String, value: String, tint: Color, font_size := 17) -> void:
@@ -390,6 +435,7 @@ func _print_receipt() -> void:
 	print_tween.tween_interval(0.30)
 	for line: Control in rows.get_children():
 		line.modulate.a = 0.0
+		print_tween.tween_callback(func(): get_tree().call_group(&"game_audio",&"cue","receipt"))
 		print_tween.tween_property(line, "modulate:a", 1.0, 0.09)
 	print_tween.tween_interval(0.38)
 	print_tween.tween_callback(_finish_print.bind(false))
@@ -418,6 +464,8 @@ func _leave_receipt(another_shift: bool) -> void:
 	dismiss()
 	if another_shift:
 		next_shift_requested.emit()
+	elif main_menu_requested.has_connections():
+		main_menu_requested.emit()
 	else:
 		free_drive_requested.emit()
 

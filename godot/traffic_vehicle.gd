@@ -3,6 +3,23 @@ extends CharacterBody3D
 const ROAD_LAYER := 32
 const OBSTACLES := 1 | 2 | 4 | 8 | 16 | ROAD_LAYER
 
+var roads: RefCounted
+var signals: Node3D
+var edge: RefCounted
+var cruise := 12.0
+var shuttle := false
+var last_stop := Vector2.INF
+var service_edge: RefCounted
+var line_goal := Vector2.INF
+var dwelling := 0.0
+var dwell_stop := Vector2.INF
+var stop_served := false
+var planned_nodes := PackedInt64Array()
+var planned_at := 0
+var scan_in := 0.0
+var scanned_gap := 0.0
+var route_complete := false
+signal at_stop(vehicle: CharacterBody3D)
 var terrain: RefCounted
 var route := PackedVector3Array()
 var limits := PackedFloat32Array()
@@ -45,6 +62,79 @@ func setup(ground: RefCounted, model: PackedScene, at: Vector2, yaw: float) -> v
 	set_physics_process(false)
 
 
+func start_flow(graph: RefCounted, first: RefCounted, lights: Node3D, s: float, unlit: Material, lit: Material, desired: float) -> void:
+	roads = graph
+	edge = first
+	signals = lights
+	cruise = desired
+	route_complete = false
+	stop_served = false
+	coast = Vector3.ZERO
+	dwelling = 0.0
+	route.clear()
+	planned_nodes.clear()
+	limits.clear()
+	var p: Vector2 = first.lane(s)
+	var end: Vector2 = first.lane(first.exit)
+	follow([[p.x,p.y,cruise],[end.x,end.y,cruise]],0,unlit,lit)
+	_extend_flow()
+	show()
+
+
+func aim_for(goal_edge: RefCounted, stop_at: Vector2) -> bool:
+	if roads == null or edge == null:
+		return false
+	var connection: PackedInt64Array = roads.navigation.get_id_path(roads.node_ids[edge.b],roads.node_ids[goal_edge.a])
+	if connection.is_empty():
+		return false
+	planned_nodes = connection
+	planned_at = 0
+	service_edge = goal_edge
+	line_goal = goal_edge.a
+	var t := clampf((stop_at-Vector2(goal_edge.a)).dot(goal_edge.dir),goal_edge.entry,goal_edge.exit)
+	dwell_stop = goal_edge.lane(t)
+	stop_served = false
+	return true
+
+
+func _extend_flow() -> void:
+	if route_complete:
+		return
+	# Keep a short local look-ahead. Trim consumed samples before appending.
+	if point > 0:
+		route = route.slice(point)
+		limits = limits.slice(point)
+		point = 0
+	for i in 6:
+		var next: RefCounted
+		if service_edge != null and edge.b == service_edge.a:
+			next = service_edge
+			service_edge = null
+			line_goal = Vector2.INF
+		elif planned_at+1 < planned_nodes.size():
+			planned_at += 1
+			var to: Vector2 = roads.navigation.get_point_position(planned_nodes[planned_at])
+			for candidate: RefCounted in roads.exits.get(edge.b,[]):
+				if candidate.b == to:
+					next = candidate
+					break
+			if next == null:
+				planned_nodes.clear()
+		if next == null:
+			next = roads.choose_after(edge)
+		if next == null:
+			route_complete = true
+			return
+		for p: Vector2 in roads.path_after(edge,next):
+			var world := _surface(p)
+			if world.distance_squared_to(route[-1]) > 0.0001:
+				route.append(world)
+				limits.append(cruise)
+		edge = next
+		if route.size() > 8:
+			return
+
+
 func follow(path: Array, start: int, unlit: Material, lit: Material) -> void:
 	for p: Array in path:
 		route.append(_surface(Vector2(p[0],p[1])))
@@ -57,6 +147,14 @@ func follow(path: Array, start: int, unlit: Material, lit: Material) -> void:
 	going = true
 	lamp_off = unlit
 	lamp_on = lit
+	if not is_instance_valid(lamps):
+		_make_lamps()
+	lamps.material_override = lamp_off
+	set_physics_process(true)
+	reset_physics_interpolation()
+
+
+func _make_lamps() -> void:
 	lamps = MeshInstance3D.new()
 	var pair := BoxMesh.new()
 	pair.size = Vector3(1.4,0.074,0.034)
@@ -65,8 +163,6 @@ func follow(path: Array, start: int, unlit: Material, lit: Material) -> void:
 	lamps.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	lamps.position = Vector3(0.0,0.72,NOSE+0.02)
 	add_child(lamps)
-	set_physics_process(true)
-	reset_physics_interpolation()
 
 
 func struck(strength: float, shot: Vector3) -> void:
@@ -95,9 +191,36 @@ func _physics_process(delta: float) -> void:
 		coast *= exp(-4.8*delta)
 		return
 
+	if roads != null and route.size()-point <= 5:
+		_extend_flow()
 	var want := _speed_ahead()
+	if signals != null:
+		var here := Vector2(position.x,position.z)
+		var nose := Vector2(-basis.z.x,-basis.z.z)
+		want *= float(signals.road_speed(here,nose,pace))
+		if dwell_stop.is_finite():
+			var distance := here.distance_to(dwell_stop)
+			if distance < 14.0 and dwelling <= 0.0:
+				want = minf(want,maxf(0.5,(distance-1.0)*0.8))
+			if distance < 2.8 and not stop_served:
+				dwelling = randf_range(4.0,8.0)+1.4
+				stop_served = true
+				at_stop.emit(self)
+	if dwelling > 0.0:
+		dwelling = maxf(0.0,dwelling-delta)
+		want = 0.0
+		if dwelling <= 0.0:
+			dwell_stop = Vector2.INF
+			line_goal = Vector2.INF
+			stop_served = false
 	var look := maxf(5.0,3.5+pace*0.73)
-	var gap := _gap(look)
+	scan_in -= delta
+	if scan_in <= 0.0:
+		scan_in = 0.1
+		scanned_gap = _gap(look)
+	else:
+		scanned_gap = maxf(0.0,scanned_gap-pace*delta)
+	var gap := scanned_gap
 	want = minf(want,sqrt(maxf(0.0,gap-1.95)*7.0))
 	var slowing := want < pace-0.1
 	pace = move_toward(pace,want,(5.8 if slowing else 2.6)*delta)
@@ -113,6 +236,9 @@ func _follow_step(meters: float, delta: float) -> void:
 	var old_fraction := fraction
 	var left := meters
 	var next := (point+1)%route.size()
+	if roads != null and next == 0:
+		going = false
+		return
 	while left > 0.0001:
 		var distance := maxf(0.005,route[point].distance_to(route[next]))
 		var remaining := distance*(1.0-fraction)
@@ -123,10 +249,16 @@ func _follow_step(meters: float, delta: float) -> void:
 		fraction = 0.0
 		point = next
 		next = (point+1)%route.size()
+		if roads != null and next == 0:
+			going = false
+			pace = 0.0
+			return
 	var target := route[point].lerp(route[next],fraction)
 	var forward := route[next]-route[point]
 	var wanted := atan2(-forward.x,-forward.z)
 	rotation.y = rotate_toward(rotation.y,wanted,delta*1.75)
+	if roads != null:
+		target.y = terrain.at(target.x,target.z,position.y)+0.04
 	var move := target-position
 	var hit := move_and_collide(move)
 	if hit:
@@ -141,6 +273,8 @@ func _speed_ahead() -> float:
 	var i := point
 	for n in 12:
 		var next := (i+1)%route.size()
+		if roads != null and next == 0:
+			break
 		distance += route[i].distance_to(route[next])
 		want = minf(want,sqrt(pow(limits[next],2.0)+6.0*distance))
 		if distance > 22.0:

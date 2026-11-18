@@ -4,13 +4,27 @@ extends Node
 const ASSETS := "res://assets/semerka-motor-%d.wav"
 const REVS := [900.0,2500.0,4000.0,5600.0]
 var voices: Array[AudioStreamPlayer] = []
-var starter := AudioStreamPlayer.new()
+var starter: AudioStreamPlayer
+var muted := false
 var wobble := 0.0
 var limiter := 0.0
 var cut := 0.0
 
 
+static func dummy_driver() -> bool:
+	if DisplayServer.get_name().to_lower() == "headless":
+		return true
+	var args := OS.get_cmdline_args()
+	for i in args.size():
+		if args[i].to_lower() == "--audio-driver=dummy" or (args[i] == "--audio-driver" and i+1 < args.size() and args[i+1].to_lower() == "dummy"):
+			return true
+	return AudioServer.has_method(&"get_driver_name") and str(AudioServer.call(&"get_driver_name")).to_lower() == "dummy"
+
+
 func _ready() -> void:
+	muted = dummy_driver()
+	if muted:
+		return
 	for i in REVS.size():
 		var path := ASSETS % i
 		var layer: AudioStreamWAV
@@ -23,11 +37,31 @@ func _ready() -> void:
 		voice.volume_db = -80.0
 		add_child(voice)
 		voices.append(voice)
-	starter.stream = preload("res://assets/courier-starter.wav")
+	starter = AudioStreamPlayer.new()
+	var starter_path := "res://assets/courier-starter.wav"
+	starter.stream = AudioStreamWAV.load_from_file(starter_path) if FileAccess.file_exists(starter_path) else ResourceLoader.load(starter_path) as AudioStreamWAV
 	add_child(starter)
 
 
+func play_starter() -> void:
+	if is_instance_valid(starter):
+		starter.play()
+
+
+func _exit_tree() -> void:
+	for voice in voices:
+		if is_instance_valid(voice):
+			voice.stop()
+			voice.stream = null
+	voices.clear()
+	if is_instance_valid(starter):
+		starter.stop()
+		starter.stream = null
+
+
 func step(delta: float, engine: RefCounted, load: bool, active: bool) -> void:
+	if muted:
+		return
 	if not active:
 		for voice in voices:
 			if voice.playing:

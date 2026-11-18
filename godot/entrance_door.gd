@@ -2,6 +2,7 @@ extends Node3D
 
 var leaf := Node3D.new()
 var opening: Tween
+var entering := 0
 
 
 func setup(at: Vector3, facing: Vector3, trim: Material, panel: Material, metal: Material) -> void:
@@ -27,6 +28,17 @@ func setup(at: Vector3, facing: Vector3, trim: Material, panel: Material, metal:
 func passage() -> Vector3:
 	return to_global(Vector3(0.0,-1.1,-0.34))
 
+
+func begin_entry() -> void:
+	entering += 1
+	if entering == 1:
+		set_open(true)
+
+
+func end_entry() -> void:
+	entering = maxi(0,entering-1)
+	if entering == 0:
+		set_open(false)
 
 func set_open(active: bool) -> void:
 	if opening:

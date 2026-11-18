@@ -19,6 +19,10 @@ var elapsed := 0.0
 var next_report := 20.0
 var ready_reported := false
 var capture_dir := ""
+var matched_input := false
+var sample_clock := 0.0
+var next_speed_sample := 0.0
+var sample_seconds := 0.0
 var startup_only := false
 var first_order_only := false
 var capture_index := 0
@@ -37,10 +41,13 @@ var last_delivery_stage := 0
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	headless = DisplayServer.get_name() == "headless"
+	matched_input = "--matched-input" in args
 	startup_only = "--startup-only" in args
 	first_order_only = "--first-order" in args
 	for arg in args:
-		if arg.begins_with("--capture-dir="):
+		if arg.begins_with("--sample-seconds="):
+			sample_seconds = arg.trim_prefix("--sample-seconds=").to_float()
+		elif arg.begins_with("--capture-dir="):
 			capture_dir = arg.trim_prefix("--capture-dir=")
 	if not headless:
 		RenderingServer.frame_post_draw.connect(_frame_presented)
@@ -81,7 +88,15 @@ func _physics_process(delta: float) -> void:
 		_set_path()
 	elif returning != game.back_to_depot:
 		_set_path()
-	if not game.courier.active and not path.is_empty():
+	if matched_input:
+		if not game.dispatch.active():
+			sample_clock += delta
+			_action(GAS, float(sample_clock < 2.8))
+			_action(REVERSE, float(sample_clock >= 2.8 and sample_clock < 4.4))
+			if sample_clock <= 7.5 and sample_clock >= next_speed_sample:
+				print("SPEED %.2f %.3f" % [sample_clock, Vector2(car.velocity.x,car.velocity.z).length()])
+				next_speed_sample += .5
+	elif not game.courier.active and not path.is_empty():
 		_drive()
 
 
@@ -109,7 +124,11 @@ func _note_phase() -> void:
 func _drive() -> void:
 	var at := Vector2(car.position.x, car.position.z)
 	var last := path.size() - 1
-	while waypoint < last and at.distance_to(path[waypoint]) < 2.3:
+	while waypoint < last:
+		var end := path[waypoint]
+		var passed := (at-end).dot(end-path[waypoint-1]) >= 0 and at.distance_to(end) < 6
+		if at.distance_to(end) >= 2.3 and not passed:
+			break
 		waypoint += 1
 	var to_target := path[waypoint] - at
 	var meters := to_target.length()
@@ -121,13 +140,13 @@ func _drive() -> void:
 			var near := Geometry2D.get_closest_point_to_segment(at,a,b)
 			to_target = near.move_toward(b, clampf(3.0 + absf(car.speed) * .60, 3, 10)) - at
 
-	if waypoint == last and meters < 6.0:
+	if waypoint == last and meters < 5.5:
 		_action(GAS, 0.0)
 		_action(REVERSE, 0.0)
 		_action(BRAKE, 1.0)
 		_action(LEFT, 0.0)
 		_action(RIGHT, 0.0)
-		_action(DELIVER, 1.0 if game.can_deliver else 0.0)
+		_action(DELIVER, 0.0)
 		return
 
 	var heading := atan2(-to_target.x, -to_target.y)
@@ -167,10 +186,12 @@ func _set_path() -> void:
 
 
 func _frame_presented() -> void:
+	if finished:
+		return
 	var now := Time.get_ticks_usec()
 	if not ready_reported and absf(car.speed) > 0.01:
 		ready_reported = true
-		print("PLAYABLE")
+		print("PLAYABLE %.3f seconds from process start · %s · %s" % [Time.get_ticks_msec()*.001,get_viewport().get_visible_rect().size,RenderingServer.get_video_adapter_name()])
 		_capture("start")
 		if startup_only:
 			get_tree().quit()
@@ -179,12 +200,17 @@ func _frame_presented() -> void:
 		if last_frame_usec != 0:
 			var interval := float(now - last_frame_usec) / 1000.0
 			frame_intervals.append(interval)
+			if interval > 50:
+				print("LONG_FRAME %.2f ms · %s · %s · tile %s · loaded %d" % [interval,car.position,phase_name,game.region_world.last_tile,game.region_world.loaded.size()])
 			if interval > slowest_interval:
 				slowest_interval = interval
 				slowest_at = Vector2(car.position.x, car.position.z)
 		else:
 			interval_start = now
 		last_frame_usec = now
+	if sample_seconds > 0 and interval_start > 0 and (now-interval_start)*.000001 >= sample_seconds:
+		_finish()
+		return
 	if capture_index == 1 and elapsed > 8.0:
 		_capture("drive")
 	if capture_index == 2 and game.delivery.stage == HANDOFF.Stage.HANDOFF:

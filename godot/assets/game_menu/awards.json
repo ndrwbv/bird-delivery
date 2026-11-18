@@ -1,0 +1,265 @@
+[
+ {
+  "id": "FIRST_ORDER",
+  "group": "progress",
+  "stat": "orders",
+  "need": 1,
+  "name": "Первая пицца",
+  "desc": "Доставить первый заказ"
+ },
+ {
+  "id": "ORDERS_10",
+  "group": "progress",
+  "stat": "orders",
+  "need": 10,
+  "name": "Втянулся",
+  "desc": "Доставить 10 заказов"
+ },
+ {
+  "id": "ORDERS_100",
+  "group": "progress",
+  "stat": "orders",
+  "need": 100,
+  "name": "Сотка",
+  "desc": "Доставить 100 заказов"
+ },
+ {
+  "id": "ORDERS_1000",
+  "group": "progress",
+  "stat": "orders",
+  "need": 1000,
+  "name": "Тысяча и одна пицца",
+  "desc": "Доставить 1000 заказов"
+ },
+ {
+  "id": "SHIFT_FULL",
+  "group": "progress",
+  "stat": "fullShifts",
+  "need": 1,
+  "name": "Смена закрыта",
+  "desc": "Отработать смену до конца"
+ },
+ {
+  "id": "SHIFTS_10",
+  "group": "progress",
+  "stat": "shifts",
+  "need": 10,
+  "name": "Свой человек",
+  "desc": "Отработать 10 смен"
+ },
+ {
+  "id": "SHIFTS_50",
+  "group": "progress",
+  "stat": "shifts",
+  "need": 50,
+  "name": "Старожил",
+  "desc": "Отработать 50 смен"
+ },
+ {
+  "id": "DISTRICT_2",
+  "group": "progress",
+  "stat": "districts",
+  "need": 2,
+  "name": "Новый район",
+  "desc": "Открыть второй район"
+ },
+ {
+  "id": "CITY_OPEN",
+  "group": "progress",
+  "stat": "city",
+  "need": 1,
+  "name": "Весь Солнечный",
+  "desc": "Открыть все районы города"
+ },
+ {
+  "id": "PERFECT_SHIFT",
+  "group": "skill",
+  "stat": "perfect",
+  "need": 1,
+  "name": "Минута в минуту",
+  "desc": "Отработать смену до конца без единого опоздания (от 5 заказов)"
+ },
+ {
+  "id": "CLEAN_SHIFT",
+  "group": "skill",
+  "stat": "clean",
+  "need": 1,
+  "name": "Ни царапины",
+  "desc": "Отработать смену до конца без единого удара"
+ },
+ {
+  "id": "LIGHTNING",
+  "group": "skill",
+  "stat": "lightning",
+  "need": 1,
+  "name": "Молния",
+  "desc": "Доставить заказ, когда осталось 90 % срока"
+ },
+ {
+  "id": "BUNDLE_5",
+  "group": "skill",
+  "stat": "bundle5",
+  "need": 1,
+  "name": "Пять адресов",
+  "desc": "Развезти сборный заказ на 5 адресов — все вовремя"
+ },
+ {
+  "id": "URGENT",
+  "group": "skill",
+  "stat": "urgent",
+  "need": 1,
+  "name": "Горит!",
+  "desc": "Успеть со срочным заказом"
+ },
+ {
+  "id": "NIGHT_ORDER",
+  "group": "skill",
+  "stat": "night",
+  "need": 1,
+  "name": "Ночной курьер",
+  "desc": "Доставить заказ между полуночью и пятью утра"
+ },
+ {
+  "id": "ERRANDS_10",
+  "group": "skill",
+  "stat": "errands",
+  "need": 10,
+  "name": "На побегушках",
+  "desc": "Выполнить 10 поручений клиентов"
+ },
+ {
+  "id": "PEDS_1",
+  "group": "chaos",
+  "stat": "peds",
+  "need": 1,
+  "name": "Пешеход, вы не правы",
+  "desc": "Сбить прохожего",
+  "adult": true
+ },
+ {
+  "id": "PEDS_100",
+  "group": "chaos",
+  "stat": "peds",
+  "need": 100,
+  "name": "Гроза тротуаров",
+  "desc": "Сбить 100 прохожих",
+  "adult": true
+ },
+ {
+  "id": "SCOOTERS_10",
+  "group": "chaos",
+  "stat": "scoots",
+  "need": 10,
+  "name": "Самокатный вопрос",
+  "desc": "Сбить 10 самокатчиков",
+  "adult": true
+ },
+ {
+  "id": "MAFIA_3",
+  "group": "chaos",
+  "stat": "mafia",
+  "need": 3,
+  "name": "Предложение, от которого не отказываются",
+  "desc": "Сбить троих мафиози",
+  "adult": true
+ },
+ {
+  "id": "RIVALS_5",
+  "group": "chaos",
+  "stat": "rivals",
+  "need": 5,
+  "name": "Здоровая конкуренция",
+  "desc": "Выбить 5 курьеров-конкурентов"
+ },
+ {
+  "id": "LAMPS_100",
+  "group": "chaos",
+  "stat": "lamps",
+  "need": 100,
+  "name": "Света нет",
+  "desc": "Снести 100 фонарей"
+ },
+ {
+  "id": "STOPS_10",
+  "group": "chaos",
+  "stat": "stops",
+  "need": 10,
+  "name": "Остановка по требованию",
+  "desc": "Снести 10 остановок"
+ },
+ {
+  "id": "CAR_BOOM",
+  "group": "chaos",
+  "stat": "boom",
+  "need": 1,
+  "name": "Пицца с дымком",
+  "desc": "Взорвать свою машину",
+  "hidden": true
+ },
+ {
+  "id": "MOOSE",
+  "group": "fun",
+  "stat": "moose",
+  "need": 1,
+  "name": "Лось не уступил",
+  "desc": "Врезаться в лося"
+ },
+ {
+  "id": "DROWNED",
+  "group": "fun",
+  "stat": "drowned",
+  "need": 1,
+  "name": "Подводная доставка",
+  "desc": "Утопить машину",
+  "hidden": true
+ },
+ {
+  "id": "POTHOLE",
+  "group": "fun",
+  "stat": "pothole",
+  "need": 1,
+  "name": "Яма с историей",
+  "desc": "Заглохнуть в яме"
+ },
+ {
+  "id": "SEMERKA_50",
+  "group": "fun",
+  "stat": "semerka",
+  "need": 50,
+  "name": "Верность Семёрке",
+  "desc": "Доставить 50 заказов на «Семёрке»"
+ },
+ {
+  "id": "BUHANKA_20",
+  "group": "fun",
+  "stat": "buhanka",
+  "need": 20,
+  "name": "Хлебовоз",
+  "desc": "Доставить 20 заказов на «Буханке»"
+ },
+ {
+  "id": "ALL_IN",
+  "group": "fun",
+  "stat": "allin",
+  "need": 1,
+  "name": "Всё на красное",
+  "desc": "Депнуть всю копилку и проиграть",
+  "hidden": true
+ },
+ {
+  "id": "ROOFTOP",
+  "group": "fun",
+  "stat": "roof",
+  "need": 1,
+  "name": "Карлсон",
+  "desc": "Запрыгнуть на машине на крышу дома"
+ },
+ {
+  "id": "TOLIK_MDAA",
+  "group": "fun",
+  "stat": "mdaa",
+  "need": 1,
+  "name": "Мдаа",
+  "desc": "Получить замечание от управляющей в конце смены"
+ }
+]

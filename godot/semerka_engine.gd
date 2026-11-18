@@ -1,6 +1,7 @@
 extends RefCounted
 
 signal stalled
+signal pothole_stalled
 signal started
 signal condition_warning(percent: int)
 
@@ -108,6 +109,7 @@ func repair() -> void:
 func pothole(severity := 1.0) -> void:
 	if not dead and randf() < stall_chance()*0.25*severity:
 		_stall()
+		pothole_stalled.emit()
 
 
 func _stall() -> void:
