@@ -2,6 +2,7 @@ shader_type spatial;
 render_mode cull_disabled, diffuse_lambert, specular_disabled;
 
 #include "res://material_grade.gdshaderinc"
+#include "res://season_tint.gdshaderinc"
 
 uniform sampler2D leaf_atlas : filter_linear_mipmap, repeat_disable;
 uniform sampler2D canopy_atlas : source_color, filter_linear_mipmap, repeat_disable;
@@ -54,7 +55,8 @@ void fragment() {
 	float shade = dense_leaf > 0.5 ? mix(0.47,1.14,surface.g) : mix(0.26,0.89,surface.g);
 	vec3 tone = paint*shade;
 	float twig = step(0.025,surface.r-surface.b)*(1.0-dense_leaf);
-	tone = mix(tone,vec3(0.17,0.098,0.04),twig*0.81);
+	if (twig < 0.5 && facet_pick(floor(world*3.0)) > season_surface.y) discard;
+	tone = mix(seasonal_leaf(tone),vec3(0.17,0.098,0.04),twig*0.81);
 	ALBEDO = display_color(tone);
 	ROUGHNESS = 1.0;
 }

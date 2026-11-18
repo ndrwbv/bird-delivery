@@ -73,7 +73,31 @@ var tire_tracks := TIRE_TRACKS.new()
 var customers: Array[Node3D] = []
 var entrances: Array[Node3D] = []
 var shift := SHIFT.new()
-var destination := 0
+var profile := preload("res://career_profile.gd").new()
+var career: RefCounted
+var quick_runs := preload("res://quick_runs.gd").new()
+var book := preload("res://south_order_book.gd").new()
+var choices := preload("res://shift_choices.gd").new()
+var menu := preload("res://game_menu.gd").new()
+var papers := preload("res://shift_papers.gd").new()
+var clock_hud := preload("res://shift_clock_hud.gd").new()
+var visitor := preload("res://gennady_visit.gd").new()
+var arrival := preload("res://story_arrival.gd").new()
+var actor_paint := ShaderMaterial.new()
+var frame_paint := StandardMaterial3D.new()
+var door_paint := StandardMaterial3D.new()
+var steel_paint := StandardMaterial3D.new()
+var current: Dictionary = {}
+var invoice: Dictionary = {}
+var playing := false
+var free_roam := false
+var story_order := false
+var ending_after_return := false
+var health_before := 7.0
+var late_charges: Array[Dictionary] = []
+var last_tip := 0
+var session_shifts := 0
+var destination := -1
 var back_to_depot := false
 var depot := Vector3.ZERO
 var marker: Node3D
@@ -95,8 +119,19 @@ func _ready() -> void:
 	region_world.setup(region_data, map_data.bounds, detail, car)
 	terrain = region_world.ground
 	region_routes.setup(region_data, map_data)
-	shift.choose_first(map_data.deliveries, _v2(map_data.spawn), region_routes)
+	book.setup(region_data, map_data, region_routes)
+	map_data.deliveries = []
+	var temporary := false
+	for arg in OS.get_cmdline_user_args():
+		temporary = temporary or arg == "--benchmark" or arg.begins_with("--capture-") or arg == "--test-profile"
+	profile.open(temporary)
+	career = profile
+	if not profile.data.has("seed"):
+		profile.data.seed = randi()
+
 	region_edge.setup(region_data.boundary)
+	car.surface.setup(region_data)
+	car.drowned.connect(_drowned)
 	car.region_edge = region_edge
 	courier.region_edge = region_edge
 	car.terrain = terrain
@@ -128,11 +163,20 @@ func _ready() -> void:
 	traffic.setup(terrain,_v2(map_data.spawn))
 	var pickups := PICKUPS.new()
 	add_child(pickups)
-	pickups.setup(terrain,car,_v2(map_data.spawn))
+	pickups.setup(terrain,car,_v2(map_data.spawn),region_data)
 	add_child(delivery)
 	delivery.setup(car,courier,chase,terrain)
 	add_child(dispatch)
-	dispatch.setup(car,courier,chase,terrain,map_data.dispatch)
+	dispatch.setup(car,terrain,map_data.dispatch)
+	delivery.arrived.connect(_pay_for_order)
+	delivery.payment_started.connect(_show_payment)
+	add_child(arrival)
+	arrival.setup(car, courier, chase, terrain, region_routes, region_data.gennady)
+	add_child(visitor)
+	arrival.at_door.connect(_enter_apartment)
+	arrival.returned.connect(_begin_return.bind(false))
+	visitor.stair_time.connect(_stairs_tick)
+	visitor.completed.connect(_story_completed)
 	add_child(tire_tracks)
 	tire_tracks.setup(car,terrain)
 	_make_marker()
@@ -143,12 +187,41 @@ func _ready() -> void:
 	chase.set_parked_view(depot-front*5.1+heading.x*3.9+Vector3.UP*3.45,
 		depot+front*3.1-heading.x*0.64+Vector3.UP*1.12)
 	_reset_car()
+	marker.hide()
 	hud.configure(map_data, region_data)
 	add_child(region_map)
 	region_map.setup(region_data, map_data, region_routes)
 	region_map.waypoint_changed.connect(_set_waypoint)
-	_refresh_order()
-	_begin_dispatch()
+	add_child(quick_runs)
+	quick_runs.setup(car, terrain, region_data, traffic)
+	quick_runs.repeat_requested.connect(_repeat_quick)
+	quick_runs.conditions_requested.connect(_quick_conditions)
+	quick_runs.menu_requested.connect(_main_menu)
+	add_child(papers)
+	papers.setup(region_data, map_data)
+	papers.next_shift_requested.connect(_start_shift)
+	papers.free_drive_requested.connect(_free_drive)
+	add_child(clock_hud)
+	add_child(choices)
+	add_child(menu)
+	menu.setup()
+	menu.bind_map(region_map)
+	menu.bind_graphics(chase, $Sun)
+	var threshold := _v2(map_data.dispatch.door)
+	menu.set_shift_location(Vector3(threshold.x, terrain.at(threshold.x,threshold.y),threshold.y), depot)
+	menu.quick_requested.connect(_start_quick)
+	menu.records_requested.connect(_records)
+	menu.set_available_modes(PackedStringArray(["normal","hell","afterhell"]))
+	menu.career_requested.connect(_enter_career)
+	menu.free_drive_requested.connect(_free_drive)
+	menu.finish_shift_requested.connect(_finish_shift.bind(false))
+	menu.main_menu_requested.connect(_main_menu)
+	menu.map_requested.connect(_open_map)
+	menu.quit_requested.connect(_quit_from_menu)
+	if temporary:
+		_start_shift()
+	else:
+		_main_menu()
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--benchmark":
 			var benchmark: Node = load("res://drive_benchmark.gd").new()
@@ -164,77 +237,397 @@ func _input(event: InputEvent) -> void:
 		last_input_pad = true
 	elif event is InputEventKey and event.pressed:
 		last_input_pad = false
+	if visitor.active() or papers.blocking() or menu.active() or choices.visible or quick_runs.results_open():
+		return
 	if event.is_action_pressed(&"district_map"):
-		region_map.open_at(Vector2(car.position.x, car.position.z), waypoint, gps_path, gps_stop)
+		_open_map()
 		get_viewport().set_input_as_handled()
 		return
-	if event.is_action_pressed(&"ui_cancel"):
-		get_tree().quit()
+	if event.is_action_pressed(&"ui_cancel") or (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_P) or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_START):
+		menu.open_pause({"shift_number": shift.number, "delivered": shift.delivered, "earned": shift.money, "balance": profile.data.wallet,
+			"clock": shift.clock_text(), "free_drive": free_roam}, invoice if playing and not back_to_depot else {})
+		get_viewport().set_input_as_handled()
+
+
+func _open_map() -> void:
+	region_map.open_at(Vector2(car.position.x, car.position.z), waypoint, gps_path, gps_stop)
+
+
+func _start_quick(id: String) -> void:
+	var options := menu.quick_options()
+	options.mode = id
+	_begin_quick(options)
+
+
+func _repeat_quick() -> void:
+	_begin_quick(quick_runs.original_options)
+
+
+func _begin_quick(options: Dictionary) -> void:
+	var sandbox := quick_runs.begin(career,options)
+	if sandbox == null:
+		_main_menu()
+		return
+	profile = sandbox
+	_start_shift()
+
+
+func _quick_conditions() -> void:
+	menu.open_quick(int(career.data.shifts))
+
+
+func _records() -> void:
+	quick_runs.show_records(career.data.get("best", {}))
+
+
+func _enter_career() -> void:
+	profile = career
+	_start_shift()
+
+
+func _main_menu() -> void:
+	quick_runs.abort()
+	profile = career
+	playing = false
+	free_roam = false
+	car.active_shift = false
+	clock_hud.hide()
+	marker.hide()
+	menu.open_start(int(profile.data.shifts) > 0, int(profile.data.shifts))
+
+
+func _drowned() -> void:
+	if playing:
+		_finish_shift(false, "dead")
+	elif free_roam:
+		_reset_car()
+
+
+func _quit_from_menu() -> void:
+	if playing:
+		_checkpoint()
+	get_tree().quit()
 
 
 func _physics_process(delta: float) -> void:
-	var action := Engine.get_physics_frames() > region_map.closed_on_frame + 1 and Input.is_action_just_pressed(&"deliver")
+	if not playing:
+		if free_roam and Input.is_action_just_pressed(&"reset_car"):
+			_reset_car()
+		return
+	if clock_hud.intro >= 0:
+		if clock_hud.advance_chat(delta):
+			car.controls_locked = false
+			_issue_order()
+		return
+	var action := Engine.get_physics_frames() > maxi(maxi(menu.consumed_physics_frame, choices.consumed_physics_frame), maxi(region_map.closed_on_frame, papers.consumed_physics_frame)) + 1 and Input.is_action_just_pressed(&"deliver")
+	if visitor.active():
+		return
+	if car.engine.restarting:
+		action = false
+	if arrival.phase != arrival.Phase.IDLE:
+		arrival.step(delta)
+		return
+	shift.tick(delta)
+	$Atmosphere.set_clock(shift.env_time)
+	if not late_charges.is_empty() and shift.elapsed >= float(late_charges[0].due):
+		var notice: Dictionary = late_charges.pop_front()
+		var fine_amount: int = int(notice.amount)
+		shift.fine(fine_amount)
+		clock_hud.notice("Ирина Сергеевна   Опоздал. Пицца на замену   −%d ₽" % fine_amount)
+		hud.show_payment(0, int(profile.data.wallet))
+		_checkpoint()
+	if car.hearts < health_before:
+		shift.hits += 1
+	health_before = car.hearts
+	clock_hud.update_clock(shift.number, shift.clock_text(), shift.deadline, not dispatch.active() and (back_to_depot or not shift.settled), ceili(car.hearts))
+	if car.hearts <= 0:
+		_finish_shift(false, "dead")
+		return
 	if Input.is_action_just_pressed(&"reset_car"):
-		dispatch.finish()
-		marker.visible = destination < customers.size()
 		_reset_car()
-		if delivery.reset_order():
+		if not current.is_empty() and not back_to_depot and not story_order and delivery.reset_order():
 			_begin_return(false)
 	if dispatch.active():
-		if dispatch.step(delta,action):
-			marker.show()
+		dispatch.step(delta)
 		return
+	if not shift.settled or back_to_depot:
+		shift.deadline -= delta
 	if back_to_depot:
-		var at := Vector2(car.position.x-depot.x,car.position.z-depot.z)
-		if shift.wait_for_dispatch(delta,at.length() <= SHIFT.DEPOT_RADIUS and absf(car.speed) < 0.9):
-			back_to_depot = false
-			destination += 1
-			_refresh_order()
-			if destination < customers.size():
-				_reset_car()
-				_begin_dispatch()
+		var at := Vector2(car.position.x-depot.x, car.position.z-depot.z)
+		if shift.deadline < 0 and not shift.return_fined and not current.get("tutorial", false):
+			shift.return_fined = true
+			shift.fine(maxi(150, roundi(shift.fee * .01) * 10))
+			profile.data.skill = maxf(0, float(profile.data.skill) - .5)
+			hud.show_payment(0, int(profile.data.wallet))
+			_checkpoint()
+		if shift.wait_for_dispatch(delta, at.length() <= SHIFT.DEPOT_RADIUS and absf(car.position.y - terrain.at(car.position.x, car.position.z)) <= 1.0):
+			if ending_after_return or (shift.elapsed >= shift.duration and (shift.number > 1 or profile.data.gennady_paid)):
+				_finish_shift(true)
+			elif not quick_runs.active() and not shift.meal_taken and shift.env_time >= .06 + 5.0 / 15.0 and shift.elapsed < shift.duration - (SHIFT.FINAL_WINDOW if shift.number == 1 else 0.0):
+				_offer_meal()
+			else:
+				_issue_order()
 		return
-	if destination >= customers.size():
+	if story_order:
+		if Vector2(car.position.x, car.position.z).distance_to(_v2(region_data.gennady.door)) <= 38:
+			var box: Node3D = dispatch.bag.duplicate()
+			add_child(box)
+			if arrival.try_begin(box):
+				marker.hide()
+				papers.dismiss()
+			else:
+				box.queue_free()
 		return
-	var old_stage := delivery.stage
-	delivery.step(delta,action,stop)
-	if old_stage != delivery.stage:
-		marker.visible = delivery.stage not in [HANDOFF.Stage.HANDOFF,HANDOFF.Stage.CASH]
+	delivery.step(delta, action, stop)
+	marker.visible = delivery.pin_alpha() > 0
 	if delivery.stage == HANDOFF.Stage.RETURNING:
-		_pay_for_order()
+		clock_hud.panel.hide()
 	if delivery.done:
 		_begin_return(delivery.failed)
+
+
+func _offer_meal() -> void:
+	shift.meal_taken = true
+	choices.selected.connect(_meal_picked, CONNECT_ONE_SHOT)
+	choices.offer("Ирина Сергеевна", "Женя, время обеда. Выбери что-нибудь, потом поедешь.",
+		["Починить машину", "«Директорская»", "Холодная пепперони"])
+
+
+func _meal_picked(index: int) -> void:
+	match index:
+		0:
+			car.hearts = car.hearts_max
+			car.damage.repair()
+			car.engine.repair()
+		1: shift.lunch_tips = true
+		2:
+			car.hearts_max += 1
+			car.hearts += 1
+	health_before = car.hearts
+	_issue_order()
+
+
+func _start_shift() -> void:
+	late_charges.clear()
+	papers.dismiss()
+	clock_hud.show()
+	_remove_order()
+	map_data.deliveries.clear()
+	destination = -1
+	back_to_depot = false
+	ending_after_return = false
+	free_roam = false
+	playing = true
+	shift = quick_runs.make_shift() if quick_runs.active() else SHIFT.new()
+	shift.begin(profile)
+	if quick_runs.active():
+		shift.pace = "normal"
+		$Atmosphere.start_quick(quick_runs.conditions.season,quick_runs.conditions.weather,int(profile.data.seed))
 	else:
-		can_deliver = delivery.action_ready(stop)
+		shift.pace = ["generous","normal","tight"][session_shifts % 3]
+		session_shifts += 1
+		$Atmosphere.start_career(shift.number,int(profile.data.seed),session_shifts == 1)
+		profile.data.season = $Atmosphere.season
+	car.begin_shift(shift.number, shift.pace, profile.data.get("engine", {}))
+	if not quick_runs.active() and shift.number == 1 and profile.data.gennady_paid:
+		var chapter: Dictionary = profile.data.get("final_summary", {})
+		for key: String in chapter:
+			shift.set(key, chapter[key])
+		_finish_shift(true)
+		return
+	_reset_car()
+	health_before = car.hearts
+	car.controls_locked = true
+	hud.show_payment(0, int(profile.data.wallet))
+	if quick_runs.active():
+		car.controls_locked = false
+		_issue_order()
+	else:
+		clock_hud.opening()
+	profile.save()
+
+
+func _issue_order() -> void:
+	var final_due: bool = shift.number == 1 and not profile.data.gennady_paid and shift.duration - shift.elapsed < SHIFT.FINAL_WINDOW
+	var order := book.next_order(shift.orders == 0, final_due, profile.data.recent, shift.level, shift.orders+1)
+	if order.is_empty():
+		push_error("В районе отсутствует доступный путь из пиццерии и обратно")
+		_finish_shift(false)
+		return
+	car.engine.begin_order()
+	shift.accept(order)
+	order.tutorial = shift.orders == 1 and int(profile.data.xp) == 0
+	_activate_order(order)
+	profile.remember(order.name)
+	_show_invoice()
+	dispatch.begin()
+	_checkpoint()
+
+
+func _activate_order(order: Dictionary) -> void:
+	_remove_order()
+	map_data.deliveries.append(order)
+	destination = map_data.deliveries.size() - 1
+	current = order
+	if quick_runs.active():
+		quick_runs.protect_order(order)
+	story_order = bool(order.get("story", false))
+	back_to_depot = false
+	ending_after_return = story_order
+	waypoint = {}
+	var at := _v2(order.stop)
+	stop = Vector3(at.x, terrain.at(at.x, at.y) + .10, at.y)
+	marker.position = stop
+	marker.show()
+	if story_order:
+		visitor.prepare()
+	else:
+		var door := _make_entrance(order)
+		var customer := _make_customer(order)
+		entrances.append(door)
+		customers.append(customer)
+		delivery.play_order(customer, door)
+	hud.set_order(shift.orders - 1, order, true)
+	_set_waypoint({}, [])
+
+
+func _remove_order() -> void:
+	for actor in customers + entrances:
+		if is_instance_valid(actor):
+			actor.queue_free()
+	entrances.clear()
+	customers.clear()
+	delivery.target = null
+	delivery.door = null
+	clock_hud.panel.hide()
+	current = {}
+
+
+func _show_invoice() -> void:
+	var recipient := "Геннадий" if story_order else ("Степан Тугарев" if shift.orders == 1 and int(profile.data.xp) == 0 else "Клиент у подъезда")
+	invoice = {"number": shift.orders, "recipient": recipient, "address": current.name, "items": "Пицца Пеперони" if story_order else "Пицца",
+		"fee": shift.fee, "route": current.from_home, "stop": current.stop, "clock": shift.clock_text(), "pad": last_input_pad,
+		"health": "♥ %d/%d" % [ceili(car.hearts), ceili(car.hearts_max)], "balance": profile.data.wallet, "flat": 10 if story_order else 0}
+	if story_order:
+		invoice.entrance = 1
+		invoice.floor = 3
+	papers.show_invoice(invoice)
 
 
 func _pay_for_order() -> void:
 	if shift.settled:
 		return
-	var before := shift.money
-	shift.settle(delivery.tips_allowed,false)
-	hud.show_payment(shift.money-before,shift.money)
+	var tips_before := shift.tips
+	var cold: float = .6 * (1 - car.hearts / car.hearts_max)
+	if car.damage.stage.size() > 8:
+		if car.damage.stage[2] >= 3:
+			cold += .5
+		elif car.damage.stage[2] == 2:
+			cold += .2
+		if car.damage.stage[8] >= 3:
+			cold += .25
+	shift.settle((story_order or delivery.tips_allowed) and cold < .25, false, story_order)
+	if shift.deadline <= 0 and not story_order and not current.get("tutorial",false):
+		late_charges.append({"due": shift.elapsed + 6.0, "amount": maxi(150, roundi(shift.fee * .12 / 10) * 10)})
+	last_tip = shift.tips - tips_before
+	if story_order:
+		var chapter := {}
+		for key in ["pay","money","tips","penalties","delivered","missed","hits","elapsed"]:
+			chapter[key] = shift.get(key)
+		profile.data.final_summary = chapter
+	_checkpoint()
+	hud.show_payment(shift.latest_payment, int(profile.data.wallet))
 
 
-func _begin_dispatch() -> void:
-	marker.hide()
-	dispatch.begin()
+func _show_payment() -> void:
+	papers.dismiss()
+	clock_hud.show_pay(shift.latest_payment - last_tip, last_tip, shift.deadline <= 0, int(profile.data.wallet))
+
+
+func _enter_apartment() -> void:
+	var amount := roundi(shift.fee * .45) if shift.deadline <= 0 else shift.fee
+	visitor.start(amount, adult, shift.deadline <= 0)
+
+
+func _stairs_tick(delta: float) -> void:
+	shift.tick(delta)
+	shift.deadline -= delta
+	visitor.set_deadline(shift.deadline)
+	visitor.late_order = shift.deadline <= 0
+	visitor.payment = roundi(shift.fee * .45) if visitor.late_order else shift.fee
+
+
+func _story_completed() -> void:
+	_pay_for_order()
+	arrival.walk_out()
 
 
 func _begin_return(failed: bool) -> void:
+	if back_to_depot:
+		return
 	back_to_depot = true
 	delivery.done = false
-	can_deliver = false
-	if failed:
-		shift.settle(delivery.tips_allowed,true)
-		hud.show_payment(0,shift.money)
-	else:
-		_pay_for_order()
-	var spec: Dictionary = map_data.deliveries[destination]
-	hud.return_to_depot(spec.back_home,map_data.spawn,failed)
+	papers.dismiss()
+	clock_hud.panel.hide()
+	if failed and not shift.settled:
+		shift.settle(false, true, false)
+		hud.show_payment(0, int(profile.data.wallet))
+	shift.deadline = float(current.back_meters) / 19.0 * 1.8 + 8.0
+	hud.return_to_depot(current.back_home, map_data.spawn, failed)
+	waypoint = {}
 	_set_waypoint({}, [])
 	marker.position = depot
-	marker_label.text = "Следующий заказ у пиццерии" if destination+1 < customers.size() else "Закрыть смену у пиццерии"
+	marker.show()
+	marker_label.text = "Закрыть смену у пиццерии" if ending_after_return else "Вернитесь в пиццерию"
+	_checkpoint()
+
+
+func _checkpoint() -> void:
+	profile.data.engine = car.engine.snapshot()
+	profile.save()
+
+
+func _finish_shift(full: bool, kind := "quit") -> void:
+	if not playing:
+		return
+	playing = false
+	car.active_shift = false
+	profile.data.erase("final_summary")
+	profile.data.engine = car.engine.snapshot()
+	dispatch.finish()
+	if quick_runs.active():
+		marker.hide()
+		clock_hud.hide()
+		papers.dismiss()
+		car.controls_locked = true
+		quick_runs.finish(shift, "time" if full else kind)
+		profile = career
+		return
+	var receipt := shift.finish(full)
+	_show_receipt(receipt)
+
+
+func _show_receipt(receipt: Dictionary) -> void:
+	car.controls_locked = true
+	marker.hide()
+	clock_hud.hide()
+	papers.show_receipt(receipt)
+
+
+func _free_drive() -> void:
+	playing = false
+	free_roam = true
+	car.begin_shift(0,"normal",profile.data.get("engine",{}))
+	profile.save()
+	papers.dismiss()
+	_remove_order()
+	back_to_depot = false
+	destination = map_data.deliveries.size()
+	clock_hud.hide()
+	marker.hide()
+	car.controls_locked = false
+	hud.free_drive(shift.delivered, shift.money)
+	_set_waypoint({}, [])
 
 
 func _vehicle_contact(contact: KinematicCollision3D, approach: float, motion: Vector3) -> float:
@@ -308,6 +701,8 @@ func _blood_hit(person: Node3D, direction: Vector3, speed: float) -> void:
 
 
 func _process(delta: float) -> void:
+	if menu.active() or papers.blocking():
+		return
 	var pose := car.get_global_transform_interpolated()
 	var at := Vector2(pose.origin.x,pose.origin.z)
 	var forward := Vector2(-pose.basis.z.x,-pose.basis.z.z)
@@ -331,7 +726,7 @@ func _set_waypoint(place: Dictionary, path: Array) -> void:
 		gps_stop = []
 		if back_to_depot:
 			gps_stop = map_data.spawn
-		elif destination < map_data.deliveries.size():
+		elif playing and not current.is_empty():
 			gps_stop = map_data.deliveries[destination].stop
 		gps_path = [] if gps_stop.is_empty() else region_routes.route_between(last_gps_at, _v2(gps_stop))
 	hud.set_navigation(gps_path, gps_stop if not gps_path.is_empty() else [])
@@ -362,24 +757,15 @@ func _update_gps(at: Vector2, delta: float) -> void:
 
 func _delivery_hint() -> String:
 	if dispatch.active():
-		var skip := "A" if last_input_pad else "E"
-		match dispatch.stage:
-			DISPATCH.Stage.RUN: return "Курьер несёт заказ  •  %s пропустить" % skip
-			DISPATCH.Stage.LOAD: return "Погрузка в багажник"
-			DISPATCH.Stage.WALK: return "Курьер садится за руль"
-			DISPATCH.Stage.START: return "Запуск двигателя"
-	if back_to_depot or destination >= customers.size():
+		return "Погрузка в багажник"
+	if back_to_depot or not playing or current.is_empty():
 		return ""
-	var button := "A" if last_input_pad else "E"
-	match delivery.stage:
-		HANDOFF.Stage.DRIVING:
-			if can_deliver:
-				return button + "  Выйти за заказом"
-		HANDOFF.Stage.TAKING: return "Забираем заказ из багажника"
-		HANDOFF.Stage.CARRYING: return "К клиенту у подъезда"
-		HANDOFF.Stage.HANDOFF: return "Передача заказа"
-		HANDOFF.Stage.CASH: return "Клиент рассчитывается"
-		HANDOFF.Stage.RETURNING: return (button + "  Сесть за руль") if can_deliver else "Вернитесь к машине"
+	if story_order:
+		return "Калинина, 96   •   подъезд 1, этаж 3"
+	if delivery.stage == HANDOFF.Stage.HANDOFF:
+		return "Клиент принимает заказ"
+	if delivery.stage == HANDOFF.Stage.CASH:
+		return "Клиент рассчитывается"
 	return ""
 
 
@@ -389,49 +775,9 @@ func _reset_car() -> void:
 	chase.reset_view()
 
 
-func _refresh_order() -> void:
-	marker.visible = destination < customers.size()
-	can_deliver = false
-	if not marker.visible:
-		delivery.done = false
-		hud.free_drive(shift.delivered,shift.money)
-		_set_waypoint({}, [])
-		return
-	var order: Dictionary = map_data.deliveries[destination]
-	shift.accept(order)
-	var parking := _v2(order.stop)
-	stop = Vector3(parking.x,terrain.at(parking.x,parking.y)+0.10,parking.y)
-	customers[destination].set_active(true)
-	delivery.play_order(customers[destination],entrances[destination])
-	_update_marker()
-	hud.set_order(destination,order,true)
-	_set_waypoint({}, [])
-
-
 func _update_marker() -> void:
-	if back_to_depot:
-		return
-	var button := "A" if last_input_pad else "E"
-	var text: String = map_data.deliveries[destination].name
-	match delivery.stage:
-		HANDOFF.Stage.DRIVING:
-			marker.position = stop
-			if can_deliver:
-				text = button + "  Выйти с заказом"
-		HANDOFF.Stage.TAKING:
-			text = "Забираем заказ из багажника"
-		HANDOFF.Stage.CARRYING:
-			marker.position = customers[destination].position + Vector3.UP*0.10
-			text = "Получатель"
-		HANDOFF.Stage.HANDOFF:
-			text = "Передача заказа"
-		HANDOFF.Stage.CASH:
-			text = "Клиент рассчитывается"
-		HANDOFF.Stage.RETURNING:
-			marker.position = car.position + Vector3.UP*0.10
-			text = (button + "  Сесть за руль") if can_deliver else "Вернитесь к машине"
-	if marker_label.text != text:
-		marker_label.text = text
+	if not current.is_empty() and not back_to_depot:
+		marker_label.text = current.name
 
 
 func _configure_materials() -> ShaderMaterial:
@@ -525,43 +871,42 @@ func _configure_materials() -> ShaderMaterial:
 
 
 func _make_entrances() -> void:
-	var frame := StandardMaterial3D.new()
-	frame.albedo_color = Color("#74654e")
-	var panel := StandardMaterial3D.new()
-	panel.albedo_color = Color("#485647")
-	panel.roughness = 0.74
-	var steel := StandardMaterial3D.new()
-	steel.albedo_color = Color("#b1a99b")
-	steel.metallic = 0.36
-	for order: Dictionary in map_data.deliveries:
-		var location := _v2(order.entrance.at)
-		var facing := _v2(order.entrance.front)
-		var edge := location+facing*0.40
-		var height: float = terrain.at(edge.x,edge.y)
-		var door := ENTRANCE.new()
-		add_child(door)
-		entrances.append(door)
-		door.setup(Vector3(location.x+facing.x*0.07,height+1.1,location.y+facing.y*0.07),
-			Vector3(facing.x,0.0,facing.y),frame,panel,steel)
+	frame_paint.albedo_color = Color("#74654e")
+	door_paint.albedo_color = Color("#485647")
+	door_paint.roughness = 0.74
+	steel_paint.albedo_color = Color("#b1a99b")
+	steel_paint.metallic = .36
+
+
+func _make_entrance(order: Dictionary) -> Node3D:
+	var location := _v2(order.entrance.at)
+	var facing := _v2(order.entrance.front)
+	var edge := location + facing * .4
+	var height: float = terrain.at(edge.x, edge.y)
+	var door := ENTRANCE.new()
+	add_child(door)
+	door.setup(Vector3(location.x+facing.x*.07,height+1.1,location.y+facing.y*.07),
+		Vector3(facing.x,0,facing.y),frame_paint,door_paint,steel_paint)
+	return door
 
 
 func _make_people() -> void:
-	var paint := ShaderMaterial.new()
-	paint.shader = ACTOR_COLOR
-	street_lights.bind(paint)
+	actor_paint.shader = ACTOR_COLOR
+	street_lights.bind(actor_paint)
 	add_child(courier)
-	courier.setup(COURIER_SCENE,paint,terrain,chase)
+	courier.setup(COURIER_SCENE,actor_paint,terrain,chase)
 	for i in map_data.walkers.size():
 		var spec: Array = map_data.walkers[i]
-		_person(i,_v2(spec[0]),_v2(spec[1]),spec[2],paint)
-	for i in map_data.deliveries.size():
-		var order: Dictionary = map_data.deliveries[i]
-		var wait_at := _v2(order.customer)
-		var customer := _person(i+2,wait_at,wait_at,0.0,paint)
-		var to_street := _v2(order.stop)-wait_at
-		customer.rotation.y = atan2(to_street.x,to_street.y)
-		customer.set_active(i == 0)
-		customers.append(customer)
+		_person(i,_v2(spec[0]),_v2(spec[1]),spec[2],actor_paint)
+
+
+func _make_customer(order: Dictionary) -> Node3D:
+	var wait := _v2(order.customer)
+	var customer := _person(shift.orders+2,wait,wait,0.0,actor_paint)
+	var street := _v2(order.stop) - wait
+	customer.rotation.y = atan2(street.x,street.y)
+	customer.set_active(true)
+	return customer
 
 
 func _person(index: int, from: Vector2, to: Vector2, phase: float, paint: Material) -> Node3D:

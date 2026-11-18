@@ -2,14 +2,17 @@ shader_type spatial;
 render_mode unshaded, cull_disabled;
 
 #include "res://material_grade.gdshaderinc"
+#include "res://quick_damage.gdshaderinc"
 #include "res://core_bounds.gdshaderinc"
 
 uniform float dusk = 0.0;
 varying vec4 paint;
 
 varying vec2 baked_xz;
+varying float quick_y;
 
 void vertex() {
+	quick_y = (MODEL_MATRIX * vec4(VERTEX,1.0)).y;
 	baked_xz = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz;
 	paint = COLOR;
 }
@@ -96,6 +99,7 @@ vec3 room(vec2 window, vec2 size, vec3 ray, float seed, float lit) {
 }
 
 void fragment() {
+	if (quick_cut(vec3(baked_xz.x, quick_y, baked_xz.y))) discard;
 	if (outside_core(baked_xz)) discard;
 	vec3 color = paint.rgb;
 	if (UV2.y > 0.05) {

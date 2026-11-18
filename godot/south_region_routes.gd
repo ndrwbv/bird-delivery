@@ -17,6 +17,7 @@ var _graph := AStar2D.new()
 var _edges: Array[Vector2i] = []
 var _cells: Dictionary = {}
 var _parking: Array[Dictionary] = []
+var _building_cells: Dictionary
 
 
 func setup(region: Dictionary, core: Dictionary) -> void:
@@ -28,7 +29,7 @@ func setup(region: Dictionary, core: Dictionary) -> void:
 	var node_ids: Dictionary = {}
 	var edges: Dictionary = {}
 	var incoming: Dictionary = {}
-	var buildings := _footprints(region.get("buildings", []))
+	_building_cells = _footprints(region.get("buildings", []))
 	for road: Dictionary in region.get("roads", []):
 		var previous := -1
 		for xy: Array in road.points:
@@ -40,7 +41,7 @@ func setup(region: Dictionary, core: Dictionary) -> void:
 				_graph.add_point(id, point)
 				incoming[id] = []
 			if previous != -1 and previous != id:
-				if not road.has("deck_y") and _crosses_building(_graph.get_point_position(previous), point, buildings):
+				if not road.has("deck_y") and _crosses_building(_graph.get_point_position(previous), point, _building_cells):
 					previous = id
 					continue
 				var direction := int(road.get("oneway", 0))
@@ -151,6 +152,10 @@ func _link(a: int, b: int, incoming: Dictionary) -> void:
 	if not _graph.are_points_connected(a, b, false):
 		_graph.connect_points(a, b, false)
 		incoming[b].append(a)
+
+
+func walk_clear(a: Vector2, b: Vector2) -> bool:
+	return not _crosses_building(a, b, _building_cells)
 
 
 func _footprints(buildings: Array) -> Dictionary:

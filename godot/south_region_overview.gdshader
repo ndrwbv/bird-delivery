@@ -2,6 +2,8 @@ shader_type spatial;
 render_mode cull_disabled, diffuse_lambert, specular_disabled;
 
 #include "res://material_grade.gdshaderinc"
+#include "res://season_tint.gdshaderinc"
+#include "res://quick_damage.gdshaderinc"
 
 uniform sampler2D elevation : filter_linear, repeat_disable;
 uniform sampler2D roads : filter_linear, repeat_disable;
@@ -22,6 +24,7 @@ void vertex() {
 }
 
 void fragment() {
+	if (quick_cut(vec3(world_xz.x, altitude, world_xz.y))) discard;
 	if (all(greaterThanEqual(world_xz,core.xy)) && all(lessThanEqual(world_xz,core.zw))) discard;
 	vec2 key = floor((world_xz-area.xy)/tile_size);
 	vec2 ready_uv = (key+0.5)/vec2(textureSize(complete_tiles,0));
@@ -30,6 +33,7 @@ void fragment() {
 	float pavement = smoothstep(0.15,0.84,texture(roads,uv).r);
 	vec3 color = mix(vec3(0.082,0.146,0.043),vec3(0.109,0.113,0.111),pavement);
 	color = mix(vec3(0.046,0.102,0.121),color,smoothstep(water_y-0.03,water_y+0.09,altitude));
+	color = seasonal_soil(mix(seasonal_grass(color),color,pavement),world_xz,pavement);
 	NORMAL = face_normal(VERTEX,VIEW);
 	ALBEDO = display_color(color);
 	ROUGHNESS = 0.97;

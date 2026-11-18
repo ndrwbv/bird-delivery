@@ -152,7 +152,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventJoypadMotion and event.axis in [JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y]:
 		get_viewport().set_input_as_handled()
 		return
-	var back := event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B
+	var back: bool = event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B
 	if back or event.is_action_pressed(&"district_map") or event.is_action_pressed(&"ui_cancel"):
 		_close()
 

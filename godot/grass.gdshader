@@ -2,6 +2,7 @@ shader_type spatial;
 render_mode cull_disabled, diffuse_lambert, specular_disabled, world_vertex_coords;
 
 #include "res://material_grade.gdshaderinc"
+#include "res://season_tint.gdshaderinc"
 #include "res://street_light.gdshaderinc"
 
 varying vec3 paint;
@@ -17,7 +18,7 @@ void vertex() {
 
 void fragment() {
 	NORMAL = normalize(VIEW_MATRIX[1].xyz*0.7 + face_normal(VERTEX,VIEW)*0.30);
-	ALBEDO = display_color(paint);
+	ALBEDO = display_color(seasonal_grass(paint));
 	EMISSION = display_color(street_bounce(ground,paint,0.74));
 	ROUGHNESS = 1.0;
 }

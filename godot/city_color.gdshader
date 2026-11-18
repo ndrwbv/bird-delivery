@@ -2,6 +2,8 @@ shader_type spatial;
 render_mode cull_disabled, diffuse_lambert, specular_disabled;
 
 #include "res://material_grade.gdshaderinc"
+#include "res://season_tint.gdshaderinc"
+#include "res://quick_damage.gdshaderinc"
 #include "res://core_bounds.gdshaderinc"
 #include "res://street_light.gdshaderinc"
 
@@ -36,6 +38,7 @@ void vertex() {
 }
 
 void fragment() {
+	if (quick_cut(world)) discard;
 	if (outside_core(world.xz)) discard;
 	vec3 color = paint.rgb;
 	vec3 n = face_normal(VERTEX,VIEW);
@@ -114,6 +117,12 @@ void fragment() {
 	color *= 1.0 + pigment*detail*0.10 + broad*0.040;
 	float luminance = dot(color,vec3(0.25,0.58,0.17));
 	color = max(vec3(0.0),mix(vec3(luminance),color,grade_surfaces?mix(1.08,0.96,grass):1.02));
+	if (grade_surfaces && level > 0.86) {
+		// Keep the main drivable surface exposed while its shoulders and roofs hold snow.
+		float road = smoothstep(0.04,0.12,paint.r)*(1.0-smoothstep(0.16,0.36,paint.r))*(1.0-grass);
+		color = mix(color,seasonal_grass(color),grass);
+		color = seasonal_soil(color,world.xz,road*0.92);
+	}
 	NORMAL = n;
 	ALBEDO = display_color(color);
 	EMISSION = display_color(street_bounce(world,color,level));

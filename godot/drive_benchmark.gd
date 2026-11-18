@@ -16,6 +16,7 @@ var waypoint := 1
 var order := -1
 var returning := false
 var elapsed := 0.0
+var next_report := 20.0
 var ready_reported := false
 var capture_dir := ""
 var startup_only := false
@@ -26,7 +27,7 @@ var interval_start := 0
 var last_frame_usec := 0
 var slowest_interval := 0.0
 var slowest_at := Vector2.ZERO
-var stage_started_usec := 0
+var phase_start := -1.0
 var phase_name := ""
 var headless := false
 var finished := false
@@ -44,35 +45,51 @@ func _ready() -> void:
 	if not headless:
 		RenderingServer.frame_post_draw.connect(_frame_presented)
 	process_physics_priority = 1
-	_set_path()
 
 
 func _physics_process(delta: float) -> void:
 	if finished:
 		return
 	elapsed += delta
+	if elapsed >= next_report:
+		next_report += 20.0
+		var obstacle := ""
+		if car.get_slide_collision_count():
+			var hit := car.get_last_slide_collision()
+			var body := hit.get_collider() as Node
+			obstacle = str(body.get_path()) if body else ""
+		print("ROUTE ", roundi(elapsed), " s · ", car.position, " · точка ", waypoint, " / ", path.size(), " · скорость ", car.speed, " · препятствие ", obstacle, " · урон ", car.hearts, " · курс ", car.rotation.y)
 	_note_phase()
-	if elapsed > 240.0:
+	if game.destination < 0:
+		return
+	if game.papers.active() and not game.papers.blocking():
+		game.papers.accept_invoice()
+	if game.choices.visible:
+		game.choices._pick(0)
+	if game.papers.blocking():
+		_finish()
+		return
+	if elapsed > 720.0:
 		push_error("Drive timed out at %s near waypoint %s of order %s" % [str(car.position), waypoint, order+1])
 		get_tree().quit(1)
 		return
 	if game.destination != order:
 		print("DELIVERY %d at %.2f s" % [game.destination, elapsed])
-		if game.destination >= game.map_data.deliveries.size() or first_order_only:
+		if game.destination >= game.map_data.deliveries.size() or (first_order_only and order >= 0):
 			_finish()
 			return
 		_set_path()
 	elif returning != game.back_to_depot:
 		_set_path()
-	if game.courier.active:
-		_walk_delivery()
-	else:
+	if not game.courier.active and not path.is_empty():
 		_drive()
 
 
 func _note_phase() -> void:
 	var next: String
-	if game.destination >= game.map_data.deliveries.size():
+	if game.destination < 0:
+		next = "общий чат"
+	elif game.destination >= game.map_data.deliveries.size():
 		next = "свободная езда"
 	elif game.dispatch.active():
 		next = "погрузка"
@@ -83,20 +100,26 @@ func _note_phase() -> void:
 	next = "%d · %s" % [game.destination + 1, next]
 	if next == phase_name:
 		return
-	var now := Time.get_ticks_usec()
-	if stage_started_usec > 0:
-		print("PHASE %s · %.2f s" % [phase_name, (now - stage_started_usec) * 0.000001])
+	if phase_start >= 0:
+		print("PHASE %s · %.2f s" % [phase_name, elapsed - phase_start])
 	phase_name = next
-	stage_started_usec = now
+	phase_start = elapsed
 
 
 func _drive() -> void:
 	var at := Vector2(car.position.x, car.position.z)
 	var last := path.size() - 1
-	while waypoint < last and at.distance_to(path[waypoint]) < 4.0:
+	while waypoint < last and at.distance_to(path[waypoint]) < 2.3:
 		waypoint += 1
 	var to_target := path[waypoint] - at
 	var meters := to_target.length()
+	# Pursue the lane itself, including long OSM segments with no intermediate vertices.
+	if waypoint > 0:
+		var a := path[waypoint-1]
+		var b := path[waypoint]
+		if a.distance_squared_to(b) > 24.0 * 24:
+			var near := Geometry2D.get_closest_point_to_segment(at,a,b)
+			to_target = near.move_toward(b, clampf(3.0 + absf(car.speed) * .60, 3, 10)) - at
 
 	if waypoint == last and meters < 6.0:
 		_action(GAS, 0.0)
@@ -112,7 +135,9 @@ func _drive() -> void:
 	var reversing := absf(error) > 2.12
 	var steer_error := wrapf(error + PI, -PI, PI) if reversing else -error
 	var turn_choke := clampf(1.0 - absf(steer_error) * 0.67, 0.26, 1.0)
-	var target_speed := minf(17.5, 5.5 + meters * 1.45) * turn_choke
+	var target_speed := minf(15.0, 3.0 + meters * .7) * turn_choke
+	if waypoint < last and meters < 12 and absf((path[waypoint+1]-path[waypoint]).angle_to(path[waypoint]-path[waypoint-1])) > .7:
+		target_speed = minf(target_speed, 2.8 + meters * .3)
 	if waypoint == last:
 		target_speed = minf(target_speed, 0.9 * meters)
 	var speed := absf(car.speed)
@@ -121,31 +146,7 @@ func _drive() -> void:
 	_action(DELIVER, 0.0)
 	_action(BRAKE, 1.0 if speed > target_speed + 2.1 and not reversing else 0.0)
 	_action(REVERSE, clampf(target_speed / 5.8, 0.45, 1.0) if reversing else 0.0)
-	_action(GAS, clampf(target_speed / 24.0, 0.12, 1.0) if not reversing and speed < target_speed + 1.0 else 0.0)
-
-
-func _walk_delivery() -> void:
-	_action(BRAKE,0.0)
-	var stage: int = game.delivery.stage
-	if stage != last_delivery_stage:
-		_action(DELIVER,0.0)
-		last_delivery_stage = stage
-		return
-	var ready: bool = game.can_deliver
-	var target: Vector3 = car.position if stage == 3 else game.customers[game.destination].position
-	var direction: Vector3 = target-game.courier.position
-	direction.y = 0.0
-	direction = direction.normalized()
-	var forward: Vector3 = -game.chase.global_basis.z
-	forward.y = 0.0
-	forward = forward.normalized()
-	var go := 0.0 if ready or stage == 2 else direction.dot(forward)
-	var turn := 0.0 if ready or stage == 2 else direction.dot(Vector3(-forward.z,0.0,forward.x))
-	_action(GAS,maxf(go,0.0))
-	_action(REVERSE,maxf(-go,0.0))
-	_action(LEFT,maxf(-turn,0.0))
-	_action(RIGHT,maxf(turn,0.0))
-	_action(DELIVER,1.0 if ready else 0.0)
+	_action(GAS, 1.0 if not reversing and speed < target_speed + 1.0 else 0.0)
 
 
 func _action(action: StringName, strength: float) -> void:
@@ -186,7 +187,7 @@ func _frame_presented() -> void:
 		last_frame_usec = now
 	if capture_index == 1 and elapsed > 8.0:
 		_capture("drive")
-	if capture_index == 2 and game.can_deliver:
+	if capture_index == 2 and game.delivery.stage == HANDOFF.Stage.HANDOFF:
 		_capture("delivery")
 
 

@@ -2,7 +2,10 @@ shader_type spatial;
 render_mode cull_disabled, diffuse_lambert, specular_disabled;
 
 #include "res://material_grade.gdshaderinc"
+#include "res://season_tint.gdshaderinc"
+#include "res://quick_damage.gdshaderinc"
 
+uniform vec2 rain_film = vec2(0.0);
 varying vec3 ground;
 varying vec3 pigment;
 varying vec2 style;
@@ -27,6 +30,7 @@ void vertex() {
 }
 
 void fragment() {
+	if (quick_cut(ground)) discard;
 	vec2 p = ground.xz;
 	vec3 color = pigment;
 	float detail = 1.0 - smoothstep(26.0, 85.0, length(VERTEX));
@@ -82,6 +86,15 @@ void fragment() {
 		float band = smoothstep(0.56,0.58,UV.y/style.y)*(1.0-smoothstep(0.78,0.80,UV.y/style.y));
 		float mullion = smoothstep(0.07,0.11,panel.x)*smoothstep(0.05,0.08,panel.y);
 		color = mix(color*(0.90+0.10*noise_at(UV)),vec3(0.118,0.156,0.162),band*mullion);
+	}
+	if (style.x < 2.5 || (style.x > 3.5 && style.x < 6.5)) {
+		float road = step(1.5,style.x)*(1.0-step(2.5,style.x));
+		float walk = step(0.5,style.x)*(1.0-step(1.5,style.x));
+		float cleared = road*(0.82+0.18*smoothstep(0.65,0.92,abs(sin(UV.y*1.6))))+walk*0.40;
+		if (style.x < 0.5) color = seasonal_grass(color);
+		color *= 1.0-0.22*rain_film.x;
+		color = mix(color,vec3(0.22,0.29,0.35),road*rain_film.y*smoothstep(0.64,0.78,noise_at(p*0.48))*0.58);
+		color = seasonal_soil(color,p,cleared);
 	}
 	NORMAL = face_normal(VERTEX,VIEW);
 	ALBEDO = display_color(color);

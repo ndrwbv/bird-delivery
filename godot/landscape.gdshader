@@ -2,6 +2,8 @@ shader_type spatial;
 render_mode cull_disabled, diffuse_lambert, specular_disabled;
 
 #include "res://material_grade.gdshaderinc"
+#include "res://season_tint.gdshaderinc"
+#include "res://quick_damage.gdshaderinc"
 #include "res://core_bounds.gdshaderinc"
 #include "res://street_light.gdshaderinc"
 
@@ -29,6 +31,7 @@ void vertex() {
 }
 
 void fragment() {
+	if (quick_cut(ground)) discard;
 	if (outside_core(ground.xz)) discard;
 	vec2 world = ground.xz;
 	float range = length(VERTEX);
@@ -42,9 +45,10 @@ void fragment() {
 	float grit = hash(floor(world*39.0))-0.5;
 	float grain = close*(1.0-smoothstep(0.025,0.1,length(fwidth(world))));
 	float pebbles = smoothstep(0.88,0.99,hash(floor(world*13.0)));
-	vec3 color = mix(grass,dirt,bare)*(1.0+grain*grit*0.22+grain*bare*pebbles*0.18);
+	vec3 color = mix(seasonal_grass(grass),dirt,bare)*(1.0+grain*grit*0.22+grain*bare*pebbles*0.18);
 	NORMAL = face_normal(VERTEX,VIEW);
 	color *= 1.0-ground_wetness*(0.15+bare*0.14);
+	color = seasonal_soil(color,world,0.0);
 	ALBEDO = display_color(color);
 	EMISSION = display_color(street_bounce(ground,color,1.0));
 	ROUGHNESS = 1.0;

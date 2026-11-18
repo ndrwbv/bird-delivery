@@ -5,6 +5,9 @@ uniform vec3 sun_vector = vec3(-0.63,0.49,0.60);
 uniform float daylight = 0.0;
 uniform float darkness = 0.0;
 uniform float overcast = 0.0;
+uniform float flash = 0.0;
+uniform float heat = 0.0;
+uniform float snow_cover = 0.0;
 
 float hash(float n) {
 	return fract(sin(n*39.721+43.58)*43758.5453);
@@ -56,5 +59,7 @@ void sky() {
 	vec3 gray = mix(vec3(0.43,0.51,0.62),vec3(0.25,0.32,0.42),elevation+cloud*0.11);
 	color = mix(color,gray,overcast*0.90);
 	vec3 night = mix(vec3(0.13,0.17,0.25),vec3(0.025,0.038,0.079),smoothstep(0.0,0.55,elevation));
-	COLOR = mix(color,night+vec3(cloud*0.025),darkness);
+	color = mix(color,vec3(0.75,0.83,0.90),snow_cover*0.32*(1.0-darkness));
+	color = mix(color,vec3(0.98,0.71,0.44),heat*0.34*(1.0-elevation));
+	COLOR = mix(mix(color,night+vec3(cloud*0.025),darkness),vec3(0.86,0.90,1.0),flash*0.75);
 }

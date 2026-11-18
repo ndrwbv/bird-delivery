@@ -41,7 +41,7 @@ class Streets extends Node2D:
 			draw_polyline(rail, Color("#9a9182"), 2.3, true)
 		for i in roads.size():
 			var color := Color("#ad9876") if main[i] else Color("#bcae94")
-			draw_polyline(roads[i], color, -1.0, true)
+			draw_polyline(roads[i], color, -1.0, false)
 			draw_polyline(roads[i], color, widths[i] + 1.8, true)
 		for i in roads.size():
 			var color := Color("#f3dcad") if main[i] else Color("#f1eada")
@@ -49,7 +49,7 @@ class Streets extends Node2D:
 		if boundary.size() > 2:
 			var line := boundary.duplicate()
 			line.append(boundary[0])
-			draw_polyline(line, Color("#83917b"), -1.0, true)
+			draw_polyline(line, Color("#83917b"), -1.0, false)
 
 
 class Markers extends Node2D:

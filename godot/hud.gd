@@ -80,7 +80,7 @@ func set_order(index: int, order: Dictionary, from_home: bool) -> void:
 	free_roam = false
 	homebound = false
 	wallet.text = "Баланс  %d ₽" % balance
-	mission.text = "СОЛНЕЧНЫЙ  /  ЮГ      •      ЗАКАЗ %d ИЗ %d" % [index + 1, order_count]
+	mission.text = "СОЛНЕЧНЫЙ  /  ЮГ      •      ЗАКАЗ %d" % [index + 1]
 	address.text = order.name
 	_set_delivery_route(order.from_home if from_home else order.route, order.stop)
 	last_meters = -1
@@ -102,7 +102,7 @@ func show_payment(earned: int, total: int) -> void:
 func free_drive(delivered: int, earned: int) -> void:
 	mission.text = "СОЛНЕЧНЫЙ  /  ЮГ"
 	address.text = "Свободная езда"
-	range_label.text = "Доставлено %d из %d    •    %d ₽" % [delivered, order_count, earned]
+	range_label.text = "Доставлено %d    •    %d ₽" % [delivered, earned]
 	_set_delivery_route([], [])
 	free_roam = true
 

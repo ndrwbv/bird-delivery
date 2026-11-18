@@ -1,9 +1,16 @@
 extends CharacterBody3D
 
+signal shift_started(pace: String)
+signal drowned
+
 # The first district uses the stock Семёрка tuning (econ.js, handling 3).
 const DAMAGE := preload("res://car_damage.gd")
 const ROOF_PAINT := preload("res://actor_color.gdshader")
 const LAMPS := preload("res://vehicle_lamps.gd")
+const ENGINE := preload("res://semerka_engine.gd")
+const SURFACE := preload("res://semerka_surface.gd")
+const MOTOR_AUDIO := preload("res://semerka_motor_audio.gd")
+const STARTER := preload("res://semerka_starter.gd")
 const MAX_SPEED := 44.0
 const ACCELERATION := 29.0
 const BRAKES := 38.0
@@ -23,6 +30,19 @@ const TRACK := 1.73
 	model.get_node("wheelLB"), model.get_node("wheelRB"),
 ]
 
+var engine := ENGINE.new()
+var surface := SURFACE.new()
+var motor_audio := MOTOR_AUDIO.new()
+var starter := STARTER.new()
+var hearts_max := 7.0
+var bonus_heart := false
+var nitro_efficiency := 1.0
+var boost_active := false
+var active_shift := true
+var airborne := false
+var sinking := -1.0
+var steer_visual := 0.0
+var shield_aura := MeshInstance3D.new()
 var region_edge: RefCounted
 var terrain: RefCounted
 var controls_locked := false
@@ -50,6 +70,28 @@ var wheel_rest: Array[Vector3] = []
 
 
 func _ready() -> void:
+	add_child(motor_audio)
+	engine.started.connect(motor_audio.starter.play.bind(0.0))
+	var layer := CanvasLayer.new()
+	layer.layer = 6
+	add_child(layer)
+	layer.add_child(starter)
+	starter.setup(engine)
+	var aura := SphereMesh.new()
+	aura.radius = 3.1
+	aura.height = 6.2
+	aura.radial_segments = 16
+	aura.rings = 10
+	var tint := StandardMaterial3D.new()
+	tint.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	tint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	tint.albedo_color = Color("8f9bff38")
+	shield_aura.mesh = aura
+	shield_aura.material_override = tint
+	shield_aura.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	shield_aura.position.y = 1.1
+	shield_aura.hide()
+	add_child(shield_aura)
 	visual.add_child(lamps)
 	var roof_light := model.get_node("PizzaRoofLight") as MeshInstance3D
 	var paint := ShaderMaterial.new()
@@ -62,16 +104,38 @@ func _ready() -> void:
 		wheel_rest.append(wheel.position)
 
 
+func begin_shift(number: int, pace: String, engine_state: Dictionary = {}) -> void:
+	if not engine_state.is_empty():
+		engine.restore(engine_state)
+	engine.begin_shift(number)
+	motor_audio.starter.play()
+	active_shift = true
+	bonus_heart = false
+	sinking = -1.0
+	surface.ice_load = 0.0
+	hearts_max = 7.0
+	hearts = hearts_max
+	nitro = 1.0 if pace == "generous" and number > 0 else 0.5
+	nitro_efficiency = 1.0
+	shield_time = 0.0
+	knock_cooldown = 0.0
+	damage.repair()
+	shift_started.emit(pace)
+
+
 func park(at: Vector2, yaw: float) -> void:
+	sinking = -1.0
+	surface.ice_load = 0.0
 	position = Vector3(at.x, terrain.at(at.x, at.y) + 0.04, at.y)
 	rotation = Vector3(0.0, yaw, 0.0)
 	speed = 0.0
 	if hearts <= 0.0:
-		hearts = 7.0
+		hearts = hearts_max
 		nitro = 0.5
 		damage.repair()
 	velocity = Vector3.ZERO
 	steering = 0.0
+	steer_visual = 0.0
 	rear_slip = 0.0
 	yaw_rate = 0.0
 	person_kick = 0.0
@@ -84,12 +148,30 @@ func park(at: Vector2, yaw: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	var driving := not controls_locked and hearts > 0.0
-	var throttle := Input.get_action_strength(&"accelerate") if driving else 0.0
-	var brake := Input.get_action_strength(&"reverse") if driving else 0.0
-	var steer := Input.get_axis(&"steer_left", &"steer_right") if driving else 0.0
+	if sinking >= 0.0:
+		sinking += delta
+		velocity *= exp(-2.2*delta)
+		position += velocity*delta
+		var floor_y: float = terrain.land_height(position.x,position.z)
+		position.y = maxf(floor_y,surface.water_level()+0.1-maxf(0.0,sinking-0.5)*1.1)
+		visual.rotation.x = lerpf(visual.rotation.x,-0.38,1.0-exp(-delta))
+		return
+	var driving := active_shift and not controls_locked and hearts > 0.0
+	var throttle := driving and Input.get_action_raw_strength(&"accelerate") > 0.154
+	var brake := driving and Input.get_action_raw_strength(&"reverse") > 0.154
+	var stick := Input.get_action_raw_strength(&"steer_right")-Input.get_action_raw_strength(&"steer_left") if driving else 0.0
+	var steer := signf(stick)*pow(clampf((absf(stick)-0.12)/0.85,0.0,1.0),1.6)
 	var handbrake := not driving or Input.is_action_pressed(&"handbrake")
 	var boosting := driving and Input.is_action_pressed(&"nitro")
+	if active_shift and hearts > 0.0:
+		engine.step(delta,speed,driving)
+	if active_shift and not controls_locked and engine.restarting:
+		var starter_pressed := Input.is_action_just_pressed(&"deliver")
+		# B is handbrake on a pad. Only keyboard Space also operates the starter.
+		starter_pressed = starter_pressed or (Input.is_action_just_pressed(&"handbrake") and Input.is_physical_key_pressed(KEY_SPACE))
+		if starter_pressed:
+			starter.press()
+	starter.step(delta,active_shift and not controls_locked)
 	shield_time = maxf(0.0,shield_time-delta)
 	knock_cooldown = maxf(0.0,knock_cooldown-delta)
 	var forward := -basis.z
@@ -97,48 +179,67 @@ func _physics_process(delta: float) -> void:
 	var longitudinal := forward.dot(velocity)
 	var lateral := right.dot(velocity)
 	var old_speed := speed
-	var loose := 0.0
-	for tire in wheel_at:
-		loose += 0.25 if terrain.material_at(tire.x,tire.z) != 0 else 0.0
+	surface.step(position,terrain,delta)
+	if driving and not airborne and ((not surface.frozen and surface.water_depth > (0.75 if surface.wading_beach else 0.15)) or surface.breaks_ice(delta,speed,position.y)):
+		sinking = 0.0
+		motor_audio.step(delta,engine,false,false)
+		drowned.emit()
+		return
+	var road_wet := surface.wetness(wet)
+	var sand := 0.0 if airborne else surface.sand
+	var snow := 0.0 if airborne else surface.loose_snow
+	var rut := 0.0 if airborne else surface.rut
 
-	if throttle > 0.0 or brake > 0.0 or absf(longitudinal) > 1.2:
-		var grade := (wheel_at[0].y+wheel_at[1].y-wheel_at[2].y-wheel_at[3].y)/(2.0*WHEELBASE)
-		longitudinal -= clampf(grade,-0.3,0.3)*24.0*delta
-	var burning := boosting and nitro > 0.0
+	if throttle or brake or absf(longitudinal) > 1.2:
+		var nose := position+forward*1.4
+		var tail := position-forward*1.45
+		var grade: float = (terrain.at(nose.x,nose.z,position.y)-terrain.at(tail.x,tail.z,position.y))/2.85
+		longitudinal -= grade*24.0*delta
+	var burning := boosting and nitro > 0.0 and not engine.dead
 	if burning:
-		nitro = maxf(0.0, nitro - 0.2 * delta)
+		nitro = maxf(0.0, nitro - 0.2 * nitro_efficiency * delta)
 		longitudinal += 55.0 * delta
-	longitudinal += ACCELERATION * throttle * maxf(0.25, 1.0 - longitudinal / MAX_SPEED) * delta
-	if brake > 0.0:
-		var retard := BRAKES*(1.0-wet*0.25) if longitudinal > 0.4 else ACCELERATION*0.5
-		longitudinal -= retard*brake*delta
+	boost_active = burning
+	if throttle and not airborne and not engine.dead:
+		longitudinal += ACCELERATION*maxf(0.25,1.0-longitudinal/MAX_SPEED)*(1.0-0.5*minf(1.0,sand))*(1.0-0.3*snow)*delta
+	if brake:
+		var retard := BRAKES*(1.0-road_wet*0.25) if longitudinal > 0.4 else (0.0 if engine.dead else ACCELERATION*0.5)
+		longitudinal -= retard*delta
+	if engine.dead:
+		longitudinal -= longitudinal*0.55*delta
 	longitudinal = clampf(longitudinal, -MAX_REVERSE, MAX_SPEED + 14.0)
 	if not burning and longitudinal > MAX_SPEED:
 		longitudinal -= (longitudinal - MAX_SPEED) * 1.4 * delta
 	longitudinal -= longitudinal * 0.3 * delta
+	if surface.wade > 0.0 and not airborne:
+		longitudinal -= longitudinal*5.0*minf(1.4,surface.wade/0.45)*delta
 	if handbrake:
 		longitudinal -= longitudinal * 1.1 * delta
+	longitudinal -= longitudinal*0.8*sand*delta
+	longitudinal -= longitudinal*0.25*snow*delta
 	if not driving:
 		longitudinal = move_toward(longitudinal,0.0,12.0*delta)
 
 	steering = _step_steering(steering,steer,delta)
 	var pace := absf(longitudinal)
 	var slip_angle := atan2(lateral,maxf(1.0,pace))
-	if handbrake and longitudinal > 5.0:
+	if handbrake and not airborne and longitudinal > 5.0:
 		rear_slip = minf(1.0,rear_slip+5.0*delta)
 	else:
 		var recovery := 2.5
 		if steering*slip_angle > 0.15*absf(slip_angle):
 			recovery = 6.0
-		elif throttle > 0.0 and absf(slip_angle) > deg_to_rad(12.0) and longitudinal > 8.0:
+		elif throttle and not airborne and absf(slip_angle) > deg_to_rad(12.0) and longitudinal > 8.0:
 			recovery = 0.7
 		rear_slip = maxf(0.0,rear_slip-recovery*delta)
-	var base_grip := lerpf(8.5,5.5,wet)*0.928
+	var base_grip := lerpf(8.5,5.5,road_wet)*0.928
 	var corner_grip := 1.0-0.18*clampf((longitudinal-8.0)/10.0,0.0,1.0)*absf(steering)
 	var grip := lerpf(maxf(base_grip*corner_grip,minf(base_grip,6.0)),1.5,rear_slip)
-	lateral *= exp(-grip*lerpf(1.0,0.85,loose)*delta)
+	lateral *= exp(-grip*surface.ground_grip*(1.0-0.55*minf(1.0,sand))*(1.0-0.22*snow)*(1.0+0.18*rut)*delta)
 
 	var turn_gain := minf(pace/8.0,1.0)/(1.0+pace*0.014*1.2)
+	if airborne:
+		turn_gain *= 0.15
 	var limit := pace/MIN_TURN_RADIUS
 	yaw_rate = clampf(-steering*2.3*0.9*turn_gain,-limit,limit)*signf(longitudinal)
 	if handbrake:
@@ -149,6 +250,10 @@ func _physics_process(delta: float) -> void:
 
 	var previous := position
 	velocity = forward*longitudinal+right*lateral
+	if not airborne and not surface.wind.is_zero_approx():
+		var gust := Vector3(surface.wind.x,0.0,surface.wind.y)
+		var force := clampf((velocity.length()-2.0)/8.0,0.0,1.0)*delta
+		velocity += (right*gust.dot(right)+forward*gust.dot(forward)*0.25)*force
 	if absf(person_kick) > 0.01:
 		var fade := exp(-delta/0.11)
 		var yaw := person_kick*0.11*(1.0-fade)
@@ -160,9 +265,15 @@ func _physics_process(delta: float) -> void:
 	var actual := (position-previous)/delta
 	brake_load = lerpf(brake_load,clampf((speed-old_speed)/delta,-18.0,12.0),1.0-exp(-7.0*delta))
 	skid = absf(actual.dot(basis.x))+(2.8*rear_slip if absf(speed) > 2.5 else 0.0)
-	_update_wheels(delta,-basis.z.dot(actual))
+	steer_visual = lerpf(steer_visual,steering*0.42,1.0-exp(-10.0*delta))
+	var wheel_spin := snow*3.0 if throttle and not engine.dead else 0.0
+	_update_wheels(delta,-basis.z.dot(actual)+wheel_spin)
+	var load_motor := not engine.dead and (throttle or burning)
+	engine.gearbox(delta,longitudinal,MAX_SPEED,load_motor,brake,burning,airborne)
+	motor_audio.step(delta,engine,load_motor,active_shift and not controls_locked and hearts > 0.0)
+	shield_aura.visible = shield_time > 0.0 and (shield_time > 2.0 or floori(shield_time*6.0)%2 == 0)
 	damage.bounce_parts(position,rotation.y,delta)
-	lamps.update_lamps(headlamps,brake > 0.0 and old_speed > 0.2,speed < -0.35)
+	lamps.update_lamps(headlamps,brake and old_speed > 0.2,speed < -0.35)
 
 
 func _step_steering(current: float, target: float, delta: float) -> float:
@@ -174,6 +285,18 @@ func _step_steering(current: float, target: float, delta: float) -> float:
 		current = 0.0
 	var rate := STEERING_RATE*STEERING_RETURN if absf(target) < absf(current) else STEERING_RATE
 	return move_toward(current,target,rate*delta)
+
+
+# A wheel contact from the road-condition layer. The release uses the same soft
+# response for an ordinary hole and a deep one. No vertical launch or camera kick.
+func pothole(front_wheel: bool, severity := 1.0) -> void:
+	if airborne or absf(speed) < 3.0:
+		return
+	var at_speed := minf(1.0,absf(speed)/30.0)
+	visual.rotation.x += (1.0 if front_wheel else -1.0)*(0.015+at_speed*0.015)
+	velocity *= 1.0-(0.1+at_speed*0.12)
+	if active_shift and not controls_locked:
+		engine.pothole(severity)
 
 
 func person_bump() -> void:
@@ -222,6 +345,10 @@ func _update_wheels(delta: float, rolling: float) -> void:
 	for i in wheels.size():
 		var sample := position + basis * wheel_rest[i]
 		sample.y = terrain.wheel_height(sample.x, sample.z, position.y)
+		if surface.ice_height > -INF:
+			sample.y = maxf(sample.y,surface.ice_height)
+		elif surface.wade > 0.0:
+			sample.y -= minf(0.35,surface.wade*0.55)
 		wheel_at[i] = sample
 		support.append(sample.y)
 	var average := (support[0]+support[1]+support[2]+support[3])*0.25
@@ -235,7 +362,7 @@ func _update_wheels(delta: float, rolling: float) -> void:
 		visual.rotation.z = lerpf(visual.rotation.z, clampf(roll,-0.105,0.105)+clampf(-yaw_rate*absf(rolling)*0.0024,-0.052,0.052), blend)
 	wheel_roll = fposmod(wheel_roll-rolling/WHEEL_RADIUS*delta, TAU)
 	for i in wheels.size():
-		var wheel_yaw := -steering*0.42 if i < 2 else 0.0
+		var wheel_yaw := -steer_visual if i < 2 else 0.0
 		wheels[i].basis = Basis(Vector3.UP,wheel_yaw)*Basis(Vector3.RIGHT,wheel_roll)
 		var base := wheel_rest[i]
 		var wheel_floor := (visual.basis * base).y + position.y - base.y
@@ -248,9 +375,15 @@ func collect_road_bonus(type: int) -> void:
 	match type:
 		0: nitro = minf(1.0,nitro+0.5)
 		1:
-			hearts = minf(7.0,hearts+1.0)
+			hearts = minf(hearts_max,hearts+1.0)
 			damage.set_hearts(hearts)
 		2: shield_time = 10.0
+		3:
+			if hearts >= hearts_max and not bonus_heart:
+				hearts_max += 1.0
+				bonus_heart = true
+			hearts = minf(hearts_max,hearts+1.0)
+			damage.set_hearts(hearts)
 
 
 func collision_damage(impact: float, other_car: bool, contact: Vector3, normal: Vector3) -> void:
@@ -265,6 +398,7 @@ func collision_damage(impact: float, other_car: bool, contact: Vector3, normal: 
 	elif not other_car and impact >= 15.0:
 		impulse = (impact-13.0)*0.16
 	if impulse > 0.0:
+		engine.hit(impact)
 		hearts = maxf(0.0,hearts-(1.0 if impulse >= 1.5 else 0.5))
 		knock_cooldown = 0.9
 		damage.set_hearts(hearts)
