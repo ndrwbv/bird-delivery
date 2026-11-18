@@ -1,12 +1,40 @@
 // Summer beach furniture, kiosk, collision footprints and guest positions from the released factories. Run from any directory.
-import {readFileSync,writeFileSync} from 'node:fs';
+import {existsSync,readFileSync,writeFileSync} from 'node:fs';
+import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+const capturePath=process.argv[2] ? resolve(process.argv[2]) : null;
 process.chdir(fileURLToPath(new URL('../../',import.meta.url)));
 import vm from 'node:vm';
 const THREE=await import(new URL('../../src/vendor/three.module.min.js',import.meta.url));
 const src=readFileSync('src/game/beach.js','utf8'),region=JSON.parse(readFileSync('godot/assets/south-region.json'));
 const t=region.terrain,w=region.water_y;
-function ground(x,z){const gx=(x-t.x)/t.step,gz=(z-t.z)/t.step,ix=Math.floor(gx),iz=Math.floor(gz),i=ix+iz*t.width,u=gx-ix,v=gz-iz,a=t.heights[i],b=t.heights[i+1],c=t.heights[i+t.width],d=t.heights[i+t.width+1];return (u>=v?a+(b-a)*u+(d-b)*v:a+(d-c)*u+(c-a)*v)-w}
+const heightPath='godot/assets/south-beach-height.json';
+if(capturePath){
+ const capture=JSON.parse(readFileSync(capturePath));
+ const grid=capture.shoreHeight??capture;
+ const height={
+  ...grid,
+  x:grid.x-region.origin[0], z:grid.z-region.origin[1],
+  heights:grid.heights.map(y=>Number((y-region.source_y).toFixed(3))),
+ };
+ writeFileSync(heightPath,JSON.stringify(height)+'\n');
+}
+const shore=existsSync(heightPath) ? JSON.parse(readFileSync(heightPath)) : null;
+function surface(grid,x,z){
+ const gx=(x-grid.x)/grid.step, gz=(z-grid.z)/grid.step;
+ const ix=Math.min(grid.width-2,Math.floor(gx)), iz=Math.min(grid.depth-2,Math.floor(gz));
+ const i=ix+iz*grid.width, u=gx-ix, v=gz-iz;
+ const a=grid.heights[i], b=grid.heights[i+1], c=grid.heights[i+grid.width], d=grid.heights[i+grid.width+1];
+ return u>=v ? a+(b-a)*u+(d-b)*v : a+(d-c)*u+(c-a)*v;
+}
+function ground(x,z){
+ const base=surface(t,x,z);
+ if(!shore) return base-w;
+ const edge=Math.min(x-shore.x,z-shore.z,shore.x+(shore.width-1)*shore.step-x,shore.z+(shore.depth-1)*shore.step-z);
+ if(edge<=0) return base-w;
+ const t0=Math.min(1,edge/12), blend=t0*t0*(3-2*t0);
+ return base+(surface(shore,x,z)-base)*blend-w;
+}
 const along=new THREE.Vector2(.459,.888).normalize();const SITE={cx:region.beach[0],cz:region.beach[1],ux:along.x,uz:along.y,nx:along.y,nz:-along.x};
 const W=(a,b)=>[SITE.cx+a*SITE.ux+b*SITE.nx,SITE.cz+a*SITE.uz+b*SITE.nz];
 const hash=(x,z,k=0)=>{let h=Math.sin(x*12.9898+z*78.233+k*37.719)*43758.5453;return h-Math.floor(h)};

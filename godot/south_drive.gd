@@ -92,6 +92,7 @@ var book := preload("res://south_order_book.gd").new()
 var achievements := ACHIEVEMENTS.new()
 var audio := preload("res://game_audio.gd").new()
 var events := preload("res://south_events.gd").new()
+var depot_growth := preload("res://south_depot_growth.gd").new()
 var litter := preload("res://south_yard_litter.gd").new()
 var respect := preload("res://district_respect.gd").new()
 var last_horn_usec := -300000
@@ -271,11 +272,13 @@ func _ready() -> void:
 	achievements.bind_vehicle(car)
 	achievements.bind_furniture(furniture)
 	add_child(audio)
-	audio.setup(car)
+	audio.setup(car,temporary)
 	add_child(events)
 	events.setup(car,terrain,traffic,region_data,profile,_person.bind(actor_paint))
 	mopeds.bind_sushi(events)
 	events.raid.furniture = furniture
+	add_child(depot_growth)
+	depot_growth.setup(events,furniture)
 	add_child(litter)
 	litter.setup(region_data,terrain,region_routes,car,events.garage_zone.contains)
 	book.danger = events.garage_zone.contains
@@ -342,7 +345,7 @@ func _ready() -> void:
 	papers.bet_requested.connect(_open_bet)
 	papers.main_menu_requested.connect(_leave_receipt)
 	add_child(menu)
-	menu.setup()
+	menu.setup(temporary)
 	menu.bind_route(route_ask)
 	menu.bind_daily(daily)
 	menu.bind_map(region_map)
@@ -585,6 +588,7 @@ func _main_menu() -> void:
 	life.clear()
 	mopeds.clear()
 	scooters.clear()
+	depot_growth.clear()
 	daily.clear()
 	staff.clear()
 	crew.clear()
@@ -658,6 +662,7 @@ func _physics_process(delta: float) -> void:
 			traffic.clock_hour = fposmod(shift.hour(),24.0)
 			events.step(delta,true,traffic.clock_hour)
 			life.step(delta,traffic.clock_hour,not courier.active)
+			depot_growth.step(delta,traffic.clock_hour,profile.data)
 			mopeds.step(delta,Vector2.INF)
 			scooters.step(delta)
 			workshop.step(delta,profile,not courier.active)
@@ -687,6 +692,7 @@ func _physics_process(delta: float) -> void:
 	events.step(delta, not dispatch.active() and not papers.active(), traffic.clock_hour)
 	var on_road := not courier.active and (back_to_depot or story_order or delivery.stage == HANDOFF.Stage.DRIVING)
 	life.step(delta,traffic.clock_hour,on_road)
+	depot_growth.step(delta,traffic.clock_hour,profile.data)
 	daily.step(delta,on_road and not back_to_depot and not dispatch.active() and not _modal_blocking())
 	if car.boost_active:
 		daily.fail("nos")
@@ -1178,6 +1184,7 @@ func _finish_shift(full: bool, kind := "quit") -> void:
 	life.clear()
 	mopeds.clear()
 	scooters.clear()
+	depot_growth.clear()
 	events.finish()
 	_sync_raid_marker()
 	litter.clear()
@@ -1519,7 +1526,7 @@ func _street_hit(amount: float, _at: Vector3) -> void:
 func _gps_route(at: Vector2) -> Array:
 	var heading := Vector2(-car.basis.z.x,-car.basis.z.z) if absf(car.speed)>1 else Vector2.ZERO
 	var deck: bool = car.position.y-terrain.land_height(car.position.x,car.position.z)>2.2
-	return region_routes.route_between(at,_v2(gps_stop),heading,deck) if waypoint.is_empty() else region_routes.route_to(at,waypoint,heading,deck)
+	return region_routes.route_between(at,_v2(gps_stop),heading,deck,true) if waypoint.is_empty() else region_routes.route_to(at,waypoint,heading,deck,true)
 
 
 func _update_gps(at: Vector2, delta: float) -> void:
@@ -1561,6 +1568,7 @@ func _delivery_hint() -> String:
 
 
 func _reset_car() -> void:
+	region_routes.forget_lane()
 	car.park(_v2(map_data.spawn),map_data.angle)
 	tire_tracks.break_tracks()
 	chase.reset_view()

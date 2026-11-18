@@ -10,6 +10,7 @@ const RECOVERABLE_SPEED := 20.0/3.6
 const FATAL_SPEED := 55.0/3.6
 const CLIENT_GLANCE := 3.0
 const CLIENT_DROP := 12.0
+var shove_speed := CLIENT_GLANCE
 
 var from := Vector2.ZERO
 var to := Vector2.ZERO
@@ -212,7 +213,7 @@ func impact(approach: float, push: Vector3, active_client: bool,
 	if defeated or knockdown > 0.0:
 		return Hit.FALL
 	player.active = true
-	if not blast and (approach < CLIENT_GLANCE or (active_client and approach < CLIENT_DROP)):
+	if not blast and (approach < shove_speed or (active_client and approach < CLIENT_DROP)):
 		if stunned > 0.0:
 			return Hit.GLANCE if approach >= CLIENT_GLANCE else Hit.SHOVE
 		stunned = 0.42

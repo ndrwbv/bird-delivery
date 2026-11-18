@@ -21,12 +21,14 @@ var _edges: Array[Vector2i] = []
 var _cells: Dictionary = {}
 var _parking: Array[Dictionary] = []
 var _building_cells: Dictionary
+var _previous_lane := Vector2i(-1,-1)
 
 
 func setup(region: Dictionary, core: Dictionary) -> void:
 	destinations.clear()
 	_closed.clear()
 	_decks.clear()
+	forget_lane()
 	revision += 1
 	_parking.clear()
 	_cells.clear()
@@ -134,13 +136,17 @@ func setup(region: Dictionary, core: Dictionary) -> void:
 		_add_approach("garage", "Мастерская", _vec(region.garage), "garage")
 
 
-func route_to(car_xz: Vector2, destination: Dictionary, forward := Vector2.ZERO, on_deck := false) -> Array:
+func route_to(car_xz: Vector2, destination: Dictionary, forward := Vector2.ZERO, on_deck := false, follow_lane := false) -> Array:
 	if _edges.is_empty() or not destination.has("stop"):
 		return []
 	var finish: Dictionary = destination.get("_snap", {})
 	if finish.is_empty():
 		finish = _nearest(_vec(destination.stop))
-	var start := _car_snap(car_xz,forward,on_deck)
+	var start := _car_snap(car_xz,forward,on_deck,follow_lane)
+	if start.is_empty() or finish.is_empty():
+		return []
+	if follow_lane:
+		_previous_lane = start.edge
 	if start.has("parking") and start.parking == destination.get("id", ""):
 		if car_xz.distance_squared_to(_vec(destination.stop)) < 0.0064:
 			return [destination.stop]
@@ -157,11 +163,15 @@ func route_to(car_xz: Vector2, destination: Dictionary, forward := Vector2.ZERO,
 
 ## Arbitrary map points resolve to reachable roads. Recognized parking stops include
 ## the authored driveway segment, so returning to the depot ends beside the pizzeria.
-func route_between(car_xz: Vector2, target_xz: Vector2, forward := Vector2.ZERO, on_deck := false) -> Array:
+func route_between(car_xz: Vector2, target_xz: Vector2, forward := Vector2.ZERO, on_deck := false, follow_lane := false) -> Array:
 	for stop: Dictionary in _parking:
 		if target_xz.distance_squared_to(_vec(stop.stop)) < 1.0:
-			return route_to(car_xz, stop, forward, on_deck)
-	return route_to(car_xz, {"stop": _xy(target_xz)}, forward, on_deck)
+			return route_to(car_xz,stop,forward,on_deck,follow_lane)
+	return route_to(car_xz,{"stop":_xy(target_xz)},forward,on_deck,follow_lane)
+
+
+func forget_lane() -> void:
+	_previous_lane = Vector2i(-1,-1)
 
 
 ## Accept a temporary barrier only when both previously allowed directions retain a detour.
@@ -284,21 +294,21 @@ func _index_edge(edge: Vector2i) -> void:
 			_cells[key].append(edge)
 
 
-func _nearest(point: Vector2, forward := Vector2.ZERO, on_deck := false) -> Dictionary:
+func _nearest(point: Vector2, forward := Vector2.ZERO, on_deck := false, follow_lane := false) -> Dictionary:
 	var close: Dictionary = {}
 	var cell := _cell(point)
 	for dx in range(-1, 2):
 		for dz in range(-1, 2):
 			for edge: Vector2i in _cells.get(cell + Vector2i(dx, dz), []):
 				close[edge] = true
-	var result := _nearest_on_edges(point, close.keys(), forward, on_deck)
+	var result := _nearest_on_edges(point,close.keys(),forward,on_deck,follow_lane)
 	# Every segment within CELL metres intersects one of those nine cells.
 	if not result.is_empty() and point.distance_squared_to(result.at) < CELL * CELL:
 		return result
-	return _nearest_on_edges(point, _edges, forward, on_deck)
+	return _nearest_on_edges(point,_edges,forward,on_deck,follow_lane)
 
 
-func _nearest_on_edges(point: Vector2, edges: Array, forward := Vector2.ZERO, on_deck := false) -> Dictionary:
+func _nearest_on_edges(point: Vector2, edges: Array, forward := Vector2.ZERO, on_deck := false, follow_lane := false) -> Dictionary:
 	var best := INF
 	var result: Dictionary = {}
 	for edge: Vector2i in edges:
@@ -308,11 +318,13 @@ func _nearest_on_edges(point: Vector2, edges: Array, forward := Vector2.ZERO, on
 		if _closed.has(edge):
 			continue
 		var distance := point.distance_to(at)
+		if follow_lane and edge == _previous_lane:
+			distance -= 3.0
+		if (follow_lane or not forward.is_zero_approx()) and _decks.has(edge) != on_deck:
+			distance += 12.0
 		if not forward.is_zero_approx():
 			var along := (b-a).normalized().dot(forward)
 			distance += 3.0*(1.0-absf(along))
-			if _decks.has(edge) != on_deck:
-				distance += 12.0
 			if (along < -.3 and not _graph.are_points_connected(edge.y,edge.x,false)) or (along > .3 and not _graph.are_points_connected(edge.x,edge.y,false)):
 				distance += 4.0
 		if distance < best:
@@ -359,8 +371,10 @@ func _add_parking(id: String, label: String, stop: Vector2, driveway: Vector2, k
 	_parking.append(item)
 
 
-func _car_snap(point: Vector2, forward := Vector2.ZERO, on_deck := false) -> Dictionary:
+func _car_snap(point: Vector2, forward := Vector2.ZERO, on_deck := false, follow_lane := false) -> Dictionary:
 	for stop: Dictionary in _parking:
+		if follow_lane and (on_deck != _decks.has(stop._snap.edge) or _closed.has(stop._snap.edge)):
+			continue
 		var parked := _vec(stop.stop)
 		var road: Vector2 = stop._snap.at
 		if parked.distance_squared_to(road) < 0.01:
@@ -368,7 +382,7 @@ func _car_snap(point: Vector2, forward := Vector2.ZERO, on_deck := false) -> Dic
 		var spur := Geometry2D.get_closest_point_to_segment(point, parked, road)
 		if point.distance_squared_to(spur) < 2.25 and point.distance_squared_to(road) > 0.04:
 			return {"edge": stop._snap.edge, "at": road, "parking": stop.id}
-	return _nearest(point,forward,on_deck)
+	return _nearest(point,forward,on_deck,follow_lane)
 
 
 func _road_path(start: Dictionary, finish: Dictionary) -> Array:

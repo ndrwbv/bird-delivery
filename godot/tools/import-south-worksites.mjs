@@ -7,6 +7,7 @@ import {createRequire} from 'node:module';
 import {createServer} from 'vite';
 import * as THREE from '../../src/vendor/three.module.min.js';
 import {captureClub} from './capture-south-club.mjs';
+import {captureDepotGrowth} from './capture-south-growth.mjs';
 
 const {createCanvas}=createRequire(import.meta.url)(process.argv[2]||'@napi-rs/canvas');
 const assets = new URL('../assets/',import.meta.url);
@@ -82,6 +83,8 @@ globalThis.addEventListener??=()=>{};
 const server=await createServer({root:fileURLToPath(new URL('../../',import.meta.url)),configFile:false,appType:'custom',
   server:{middlewareMode:true,hmr:false,watch:null,ws:false},optimizeDeps:{noDiscovery:true,include:[]},logLevel:'silent',
   plugins:[{name:'summer-shop-geometry',transform(s,id){
+    if(id.endsWith('/src/game/growth.js'))return s+'\nexport function nativeGrowth(api,d,s){A=api;buildDecor(d,0,s);return DECOR.get(d);} export function nativePoster(){POSTER_MAT=null;return posterMat().map.image;}';
+    if(id.endsWith('/src/game/pizzadome.js'))return s+'\nexport {signGeo};';
     if(id.endsWith('/src/game/horsebox.js'))return s+'\nexport function nativeTrailer(api){A=api;build();return GEO;}';
     if(id.endsWith('/src/game/nightlife.js')){
       const start=s.indexOf('  for (const q of C.dancers) {',s.indexOf('function clubStep'));
@@ -146,11 +149,18 @@ function section(shapes,origin){
   const packed=deflateSync(body);
   return Buffer.concat([u32(packed.length),u32(body.length),packed]);
 }
-const horsebox=(await load('horsebox')).nativeTrailer(api);
-await writeFile(new URL('south-horsebox.bin',assets),Buffer.concat(
-  ['body','lights','horse','tail'].map(part=>section([horsebox[part]],[0,0,0]))
-));
+if(!process.argv.includes('--depot-only')){
+  const horsebox=(await load('horsebox')).nativeTrailer(api);
+  await writeFile(new URL('south-horsebox.bin',assets),Buffer.concat(
+    ['body','lights','horse','tail'].map(part=>section([horsebox[part]],[0,0,0]))
+  ));
+}
 if(process.argv.includes('--horsebox-only')){
+  await server.close();
+  process.exit(0);
+}
+await captureDepotGrowth({api,load,server,section,assets,read,writeFile,createCanvas,THREE,original});
+if(process.argv.includes('--depot-only')){
   await server.close();
   process.exit(0);
 }

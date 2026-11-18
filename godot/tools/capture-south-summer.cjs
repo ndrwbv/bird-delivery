@@ -63,7 +63,16 @@ async function capture() {
         const b = d.BALC.spot(i);
         if (b.x>1950 && b.x<5950 && b.z>1200 && b.z<4500) balc.push(fields(b));
       }
-      return {version:'v0.36.0', origin:'original global x/z', late:d.LATE.left(), benches, balc,
+      const [cx,cz] = d.BEACH.at(0,0);
+      const step = 4;
+      const x = Math.floor((cx-112)/step)*step;
+      const z = Math.floor((cz-112)/step)*step;
+      const width = 57, depth = 57, heights = [];
+      for (let row=0; row<depth; row++) {
+        for (let col=0; col<width; col++) heights.push(Math.round(d.groundH(x+col*step,z+row*step)*100)/100);
+      }
+      const shoreHeight = {x,z,step,width,depth,heights};
+      return {version:'v0.36.0', origin:'original global x/z', late:d.LATE.left(), benches, balc, shoreHeight,
         pitches:rows(d.PITCHES), gym:rows(d.WORK.SITES), kites:rows(d.KITES.SPOTS), courts:rows(d.COURTS.LIST),
         hookah:d.HOOKAH.SPOTS.map(s => ({b:fields(s.b),n:s.n})), ramps:rows(d.RAMPS), jumps:rows(d.JUMPS.LIST)};
     });

@@ -4,6 +4,8 @@ const ROAD_CELL := 48.0
 const SEAM_METERS := 24.0
 const PAVEMENT := 0
 const GRASS := 1
+const SHORE_PATH := "res://assets/south-beach-height.json"
+const SHORE_BLEND := 12.0
 
 var core: Rect2
 var detail: RefCounted
@@ -12,6 +14,11 @@ var step: float
 var columns: int
 var rows: int
 var heights: PackedFloat32Array
+var shore_bounds := Rect2()
+var shore_step := 4.0
+var shore_columns := 0
+var shore_rows := 0
+var shore_heights := PackedFloat32Array()
 var road_cells := {}
 var road_sections: Array[Dictionary] = []
 
@@ -25,6 +32,7 @@ func setup(data: Dictionary, bounds: Array, detail_ground: RefCounted) -> void:
 	columns = int(spec.width)
 	rows = int(spec.depth)
 	heights = PackedFloat32Array(spec.heights)
+	_load_shore()
 	for road: Dictionary in data.roads:
 		var half := float(road.width)*0.5
 		for segment in sections(road.points,half,half+sidewalk_width(road),road):
@@ -40,6 +48,18 @@ func setup(data: Dictionary, bounds: Array, detail_ground: RefCounted) -> void:
 					if not road_cells.has(key):
 						road_cells[key] = []
 					road_cells[key].append(segment)
+
+
+func _load_shore() -> void:
+	var shore: Variant = JSON.parse_string(FileAccess.get_file_as_string(SHORE_PATH))
+	if not shore is Dictionary or int(shore.width)<2 or int(shore.depth)<2:
+		return
+	shore_columns = int(shore.width)
+	shore_rows = int(shore.depth)
+	shore_step = float(shore.step)
+	shore_heights = PackedFloat32Array(shore.heights)
+	if shore_heights.size()==shore_columns*shore_rows and shore_step>0.0:
+		shore_bounds = Rect2(Vector2(shore.x,shore.z),Vector2(shore_columns-1,shore_rows-1)*shore_step)
 
 
 static func sidewalk_width(road: Dictionary) -> float:
@@ -101,17 +121,28 @@ static func sections(raw: Array, half: float, sidewalk: float, road := {}) -> Ar
 
 
 func _raw(x: float, z: float) -> float:
-	var gx := clampf((x-origin.x)/step, 0, columns-1)
-	var gz := clampf((z-origin.y)/step, 0, rows-1)
-	var ix := mini(floori(gx), columns-2)
-	var iz := mini(floori(gz), rows-2)
+	var base := _sample_grid((x-origin.x)/step,(z-origin.y)/step,columns,rows,heights)
+	var p := Vector2(x,z)
+	if not shore_bounds.has_point(p):
+		return base
+	var inside := p-shore_bounds.position
+	var to_edge := minf(minf(inside.x,inside.y),minf(shore_bounds.size.x-inside.x,shore_bounds.size.y-inside.y))
+	var sampled := _sample_grid(inside.x/shore_step,inside.y/shore_step,shore_columns,shore_rows,shore_heights)
+	return lerpf(base,sampled,smoothstep(0.0,SHORE_BLEND,to_edge))
+
+
+static func _sample_grid(x: float,z: float,width: int,depth: int, values: PackedFloat32Array) -> float:
+	var gx := clampf(x,0,width-1)
+	var gz := clampf(z,0,depth-1)
+	var ix := mini(floori(gx),width-2)
+	var iz := mini(floori(gz),depth-2)
 	var u := gx-ix
 	var v := gz-iz
-	var i := iz * columns + ix
-	var a := heights[i]
-	var b := heights[i+1]
-	var c := heights[i+columns]
-	var d := heights[i+columns+1]
+	var i := iz * width + ix
+	var a := values[i]
+	var b := values[i+1]
+	var c := values[i+width]
+	var d := values[i+width+1]
 	# Both the mesh and this sampler split from (0,0) to (1,1).
 	if u >= v:
 		return a + (b-a)*u + (d-b)*v

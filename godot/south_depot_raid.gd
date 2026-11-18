@@ -1,5 +1,7 @@
 extends Node3D
 
+signal tables_smashed
+
 const COLOR := [Color("#4fc3f7"),Color("#ffcc1a")]
 const CRY := [["роллы — сила!","пицца — прошлый век!","васаби вам в тесто!","это наш район!"],
 	["слава королеве!","бургер — король!","пицца — не еда!","это наш район!"]]
@@ -192,6 +194,7 @@ func _damage_tables() -> void:
 	broken = true
 	if is_instance_valid(furniture):
 		furniture.smash_tables(depot,17.0)
+	tables_smashed.emit()
 
 
 func _shatter() -> void:

@@ -67,13 +67,15 @@ var music_row := HBoxContainer.new()
 var music_name := Button.new()
 var music_toggle := Button.new()
 var _configured := false
+var use_saved_preferences := true
 var driving_camera: Camera3D
 var sunlight: DirectionalLight3D
 
-func setup() -> void:
+func setup(temporary := false) -> void:
 	if _configured:
 		return
 	_configured = true
+	use_saved_preferences = not temporary
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 6
 	hide()
@@ -92,7 +94,8 @@ func setup() -> void:
 			for source: String in bundle[code]:
 				catalog.add_message(source, bundle[code][source])
 			TranslationServer.add_translation(catalog)
-	prefs.load(PREFS)
+	if use_saved_preferences:
+		prefs.load(PREFS)
 	selected_locale = str(prefs.get_value("menu","language",""))
 	if selected_locale in CODES:
 		TranslationServer.set_locale(selected_locale)
@@ -721,6 +724,8 @@ func _credits_page() -> void:
 
 func _save(section: String, key: String, value: Variant) -> void:
 	prefs.set_value(section,key,value)
+	if not use_saved_preferences:
+		return
 	var error := prefs.save(PREFS)
 	if error != OK:
 		push_warning("Menu settings: " + error_string(error))

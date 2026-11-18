@@ -145,6 +145,8 @@ func _land(mesh: SurfaceTool, area: Rect2, roads: Array, greens: Array) -> void:
 	var spacing := ground.step
 	if area.intersects(ground.core.grow(GROUND.SEAM_METERS)):
 		spacing = minf(spacing,4.0)
+	if area.intersects(ground.shore_bounds):
+		spacing = minf(spacing,ground.shore_step)
 	var xs := _lines(area.position.x, area.end.x, ground.origin.x, spacing)
 	var zs := _lines(area.position.y, area.end.y, ground.origin.y, spacing)
 	var low := INF

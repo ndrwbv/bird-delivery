@@ -50,8 +50,9 @@ var cue_pool: Array[AudioStreamPlayer] = []
 var spatial_pool: Array[AudioStreamPlayer3D] = []
 var requests: Array[Dictionary] = []
 var _ready_audio := false
+var use_saved_preferences := true
 
-func setup(car: Node3D) -> void:
+func setup(car: Node3D, temporary := false) -> void:
 	if _ready_audio:
 		return
 	_ready_audio = true
@@ -59,9 +60,11 @@ func setup(car: Node3D) -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	ear = car
 	unavailable = MOTOR_AUDIO.dummy_driver()
-	settings.load(PREFS)
+	use_saved_preferences = not temporary
 	var legacy := ConfigFile.new()
-	legacy.load("user://game_settings.cfg")
+	if use_saved_preferences:
+		settings.load(PREFS)
+		legacy.load("user://game_settings.cfg")
 	muted = bool(settings.get_value("mix","muted",legacy.get_value("sound","mute",false)))
 	music_off = bool(settings.get_value("mix","music_off",false))
 	for k: String in BUS:
@@ -172,7 +175,8 @@ func toggle_music() -> void:
 
 func _save(key: String, value: Variant) -> void:
 	settings.set_value("mix",key,value)
-	settings.save(PREFS)
+	if use_saved_preferences:
+		settings.save(PREFS)
 
 func title() -> String:
 	if music_off or muted:
