@@ -2,19 +2,25 @@ extends RefCounted
 
 const DONATIONS := preload("res://district_donations.gd")
 const RESPECT := preload("res://district_respect.gd")
+const GROWTH := preload("res://restaurant_growth.gd")
 const DEPOT_RADIUS := 7.0
 const FINAL_WINDOW := 75.0
 const T0 := 0.06
+const LUNCH_AT := .06 + 5.0/15.0
 const HOURS := [Vector2(.06,9),Vector2(.66,18),Vector2(.75,21),Vector2(.96,29),Vector2(1.06,33)]
 var profile: RefCounted
 var number := 1
 var duration := 239.85
 var elapsed := 0.0
 var env_time := T0
+var start_time := T0
 var day_end := .82875
+var all_day := false
+var daytime := false
 var slow := .65
 var sun_rate := 0.0
 const UNLOCK_AT := [4,9,14,20,26,33,40]
+const SPEED := [1.0,1.03,1.06,1.09,1.12,1.15,1.18,1.21]
 var tier := 0
 var level := 1
 var orders := 0
@@ -33,6 +39,7 @@ var pay := 0
 var penalties := 0
 var client_fine := 0
 var knocked := 0
+var growth_reached := 0
 var hits := 0
 var hits_at_start := 0
 var issued_deadline := 0.0
@@ -49,13 +56,15 @@ func begin(career: RefCounted) -> void:
 	for threshold in UNLOCK_AT:
 		if int(profile.data.get("counted",0)) >= threshold:
 			tier += 1
-	var daytime := number >= 2 and (number - 2) % 3 == 0
+	daytime = number >= 2 and (number - 2) % 3 == 0
+	all_day = tier >= 1
+	start_time = _phase_at(_next_hour(float(profile.data.get("clock_hour",9.0)))) if all_day and not daytime else T0
+	env_time = start_time
 	day_end = .60 if daytime else .82875
 	slow = .85 if daytime else (.65 if number <= 3 else (1.0 if number <= 8 else 1.3))
 	duration = (day_end - T0) * 480.0 * slow
-	var weighted := .01 / 1.5 + minf(.55, day_end - .07)
-	weighted += clampf(day_end - .62, 0, .15) / 1.5 + maxf(0, day_end - .77) / 2.0
-	sun_rate = weighted / duration
+	day_end += start_time-T0
+	_schedule()
 	level = 1
 	for threshold in [3, 8, 15, 25]:
 		if int(profile.data.xp) >= threshold:
@@ -71,25 +80,67 @@ func tick(delta: float) -> void:
 		env_time = day_end
 		return
 	if elapsed + .000001 >= duration:
-		if day_end < .62:
+		if daytime:
 			env_time = minf(.615, env_time + delta * .15 / (480.0 * slow))
 		else:
-			env_time = fmod(env_time + delta / (480.0 * slow), 1.0)
+			env_time += delta/(480.0*slow)
 	else:
-		var tempo := 1.5 if env_time < .07 or env_time >= .62 else 1.0
-		if env_time >= .77:
-			tempo = 2.0
-		env_time += delta * sun_rate * tempo
+		env_time += delta*sun_rate*_tempo(env_time)
 
 
 func hour() -> float:
-	var t := env_time + 1.0 if env_time < T0 else env_time
+	var t := T0+fposmod(env_time-T0,1.0)
+	if is_equal_approx(t,T0) or is_equal_approx(t,T0+1.0):
+		return 9.0
 	for i in range(1, HOURS.size()):
 		var a: Vector2 = HOURS[i-1]
 		var b: Vector2 = HOURS[i]
 		if t <= b.x:
 			return lerpf(a.y,b.y,inverse_lerp(a.x,b.x,t))
 	return 9.0
+
+
+func lunch_due() -> bool:
+	return not meal_taken and env_time >= LUNCH_AT+ceilf(start_time-LUNCH_AT)
+
+
+func speed_multiplier() -> float:
+	return SPEED[tier]
+
+
+func _schedule() -> void:
+	var slices := ceili((day_end-start_time)/.002)
+	var width := (day_end-start_time)/float(slices)
+	var weighted := 0.0
+	for i in slices:
+		weighted += width/_tempo(start_time+(float(i)+.5)*width)
+	sun_rate = weighted/duration
+
+
+static func _tempo(at: float) -> float:
+	var phase := .07+fposmod(at-.07,1.0)
+	if phase>=.93:
+		return 1.5
+	if phase>=.77:
+		return 2.0
+	return 1.5 if phase>=.62 else 1.0
+
+
+static func _phase_at(value: float) -> float:
+	if is_equal_approx(value,9.0):
+		return T0
+	var h := value+24.0 if value<9.0 else value
+	for i in range(1,HOURS.size()):
+		var a: Vector2 = HOURS[i-1]
+		var b: Vector2 = HOURS[i]
+		if h<=b.y:
+			return lerpf(a.x,b.x,inverse_lerp(a.y,b.y,h))
+	return T0
+
+
+static func _next_hour(value: float) -> float:
+	var local := fposmod(value,24.0)
+	return local if local<12.0 else 9.0
 
 
 func clock_text() -> String:
@@ -112,7 +163,8 @@ func quote(order: Dictionary) -> int:
 	var boxes := maxi(people_here,int(order.get("boxes",people_here)))
 	var portions := float(people_here-1)+.5*float(boxes-people_here)
 	base += roundi(portions*roundi(640*factor/10))*10
-	var fee_before_event := roundi(base * (1.0 + .05*tier) * (1.1 if pace == "tight" else 1.0) / 10.0) * 10
+	var growth: float = GROWTH.PAY[GROWTH.stage(profile.data)]
+	var fee_before_event := roundi(base * (1.0 + .05*tier) * (1.1 if pace == "tight" else 1.0) * growth / 10.0) * 10
 	return fee_before_event + int(order.get("pz",{}).get("add",0))
 
 
@@ -160,7 +212,8 @@ func settle(tips_allowed: bool, failed: bool, story: bool, rich_neighbor := Call
 		var base := roundi(fee * .45) if late else fee
 		var clean := clampf(float(profile.data.get("trash_donated",0))/DONATIONS.TRASH_GOAL,0.0,1.0)
 		var regional_tip: float = {"gang":-.05,"rich":.35,"poor":-.10}.get(client_zone,0.0)
-		var chance := .25 + .1*clean + regional_tip + (.25 if pace == "generous" else (-.05 if pace == "tight" else 0.0))
+		var growth: float = GROWTH.TIPS[GROWTH.stage(profile.data)]
+		var chance := .25 + .1*clean + regional_tip + growth + (.25 if pace == "generous" else (-.05 if pace == "tight" else 0.0))
 		var multiplier: float = RESPECT.TIPS[RESPECT.rank(profile.data)] * (1.5 if pace == "generous" else 1.0)
 		if lunch_tips:
 			chance += .2
@@ -216,6 +269,7 @@ func finish(full: bool) -> Dictionary:
 	profile.data.wallet = int(profile.data.wallet) + bonus
 	profile.data.stars = int(profile.data.stars) + stars
 	profile.data.shifts = number
+	profile.data.clock_hour = snappedf(fposmod(hour(),24.0),.01)
 	if delivered >= 3:
 		profile.data.counted = int(profile.data.get("counted",0)) + 1
 	profile.data.deliveries = int(profile.data.get("deliveries",0)) + delivered

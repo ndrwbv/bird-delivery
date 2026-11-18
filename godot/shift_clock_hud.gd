@@ -85,7 +85,8 @@ func queue_notice(value: String, kind: String, duration := 4.0) -> void:
 	for item in waiting:
 		if item.text == value:
 			return
-	waiting.append({"text":value,"kind":kind,"priority":int(PRIORITY.get(kind,5)),"age":0.0,"duration":duration,"wait":60.0 if kind=="ach" else 20.0})
+	var wait := 60.0 if kind in ["ach","daily"] else (25.0 if kind=="note" else 20.0)
+	waiting.append({"text":value,"kind":kind,"priority":int(PRIORITY.get(kind,5)),"age":0.0,"duration":duration,"wait":wait})
 	if kind in ["boss","crew","line"] and phone:
 		phone.message(value,kind!="crew",false,false)
 
@@ -155,6 +156,24 @@ func _show_notice(item: Dictionary) -> void:
 		phone.set_channel("crew" if item.kind=="crew" else "direct")
 		phone.begin_message()
 	else:
+		var daily: bool=item.kind in ["note","daily"]
+		if daily:
+			var half:=minf(230.0,(get_viewport().get_visible_rect().size.x-32.)*.5)
+			banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+			banner.offset_left=-half
+			banner.offset_right=half
+			banner.offset_top=52
+			banner.offset_bottom=52
+			banner.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+			if item.kind=="daily":
+				get_tree().call_group(&"game_audio",&"cue","task-done")
+		else:
+			banner.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+			banner.offset_left=16
+			banner.offset_right=326
+			banner.offset_top=-320
+			banner.offset_bottom=-248
+			banner.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT
 		banner.text = item.text
 		banner.show()
 

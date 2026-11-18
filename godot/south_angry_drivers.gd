@@ -17,7 +17,7 @@ func clear() -> void:
 
 
 func struck(v: CharacterBody3D, force: float) -> void:
-	if v.owner_lost:
+	if v.wreck or v.owner_lost:
 		return
 	for state in drivers:
 		if state.vehicle==v:
@@ -262,7 +262,7 @@ func step(delta: float, at: Vector2) -> void:
 	chase_cd = maxf(0,chase_cd-delta)
 	for i in range(drivers.size()-1,-1,-1):
 		var s := drivers[i]
-		if not is_instance_valid(s.vehicle) or s.vehicle.is_queued_for_deletion():
+		if not is_instance_valid(s.vehicle) or s.vehicle.is_queued_for_deletion() or s.vehicle.wreck:
 			if is_instance_valid(s.driver):
 				cast.retire(s.driver)
 			drivers.remove_at(i)

@@ -208,11 +208,11 @@ func _update_position() -> void:
 
 
 func impact(approach: float, push: Vector3, active_client: bool,
-			contact_offset: Vector3 = Vector3(0.0,0.48,0.0), lift: float = 0.60) -> int:
+			contact_offset: Vector3 = Vector3(0.0,0.48,0.0), lift: float = 0.60, blast := false) -> int:
 	if defeated or knockdown > 0.0:
 		return Hit.FALL
 	player.active = true
-	if approach < CLIENT_GLANCE or (active_client and approach < CLIENT_DROP):
+	if not blast and (approach < CLIENT_GLANCE or (active_client and approach < CLIENT_DROP)):
 		if stunned > 0.0:
 			return Hit.GLANCE if approach >= CLIENT_GLANCE else Hit.SHOVE
 		stunned = 0.42
@@ -224,7 +224,7 @@ func impact(approach: float, push: Vector3, active_client: bool,
 
 	if approach >= RECOVERABLE_SPEED:
 		hit_points -= 1
-	defeated = approach >= FATAL_SPEED or hit_points <= 0 or active_client
+	defeated = blast or approach >= FATAL_SPEED or hit_points <= 0 or active_client
 	facing_before_hit = rotation.y
 	knockdown = 30.0 if defeated else 2.75
 	knockdown_elapsed = 0.0

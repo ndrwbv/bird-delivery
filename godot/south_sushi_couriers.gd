@@ -9,10 +9,16 @@ var shops: Array[Dictionary] = []
 var cooldown := 0.0
 var uniform := {}
 var in_district := {}
+var hat: ArrayMesh
 
 func bind(mopeds: Node3D, events: Node3D) -> void:
 	owner = mopeds
 	director = events
+	var cap := SurfaceTool.new()
+	cap.begin(Mesh.PRIMITIVE_TRIANGLES)
+	mopeds._box(cap,Vector3(.29,.13,.30),Vector3(0,.235,.01),BLUE)
+	mopeds._box(cap,Vector3(.22,.03,.20),Vector3(0,.18,-.19),BLUE.darkened(.3))
+	hat = mopeds._commit(cap)
 	shops.clear()
 	for entry in events.worksites.sites:
 		var site: Dictionary = entry.info
@@ -39,6 +45,14 @@ func rider(index: int, at: Vector2) -> Node3D:
 			paint.set_shader_parameter("new_trousers",Vector3(tint.r,tint.g,tint.b))
 			uniform[model] = paint
 		view.material_override = uniform[model]
+	var head := BoneAttachment3D.new()
+	head.name = "SushiCap"
+	person.skeleton.add_child(head)
+	head.bone_name = &"Joint_7"
+	var view := MeshInstance3D.new()
+	view.mesh = hat
+	view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	head.add_child(view)
 	return person
 
 func _job(shop: Dictionary) -> Vector2:

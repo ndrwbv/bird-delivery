@@ -158,7 +158,7 @@ func apply(order: Dictionary, manifest: RefCounted, shift: RefCounted, book: Ref
 	for exclusion in ["story","tutorial","edge","beach","fest","hol","quick"]:
 		if order.get(exclusion,false):
 			return false
-	var now: float = shift.hour()
+	var now: float = fposmod(shift.hour(),24.0)
 	if issued>=int(catalog.rules.MAX) or now<float(twist.from) or now>=float(twist.to) or randf()>=float(twist.share):
 		return false
 	var selected := _delivery_site(book,order)

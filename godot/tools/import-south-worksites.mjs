@@ -82,6 +82,7 @@ globalThis.addEventListener??=()=>{};
 const server=await createServer({root:fileURLToPath(new URL('../../',import.meta.url)),configFile:false,appType:'custom',
   server:{middlewareMode:true,hmr:false,watch:null,ws:false},optimizeDeps:{noDiscovery:true,include:[]},logLevel:'silent',
   plugins:[{name:'summer-shop-geometry',transform(s,id){
+    if(id.endsWith('/src/game/horsebox.js'))return s+'\nexport function nativeTrailer(api){A=api;build();return GEO;}';
     if(id.endsWith('/src/game/nightlife.js')){
       const start=s.indexOf('  for (const q of C.dancers) {',s.indexOf('function clubStep'));
       const end=s.indexOf('  for (const g of C.guests)',start);
@@ -144,6 +145,14 @@ function section(shapes,origin){
   const body=Buffer.concat([variant(36,p.length/3,bufferOf(p,Float32Array)),variant(36,n.length/3,bufferOf(n,Float32Array)),variant(37,c.length/4,bufferOf(c,Float32Array)),variant(30,ix.length,bufferOf(ix,Int32Array))]);
   const packed=deflateSync(body);
   return Buffer.concat([u32(packed.length),u32(body.length),packed]);
+}
+const horsebox=(await load('horsebox')).nativeTrailer(api);
+await writeFile(new URL('south-horsebox.bin',assets),Buffer.concat(
+  ['body','lights','horse','tail'].map(part=>section([horsebox[part]],[0,0,0]))
+));
+if(process.argv.includes('--horsebox-only')){
+  await server.close();
+  process.exit(0);
 }
 const originalRandom=Math.random;
 let visualSeed=0x361107;

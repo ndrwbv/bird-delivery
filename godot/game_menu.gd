@@ -40,6 +40,8 @@ var hint := Label.new()
 var mode_ids := PackedStringArray()
 var quick := {"mode":"normal", "weather":"auto", "len":"medium"}
 var quick_mode_field: OptionButton
+var route_preference: CanvasLayer
+var daily: Node
 var selected_locale := ""
 var completed_shifts := 0
 var summary := {}
@@ -148,6 +150,12 @@ func bind_steam(platform: Node) -> void:
 	steam_platform = platform
 	if active() and current_page == "language":
 		_show_page("language")
+
+func bind_route(source: CanvasLayer) -> void:
+	route_preference=source
+
+func bind_daily(source: Node) -> void:
+	daily=source
 
 func bind_profile(owner: RefCounted, honors: CanvasLayer, modes: Node) -> void:
 	if profile_tool:
@@ -441,6 +449,13 @@ func _pause_page() -> void:
 				order.add_child(_wrapped(content,18))
 			if bool(invoice.get("can_cancel",false)) and cancel_order_requested.has_connections():
 				_button(order,"Отменить заказ",_leave.bind(cancel_order_requested))
+		if daily and not daily.tasks.is_empty():
+			order.add_child(HSeparator.new())
+			order.add_child(_label("задания на день",16,FAINT))
+			for task: Dictionary in daily.tasks:
+				var progress := "✓" if task.done else ("%d/%d" % [task.got,task.n])
+				var row := _wrapped("%s   %s   +%d ₽" % [progress,tr(task.label),task.pay],15)
+				order.add_child(row)
 	focus_default = _tile("продолжить","resume",_leave.bind(resume_requested))
 	if map_requested.has_connections():
 		_tile("карта","map",_open_map)
@@ -528,6 +543,8 @@ func _settings_page() -> void:
 		0:
 			_field(card,"курьер",tr("Женя"))
 			_field(card,"район",tr("Юг"))
+			if route_preference:
+				_option(card,"путь на дороге",PackedStringArray(["выкл","вкл"]),int(route_preference.preference()),func(i:int): route_preference.set_preference(i==1))
 			if profile_tool and not pause_menu:
 				_button(card,"сохранение карьеры",_show_page.bind("profile"))
 			_button(card,"авторы и лицензии",_show_page.bind("credits"))
@@ -650,7 +667,10 @@ func _sound_slider(card: Container, key: String, title: String) -> void:
 		)
 
 func _controls(card: Container) -> void:
-	for line: Array in [["газ","W / ↑","RT"],["тормоз","S / ↓","LT"],["руль","A D / ← →","L"],["ручник","Space","B"],["нитро","Shift / N","RB"],["карта","Tab","Y"],["пауза","Esc / P","Menu"]]:
+	var rows := [["газ","W / ↑","RT"],["тормоз","S / ↓","LT"],["руль","A D / ← →","L"],["ручник","Space","B"],
+		["нитро","Shift / N","A / RB"],["клаксон","H","LB"],["карта","Tab","Y"],["камера","V","View"],
+		["звук","M","R3"],["музыка","B","L3"],["следующая станция","F","↓"],["пауза","Esc / P","Menu"]]
+	for line: Array in rows:
 		_field(card,line[0],line[1]+"     ·     "+line[2])
 
 func _profile_page() -> void:

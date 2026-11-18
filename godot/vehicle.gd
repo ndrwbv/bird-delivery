@@ -38,6 +38,9 @@ var motor_audio := MOTOR_AUDIO.new()
 var starter := STARTER.new()
 var armor_level := 0
 var tuned_speed := MAX_SPEED
+var equipment_speed := MAX_SPEED
+var speed_multiplier := 1.0
+var acceleration := ACCELERATION
 var equipment := preload("res://semerka_addons.gd").new()
 var hearts_max := 7.0
 var bonus_heart := false
@@ -126,12 +129,16 @@ func apply_equipment(loadout: Dictionary) -> void:
 	armor_level = clampi(int(loadout.get("armor",0)),0,3)
 	hearts_max = 7.0 + armor_level + (1.0 if bonus_heart else 0.0)
 	hearts = clampf(hearts + (hearts_max - old_max),0,hearts_max)
-	tuned_speed = MAX_SPEED*(1.0 + .04*clampi(int(loadout.get("engine",0)),0,3))
+	equipment_speed = MAX_SPEED*(1.0 + .04*clampi(int(loadout.get("engine",0)),0,3))
+	tuned_speed = equipment_speed*speed_multiplier
 	damage.paint_body(Color.from_string(str(loadout.get("paint","#ebe6d8")),Color("#ebe6d8")))
 	equipment.configure(bool(loadout.get("wings",false)),bool(loadout.get("gun",false)))
 
 
-func begin_shift(number: int, pace: String, engine_state: Dictionary = {}) -> void:
+func begin_shift(number: int, pace: String, engine_state: Dictionary = {}, regional_speed := 1.0) -> void:
+	speed_multiplier = regional_speed
+	tuned_speed = equipment_speed*speed_multiplier
+	acceleration = ACCELERATION*speed_multiplier
 	if not engine_state.is_empty():
 		engine.restore(engine_state)
 	engine.begin_shift(number)
@@ -243,9 +250,9 @@ func _physics_process(delta: float) -> void:
 		longitudinal += 55.0 * delta
 	boost_active = burning
 	if throttle and not airborne and not engine.dead:
-		longitudinal += ACCELERATION*maxf(0.25,1.0-longitudinal/tuned_speed)*(1.0-0.5*minf(1.0,sand))*(1.0-0.3*snow)*delta
+		longitudinal += acceleration*maxf(0.25,1.0-longitudinal/tuned_speed)*(1.0-0.5*minf(1.0,sand))*(1.0-0.3*snow)*delta
 	if brake:
-		var retard := BRAKES*(1.0-road_wet*0.25) if longitudinal > 0.4 else (0.0 if engine.dead else ACCELERATION*0.5)
+		var retard := BRAKES*(1.0-road_wet*0.25) if longitudinal > 0.4 else (0.0 if engine.dead else acceleration*0.5)
 		longitudinal -= retard*delta
 	if engine.dead:
 		longitudinal -= longitudinal*0.55*delta
@@ -474,7 +481,7 @@ func collect_road_bonus(type: int) -> void:
 			damage.set_hearts(hearts)
 
 
-func collision_damage(impact: float, other_car: bool, contact: Vector3, normal: Vector3) -> void:
+func collision_damage(impact: float, other_car: bool, contact: Vector3, normal: Vector3, impulse_override := -1.0) -> void:
 	if airborne or ramp_safe > 0.0:
 		return
 	if shield_time > 0.0:
@@ -483,7 +490,9 @@ func collision_damage(impact: float, other_car: bool, contact: Vector3, normal: 
 	if knock_cooldown > 0.0:
 		return
 	var impulse := 0.0
-	if other_car and impact >= 8.5:
+	if impulse_override>=0.0:
+		impulse = impulse_override
+	elif other_car and impact >= 8.5:
 		impulse = 0.5 if impact < 12.5 else maxf(0.8,(impact-5.0)*0.14)
 	elif not other_car and impact >= 15.0:
 		impulse = (impact-13.0)*0.16

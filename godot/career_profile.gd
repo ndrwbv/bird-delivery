@@ -19,12 +19,13 @@ func _identity() -> String:
 func _valid(value: Variant) -> bool:
 	if not value is Dictionary or value.get("version") != 1 or not value.has("wallet"):
 		return false
-	for key: String in ["wallet","shifts","stars","xp","skill","skill_shift","resets","counted","deliveries","knocked","seed","respect","trash_donated","gang_donated"]:
+	for key: String in ["wallet","shifts","stars","xp","skill","skill_shift","resets","counted","deliveries","knocked","seed","respect","trash_donated","gang_donated","clock_hour","south_growth"]:
 		if value.has(key) and (typeof(value[key]) not in [TYPE_INT,TYPE_FLOAT] or not is_finite(float(value[key]))):
 			return false
-	if value.has("recent") and not value.recent is Array:
-		return false
-	for key: String in ["best","semerka","engine","pending_transfer","crew_totals"]:
+	for key: String in ["recent","daily_last","crew_last"]:
+		if value.has(key) and not value[key] is Array:
+			return false
+	for key: String in ["best","semerka","engine","pending_transfer","crew_totals","final_summary","pizzeria_events"]:
 		if value.has(key) and not value[key] is Dictionary:
 			return false
 	if value.has("save_id") and (not value.save_id is String or str(value.save_id).is_empty()):

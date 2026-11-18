@@ -1,6 +1,7 @@
 extends Node3D
 
 signal prop_lost(id: int)
+signal player_knocked(kind: String)
 
 const MASK_WIDTH := 4096
 const PROP_LAYER := 8
@@ -78,6 +79,7 @@ func impact(contact: KinematicCollision3D, approach: float, motion: Vector3) -> 
 	PhysicsServer3D.body_set_shape_disabled(body,shape_index,true)
 	down[id] = true
 	prop_lost.emit(id)
+	player_knocked.emit(item.kind)
 	mask_image.set_pixel(id,0,Color.WHITE)
 	mask_dirty = true
 	set_process(true)

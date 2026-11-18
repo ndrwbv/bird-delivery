@@ -1,6 +1,7 @@
 extends CharacterBody3D
 
 const ROAD_LAYER := 32
+const TRAILER_LAYER := 1024
 const OBSTACLES := 1 | 2 | 4 | 8 | 16 | ROAD_LAYER
 
 var roads: RefCounted
@@ -8,6 +9,11 @@ var signals: Node3D
 var edge: RefCounted
 var cruise := 12.0
 var shuttle := false
+var ordinary := false
+var traffic_body := false
+var wreck := false
+var horse_rolled := false
+var tow_length := 0.0
 var last_stop := Vector2.INF
 var service_edge: RefCounted
 var line_goal := Vector2.INF
@@ -47,7 +53,7 @@ func setup(ground: RefCounted, model: PackedScene, at: Vector2, yaw: float) -> v
 	collision_layer = ROAD_LAYER
 	collision_mask = OBSTACLES
 	motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
-	ray.collision_mask = OBSTACLES
+	ray.collision_mask = OBSTACLES | TRAILER_LAYER
 	ray.exclude = [get_rid()]
 	var box := BoxShape3D.new()
 	box.size = Vector3(2.02,1.46,NOSE*2.0)
@@ -171,20 +177,20 @@ func _make_lamps() -> void:
 
 
 func struck(strength: float, shot: Vector3) -> void:
-	if strength < 2.7:
+	if wreck or strength < 2.7:
 		return
 	_impact_motion(strength,shot)
 	player_impact.emit(self,strength)
 
 
 func displace(strength: float, shot: Vector3) -> void:
-	if strength >= 2.7:
+	if not wreck and strength >= 2.7:
 		_impact_motion(strength,shot)
 
 
 func _impact_motion(strength: float, shot: Vector3) -> void:
 	going = false
-	coast += shot.normalized()*clampf(strength*0.26,1.0,9.0)
+	coast += shot.normalized()*clampf(strength*0.26,1.0,15.0 if tow_length>0.0 else 9.0)
 	visual.rotation.z = clampf(shot.normalized().dot(basis.x)*strength*0.004,-0.12,0.12)
 	visual.position.y = maxf(-0.10,visual.position.y-minf(0.085,strength*0.003))
 	if lamps:
@@ -354,7 +360,7 @@ func _road_changed(a: Vector2,b: Vector2) -> void:
 
 # Return from the current physical position after being pushed off the route.
 func resume_flow(goal: RefCounted = null) -> bool:
-	if roads==null or owner_lost:
+	if wreck or roads==null or owner_lost:
 		return false
 	var here := Vector2(position.x,position.z)
 	var start: RefCounted = roads.nearest(here,Vector2(-basis.z.x,-basis.z.z))

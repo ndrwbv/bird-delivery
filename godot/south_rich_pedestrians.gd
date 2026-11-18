@@ -1,6 +1,7 @@
 extends Node3D
 
 const POSE:=preload("res://delivery_actor_pose.gd")
+const TROUSERS:={0:Vector3(10,13,27),2:Vector3(3,4,5),4:Vector3(65,50,26)}
 const LINES:=["Шофёр, машину!","Без сахара, я сказал","Продавай всё!","Опять пробки…","Не наш уровень"]
 const EN:=["Driver, my car!","No sugar, I said","Sell everything!","Traffic again…","Beneath us"]
 var yard:Node
@@ -64,6 +65,11 @@ func _dress(person:Dictionary,at:Vector2,tone:String) -> Node3D:
 		if paint is ShaderMaterial:
 			var c:=Color(tone).srgb_to_linear()
 			paint.set_shader_parameter(&"new_shirt",Vector3(c.r,c.g,c.b))
+			if TROUSERS.has(int(person.model)):
+				paint.set_shader_parameter(&"change_trousers",true)
+				paint.set_shader_parameter(&"original_trousers",TROUSERS[int(person.model)]/255.0)
+				var trousers:=Color("#1f2328").srgb_to_linear() if person.female else c
+				paint.set_shader_parameter(&"new_trousers",Vector3(trousers.r,trousers.g,trousers.b))
 		jackets[id]=paint
 	for mesh in actor.model.find_children("*","MeshInstance3D",true,false):mesh.material_override=jackets[id]
 	actor.player.get_animation("walk").loop_mode=Animation.LOOP_LINEAR
@@ -75,6 +81,24 @@ func _accessory(parent:Node3D,key:String,parts:Array) -> void:
 	mesh.mesh=accessories[key]
 	mesh.material_override=yard.props_paint
 	parent.add_child(mesh)
+
+func _headwear(actor:Node3D,sunglasses:bool,cap:bool) -> void:
+	var head:=BoneAttachment3D.new()
+	actor.skeleton.add_child(head)
+	var joint:int=actor.skeleton.find_bone("Joint_7")
+	head.bone_idx=joint
+	var world:Transform3D=actor.skeleton.global_transform*actor.skeleton.get_bone_global_pose(joint)
+	var anchor:=Node3D.new()
+	head.add_child(anchor)
+	anchor.transform=Transform3D(world.basis.inverse()*actor.global_basis,Vector3.ZERO)
+	if cap:
+		_accessory(anchor,"driver_cap",[[.27,.085,.25,"#24252c",0,.22,0,0,0,0],[.205,.018,.105,"#13161b",0,.175,.134,0,0,0]])
+	else:
+		var parts:Array=[[.07,.018,.022,"#27272a",0,.065,.108,0,0,0],[.105,.066,.018,"#23242a",-.066,.064,.107,0,0,0],[.105,.066,.018,"#23242a",.066,.064,.107,0,0,0]]
+		if not sunglasses:
+			parts.append([.077,.044,.008,"#898d91",-.066,.065,.12,0,0,0])
+			parts.append([.077,.044,.008,"#898d91",.066,.065,.12,0,0,0])
+		_accessory(anchor,"sun_glasses" if sunglasses else "spectacles",parts)
 
 func _spawn(observer:Vector2) -> void:
 	var roads:Array=traffic.roads.around(observer,175)
@@ -92,6 +116,7 @@ func _spawn(observer:Vector2) -> void:
 			person=yard.people.worker(random.randi())
 		var colors:=["#8a6a4e","#e8e0d4","#4a3a30","#b89a7a","#d8c8b0","#2b2a30"] if female else ["#1f2328","#2b2f3a","#3a3036","#2e3a4a","#4a4540"]
 		var actor:=_dress(person,at,colors[random.randi_range(0,colors.size()-1)])
+		_headwear(actor,random.randf()<.75,false)
 		actor.rotation.y=atan2(e.dir.x,e.dir.y)
 		actor.player.play(&"walk")
 		var grip:=BoneAttachment3D.new()
@@ -138,6 +163,7 @@ func _walk(g:Dictionary,observer:Vector2,delta:float) -> void:
 	actor.rotation.y=lerp_angle(actor.rotation.y,atan2(facing.x,facing.y),1-exp(-7*delta))
 	actor.position=Vector3(target.x,yard.terrain.at(target.x,target.y),target.y)
 	if actor.player.current_animation!=&"walk":actor.player.play(&"walk",.15,g.speed)
+	if not g.cross.is_empty():g.cross.occupied=absf((target-g.cross.p).dot(Vector2(-g.cross.dir.y,g.cross.dir.x)))<g.cross.width*.5+.4
 
 func _park(observer:Vector2) -> void:
 	if not chauffeur.is_empty():return
@@ -179,6 +205,7 @@ func _driver() -> void:
 		if not p.female:break
 		p=yard.people.worker(random.randi())
 	var driver:=_dress(p,chauffeur.home,"#1f2328")
+	_headwear(driver,false,true)
 	driver.rotation.y=chauffeur.yaw
 	driver.player.play(&"idle")
 	driver.player.advance(0)

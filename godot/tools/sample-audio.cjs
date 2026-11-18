@@ -84,6 +84,8 @@ fx:(name,cb)=>cb(s)};
     else if(id in tones){const [f,d,v]=tones[id];s.blip(f,d,'square',v);if(id==='honk')setTimeout(()=>s.blip(420,.2,'square',.07),170)}
     else if(id in noiseFX){s.noise(...noiseFX[id])}
     else if(id==='repair') [0,140,300,420].forEach((d,i)=>setTimeout(()=>s.blip(900+i*140,.06,'square',.08),d));
+    else if(id==='task-done') [784,1046,1568].forEach((f,i)=>setTimeout(()=>s.blip(f,i===2?.22:.09,'triangle',.12),i*80));
+    else if(id==='horse') [880,1180,760].forEach((f,i)=>setTimeout(()=>s.blip(f,.12,'sawtooth',.07),i*110));
     else if(id==='engine-stall'){s.blip(70,.35,'sawtooth',.2);setTimeout(()=>s.blip(52,.4,'square',.14),160);s.noise(.3,.2)}
     else if(id==='engine-crank'){s.noise(.12,.22);s.blip(120,.14,'sawtooth',.16)}
     else throw Error(id);
@@ -100,7 +102,7 @@ fx:(name,cb)=>cb(s)};
   }`));
   for(const [i,id] of ['asphalt','rain','lanterns','snow','beach','mandarins'].entries()) if (!fs.existsSync(path.join(dir,id+'.ogg'))) await evalJS('chip('+i+')');
   for(const id of ['city','wind','birds','crickets','stairwell','storm-wind','rain-roof','crowd','construction']) if (!fs.existsSync(path.join(dir,'amb-'+id+'.ogg'))) await evalJS('amb('+JSON.stringify('amb-'+id)+')');
-  const cues='coin order tick boom fail nitro-pick nitro thud ui-click ui-deny squish door-open door-close box trunk go back coffee receipt bet reel-tick reel-stop honk hurt glass smash bump splash drown whoosh repair engine-stall engine-crank'.split(' ');
+  const cues='coin order tick boom fail nitro-pick nitro thud ui-click ui-deny squish door-open door-close box trunk go back coffee receipt bet reel-tick reel-stop honk hurt glass smash bump splash drown whoosh repair task-done horse engine-stall engine-crank'.split(' ');
   for(const [idx,prefix] of ['stairs-','intercom-'].entries()) for(const m of recipeBook[idx].matchAll(/^    (\w+):/gm)) cues.push(prefix+m[1]);
   for (const id of cues) if (!fs.existsSync(path.join(dir,id+'.ogg'))) await evalJS('fx('+JSON.stringify(id)+')');
   for (const id of ['wall','car','pole','fence','person','bin','tree','curb','rail']) for(let i=0;i<3;i++) if(!fs.existsSync(path.join(dir,'hit-'+id+'-'+['light','mid','heavy'][i]+'.ogg'))) await evalJS('hit('+JSON.stringify(id)+','+i+')');

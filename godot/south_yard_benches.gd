@@ -50,6 +50,7 @@ func _add(spot:Dictionary) -> void:
 	body.collision_layer=8
 	body.collision_mask=0
 	body.set_meta(&"summer_prop",_impact.bind(id))
+	body.set_meta(&"daily_prop","bench")
 	body.position=Vector3(spot.at.x,yard.terrain.land_height(spot.at.x,spot.at.y),spot.at.y)
 	body.rotation.y=spot.face
 	add_child(body)

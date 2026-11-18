@@ -1,6 +1,7 @@
 extends RefCounted
 
 const PIZZAS := ["пепперони","маргарита","четыре сыра","мясная","гавайская","птичий микс","ветчина и сыр","диабло","карбонара"]
+const GROWTH := preload("res://restaurant_growth.gd")
 const STACK_COUNTS := [2,2,2,3,3,3,4,4,5,6,8]
 const LIMITS := [2,20,35,55,80,110]
 const SIZE_WEIGHTS := [28,18,9,6,3,2]
@@ -78,6 +79,8 @@ func _make_stops(first: Dictionary, shift: RefCounted, book: RefCounted, life: i
 		if life >= LIMITS[i]:
 			cap = i + 2
 			time_factor = TIME_FACTOR[i]
+	if cap > 1:
+		cap = clampi(cap+int(GROWTH.SIZE[GROWTH.stage(shift.profile.data)]),2,7)
 	cap = mini(cap, roundi(lerpf(3,7,clampf(skill/5.0,0,1))))
 	cap = mini(cap, 2 if last_size >= 4 else last_size+3)
 	cap = mini(cap, int(shift.orders)+1)

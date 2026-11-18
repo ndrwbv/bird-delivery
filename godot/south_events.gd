@@ -61,6 +61,7 @@ var _decoration_materials := {}
 var clock_write := 60.0
 var dialogue: Dictionary
 var special_orders := preload("res://south_pizzeria_events.gd").new()
+var horseboxes := preload("res://south_horseboxes.gd").new()
 var club := preload("res://south_evening_club.gd").new()
 var worksites := preload("res://south_worksites.gd").new()
 var street_works := preload("res://south_roadworks.gd").new()
@@ -118,6 +119,8 @@ func setup(player: CharacterBody3D, terrain: RefCounted, population: Node3D, map
 	garage_zone.setup(self)
 	add_child(special_orders)
 	special_orders.setup(self)
+	add_child(horseboxes)
+	horseboxes.setup(self)
 	add_child(club)
 	club.setup(self)
 	add_child(winter_view)
@@ -127,6 +130,7 @@ func setup(player: CharacterBody3D, terrain: RefCounted, population: Node3D, map
 	holes.struck.connect(func(strength: float): road_thump.emit(strength))
 	translation = Translation.new()
 	translation.locale = "en"
+	translation.add_message("иго-го!","neigh!")
 	for ru: String in shared.en:
 		translation.add_message(ru,shared.en[ru])
 	TranslationServer.add_translation(translation)
@@ -223,6 +227,7 @@ func begin_shift(shift_number: int, seconds: float, free_drive := false, quick_r
 	session_deliveries = career_n
 	session_shifts = career_shifts
 	running = true
+	horseboxes.begin()
 	if not ride and not quick:
 		session_shifts += 1
 	if quick:
@@ -403,6 +408,7 @@ func _end(index: int) -> void:
 
 
 func finish() -> void:
+	horseboxes.clear()
 	special_orders.clear()
 	club.reset()
 	worksites.reset()
@@ -430,6 +436,7 @@ func step(delta: float, live: bool, hour: float) -> void:
 		return
 	elapsed += delta
 	special_orders.step(delta,hour)
+	horseboxes.step(delta,cast.at(car))
 	club.step(delta,cast.at(car),hour)
 	worksites.step(delta,cast.at(car))
 	holes.step(delta)

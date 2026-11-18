@@ -5,7 +5,7 @@ const MINI_METERS := 495.0
 const INK := Color("#433f30")
 const PAPER := Color("#e8dfcb")
 const OUTSIDE := Color("#c8cabc")
-const ROUTE_COLOR := Color("#216b99")
+const ROUTE_COLOR := Color("#ff8a2b")
 const POI_COLOR := Color("#915a35")
 const GREEN_COLORS := {
 	"park": Color("#c5d2ad"), "wood": Color("#b5c8a0"), "water": Color("#98bfcc"),
@@ -65,8 +65,9 @@ class Frame extends Control:
 
 
 class EdgeArrow extends Node2D:
+	var color := ROUTE_COLOR
 	func _draw() -> void:
-		draw_colored_polygon(PackedVector2Array([Vector2.ZERO, Vector2(-8, 4), Vector2(-8, -4)]), ROUTE_COLOR)
+		draw_colored_polygon(PackedVector2Array([Vector2.ZERO, Vector2(-8, 4), Vector2(-8, -4)]), color)
 
 
 var _streets: Streets
@@ -81,6 +82,8 @@ var _zoom := 1.0
 var _home := Vector2.ZERO
 var _landmarks: Array[Dictionary] = []
 var _route := PackedVector2Array()
+var _walk := PackedVector2Array()
+var _route_color := ROUTE_COLOR
 var _destination := Vector2.ZERO
 var _has_destination := false
 var _player := Vector2.ZERO
@@ -90,6 +93,8 @@ var _incident_label := ""
 
 
 func setup(region: Dictionary, core: Dictionary, full: bool) -> void:
+	if not is_in_group(&"delivery_maps"):
+		add_to_group(&"delivery_maps")
 	_full = full
 	clip_contents = true
 	if not full:
@@ -100,6 +105,7 @@ func setup(region: Dictionary, core: Dictionary, full: bool) -> void:
 	_center = _bounds.get_center() if full else _point(core.spawn)
 	_zoom = 1.0
 	_route.clear()
+	_walk.clear()
 	_landmarks.clear()
 	_has_destination = false
 	_has_player = false
@@ -187,6 +193,22 @@ func set_player(at: Vector2) -> void:
 		_markers.queue_redraw()
 
 
+func set_walk(points: PackedVector2Array) -> void:
+	if points==_walk:return
+	_walk=points
+	if is_instance_valid(_markers):
+		_markers.queue_redraw()
+
+
+func set_route_color(color: Color) -> void:
+	if _route_color==color:return
+	_route_color=color
+	if is_instance_valid(_markers):
+		_markers.queue_redraw()
+		_arrow.color=color
+		_arrow.queue_redraw()
+
+
 func follow(at: Vector2) -> void:
 	if not _full and at != _center:
 		_center = at
@@ -270,7 +292,9 @@ func draw_markers(layer: Node2D) -> void:
 		for point in _route:
 			path.append(point * _scale)
 		layer.draw_polyline(path, Color("#f4efe1"), 4.8, true)
-		layer.draw_polyline(path, ROUTE_COLOR, 2.5, true)
+		layer.draw_polyline(path, _route_color, 2.5, true)
+	if _has_destination and _walk.size()==2:
+		layer.draw_dashed_line(_walk[0]*_scale,_walk[1]*_scale,_route_color,2.0,3.0,true,true)
 	var home := _home * _scale
 	layer.draw_rect(Rect2(home - Vector2.ONE * 3.5, Vector2.ONE * 7.0), Color("#b54e25"))
 	for landmark: Dictionary in _landmarks:
@@ -283,7 +307,7 @@ func draw_markers(layer: Node2D) -> void:
 	if _has_destination:
 		var dest := _destination * _scale
 		layer.draw_circle(dest, 6.0, Color("#fff5dd"), true, -1.0, true)
-		layer.draw_circle(dest, 4.3, ROUTE_COLOR, true, -1.0, true)
+		layer.draw_circle(dest, 4.3, _route_color, true, -1.0, true)
 	if _incident.is_finite():
 		var pin := _incident*_scale
 		layer.draw_circle(pin,8.0,Color("#fdf3db"),true,-1.0,true)

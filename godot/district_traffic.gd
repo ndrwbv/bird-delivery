@@ -9,7 +9,9 @@ const PEOPLE := preload("res://south_street_people.gd")
 const BY_HOUR := [8,6,5,4,4,6,10,18,28,26,22,21,22,22,21,21,23,27,28,27,20,16,13,10]
 
 signal vehicle_struck(vehicle: CharacterBody3D, strength: float)
+signal ordinary_vehicle_spawned(vehicle: CharacterBody3D)
 
+var damage:=preload("res://south_traffic_damage.gd").new()
 var terrain: RefCounted
 var observer: Node3D
 var off := StandardMaterial3D.new()
@@ -28,6 +30,8 @@ var initial := true
 
 func setup(ground: RefCounted, start: Vector2, region: Dictionary = {}, player: Node3D = null, factory := Callable()) -> void:
 	terrain = ground
+	add_child(damage)
+	damage.setup(self)
 	observer = player if player else get_parent().get_node_or_null("Car")
 	if region.is_empty():
 		region = JSON.parse_string(FileAccess.get_file_as_string("res://assets/south-region.json"))
@@ -76,6 +80,7 @@ func _physics_process(delta: float) -> void:
 	if not is_instance_valid(observer):
 		return
 	var at := Vector2(observer.position.x,observer.position.z)
+	damage.step(delta)
 	signals.tick(delta)
 	people.tick(delta,at)
 	ambulance.step(delta,self,at)
@@ -88,6 +93,7 @@ func _physics_process(delta: float) -> void:
 	var evicted := false
 	for i in range(moving.size()-1,-1,-1):
 		var vehicle := moving[i]
+		if vehicle.wreck:continue
 		var p := Vector2(vehicle.position.x,vehicle.position.z)
 		if p.distance_squared_to(at) > 520.0*520.0 or (moving.size() > target and not vehicle.incident and _out_of_view(vehicle.position,at)):
 			moving.remove_at(i)
@@ -118,14 +124,33 @@ func _out_of_view(p: Vector3, at: Vector2) -> bool:
 	return camera == null or not camera.is_position_in_frustum(p)
 
 
-func _clear(p: Vector2, observer_at: Vector2) -> bool:
+func _clear(p: Vector2, observer_at: Vector2, parking_yaw := INF) -> bool:
 	if p.distance_squared_to(observer_at) < 81.0:
 		return false
 	for vehicle in moving:
 		if p.distance_squared_to(Vector2(vehicle.position.x,vehicle.position.z)) < 14.0*14.0:
 			return false
 	for vehicle: CharacterBody3D in active_parking.values():
-		if p.distance_squared_to(Vector2(vehicle.position.x,vehicle.position.z)) < 3.5*3.5:
+		var delta := p-Vector2(vehicle.position.x,vehicle.position.z)
+		if is_finite(parking_yaw):
+			if delta.length_squared() < 31.0 and _parking_overlaps(delta,parking_yaw,vehicle.rotation.y):
+				return false
+		elif delta.length_squared() < 3.5*3.5:
+			return false
+	return true
+
+
+func _parking_overlaps(delta: Vector2, first_yaw: float, second_yaw: float) -> bool:
+	# Steam parking rows use 2.7 m between cars side by side. Check the actual
+	# oriented Seven footprints, including a handspan of clearance at each side.
+	var first_side := Vector2(cos(first_yaw),-sin(first_yaw))
+	var first_length := Vector2(-first_side.y,first_side.x)
+	var second_side := Vector2(cos(second_yaw),-sin(second_yaw))
+	var second_length := Vector2(-second_side.y,second_side.x)
+	for axis: Vector2 in [first_side,first_length,second_side,second_length]:
+		var side_width := 1.08*(absf(axis.dot(first_side))+absf(axis.dot(second_side)))
+		var car_length := 2.55*(absf(axis.dot(first_length))+absf(axis.dot(second_length)))
+		if absf(delta.dot(axis)) >= side_width+car_length:
 			return false
 	return true
 
@@ -163,6 +188,10 @@ func _spawn_flow(at: Vector2) -> void:
 			vehicle.shuttle = true
 			vehicle.cruise = randf_range(8.5,11.0)
 			vehicle.at_stop.connect(_serve_stop)
+		vehicle.traffic_body = not vehicle.shuttle
+		vehicle.ordinary = not taxi and not vehicle.shuttle
+		if vehicle.ordinary:
+			ordinary_vehicle_spawned.emit(vehicle)
 		return
 
 
@@ -211,13 +240,17 @@ func _stream_parking(at: Vector2) -> void:
 	for i in parked.size():
 		var spec := parked[i]
 		var d := at.distance_squared_to(spec.at)
+		if damage.hidden_parking.has(i):
+			if d>310.0*310.0:damage.hidden_parking.erase(i)
+			continue
 		if active_parking.has(i):
 			var vehicle: CharacterBody3D = active_parking[i]
-			if d > 310.0*310.0:
+			if d > 310.0*310.0 and not vehicle.wreck:
 				vehicle.queue_free()
 				active_parking.erase(i)
-		elif not spawned and d < 210.0*210.0 and _clear(spec.at,at):
+		elif not spawned and d < 210.0*210.0 and _clear(spec.at,at,spec.yaw):
 			active_parking[i] = _instance(spec.at,spec.yaw)
+			active_parking[i].traffic_body=true
 			spawned = true
 
 

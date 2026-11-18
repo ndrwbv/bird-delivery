@@ -7,7 +7,7 @@ const SPEED := [29.0,27.0,23.0,28.0]
 const TIP := [1.0,1.0,1.25,1.1]
 const LOAD_TIMES := [Vector2(8,12),Vector2(3,6),Vector2(20,28),Vector2(14,20)]
 const DOOR_TIMES := [Vector2(5,8),Vector2(3,5),Vector2(10,14),Vector2(8,12)]
-const GROWTH := [0.95,1.0,1.04,1.08,1.12]
+const GROWTH := preload("res://restaurant_growth.gd")
 const ROSTER_START := [12000,5600,17600,2400,8400,3920,12320]
 var traffic: Node
 var depot := Vector2.ZERO
@@ -52,12 +52,12 @@ static func count_for(number: int, level: int) -> int:
 	for at in [2,5,8,11,14]:
 		if number-1 >= at:
 			count += 1
-	return mini(6,maxi(count,mini(4,level)))
+	return mini(6,maxi(count,int(GROWTH.COURIERS[clampi(level-1,0,4)])))
 
 func begin(profile: Dictionary, number: int, level: int) -> void:
 	clear()
 	current_shift = number
-	growth = clampi(level-1,0,GROWTH.size()-1)
+	growth = clampi(level-1,0,GROWTH.PAY.size()-1)
 	rng.seed = ("%d/crew/%d" % [int(profile.get("seed",1)),number]).hash()
 	var previous: Array = profile.get("crew_last",[])
 	var chosen: Array = []
@@ -171,7 +171,7 @@ func step(delta: float, calm_first: bool, player_target: Vector2 = Vector2.INF) 
 			r.goal = next
 			r.lost = false
 			var base_fee := roundi((640+1.12*meters)/10.0)*10
-			r.fee = roundi(base_fee*2.0*float(GROWTH[growth])/10.0)*10
+			r.fee = roundi(base_fee*2.0*float(GROWTH.PAY[growth])/10.0)*10
 			r.leg = "go"
 		else:
 			r.leg = "back"

@@ -118,6 +118,7 @@ var returning_from_spending := false
 var bold := SystemFont.new()
 var print_tween: Tween
 var printing := false
+var receipt_blocker: Callable
 var input_after := 0
 var consumed_physics_frame := -2
 var gas_armed := true
@@ -247,12 +248,19 @@ func show_receipt(receipt: Dictionary) -> void:
 		_receipt_row(tr("Сорвано заказов"), str(int(receipt.missed)), RED)
 	if int(receipt.get("penalties", 0)) > 0:
 		_receipt_row(tr("Штрафы и вычеты"), "−" + _money(int(receipt.penalties)), RED)
+	var daily: Dictionary = receipt.get("daily",{})
+	if not daily.is_empty():
+		var daily_total := int(daily.earned)
+		_receipt_row(tr("задания: {got} из {all}").format({"got":daily.done,"all":daily.total}),("+" if daily_total>0 else "")+_money(daily_total),GREEN if daily_total>0 else MUTED)
 	if receipt.has("bonus"):
 		_receipt_row(tr("Бонус за смену"), _money(int(receipt.bonus)), GREEN)
 	if receipt.has("stars"):
 		_receipt_row(tr("Звёзды"), str(receipt.stars), INK)
 	if receipt.has("rank"):
 		_receipt_row(tr("Место в смене"), str(receipt.rank), INK)
+	var growth := int(receipt.get("restaurant_growth",0))
+	if growth > 0:
+		_receipt_row(tr("Рейтинг пиццерии вырос"), "★".repeat(growth), GREEN)
 	if int(receipt.get("win",0)) > 0:
 		_receipt_row(tr("Первое место на смене"), "+" + _money(int(receipt.win)),GREEN)
 	if receipt.has("rating"):
@@ -302,7 +310,7 @@ func _layout() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not active() or returning_from_spending:
+	if not active() or returning_from_spending or (page==Page.RECEIPT and receipt_blocker.is_valid() and receipt_blocker.call()):
 		return
 	if page == Page.INVOICE:
 		if get_tree().paused:
@@ -459,6 +467,7 @@ func _build_receipt() -> void:
 
 
 func _spending(request: Signal) -> void:
+	if receipt_blocker.is_valid() and receipt_blocker.call():return
 	if page == Page.RECEIPT and not printing and not returning_from_spending and Time.get_ticks_msec() >= input_after:
 		returning_from_spending = true
 		release_focus()
@@ -507,7 +516,7 @@ func _finish_print(skipped: bool) -> void:
 
 
 func _leave_receipt(another_shift: bool) -> void:
-	if page != Page.RECEIPT or printing or Time.get_ticks_msec() < input_after:
+	if page != Page.RECEIPT or printing or Time.get_ticks_msec() < input_after or (receipt_blocker.is_valid() and receipt_blocker.call()):
 		return
 	consumed_physics_frame = Engine.get_physics_frames()
 	dismiss()

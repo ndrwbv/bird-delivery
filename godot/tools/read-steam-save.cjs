@@ -135,6 +135,8 @@ async function convert(source) {
     semerka:{armor:num(tune.armor,0,3)|0,engine:num(tune.engine,0,3)|0,wings:!!tune.wings,gun:!!tune.gun,paint:validPaint?hex:'#ebe6d8'}};
   if(get('don-trash')!=null) career.trash_donated=Math.min(480000,int(get('don-trash'))*cashMultiplier);
   if(get('don-gang')!=null) career.gang_donated=Math.min(640000,int(get('don-gang'))*cashMultiplier);
+  if(get('clock')!=null) career.clock_hour=num(get('clock'),0,24);
+  if(Array.isArray(get('pz-grow'))) career.south_growth=get('pz-grow').reduce((sum,n)=>sum+int(n),0);
   const oldBoard=array(get('lb-local'));
   if(oldBoard.length){
     career.imported_scores=oldBoard.slice(0,50).map(item=>{
@@ -143,6 +145,12 @@ async function convert(source) {
     }).filter(row=>row.score>0);
   }
   if(get('route')!=null) career.road_path=!['0','off','false'].includes(String(get('route')));
+  if(['1','2'].includes(String(get('route-ask')))) career.road_path_ask=Number(get('route-ask'));
+  const previousDaily=get('daily-last');
+  if(previousDaily!=null) {
+    const ids=Array.isArray(previousDaily)?previousDaily:safeText(previousDaily).split(/\s+/);
+    career.daily_last=ids.filter(id=>typeof id==='string' && /^[a-z]{1,16}$/.test(id)).slice(0,3);
+  }
   if(get('doorgames')!=null) career.door_games=!['0','off','false'].includes(String(get('doorgames')));
   return {version:1,career,quick:{best:int(quick.best),history},awards:{got,seen,n:cleanCounters}};
 }
