@@ -2,6 +2,7 @@ shader_type spatial;
 render_mode cull_disabled, diffuse_lambert, specular_disabled;
 
 #include "res://material_grade.gdshaderinc"
+#include "res://core_bounds.gdshaderinc"
 #include "res://street_light.gdshaderinc"
 
 uniform float ground_wetness = 0.0;
@@ -28,6 +29,7 @@ void vertex() {
 }
 
 void fragment() {
+	if (outside_core(ground.xz)) discard;
 	vec2 world = ground.xz;
 	float range = length(VERTEX);
 	float close = 1.0-smoothstep(22.0,78.0,range);

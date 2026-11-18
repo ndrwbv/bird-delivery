@@ -1,7 +1,7 @@
 extends Node3D
 
-const COLORS := [Color("#187dae"),Color("#e9554c"),Color("#498fc4"),Color("#e9953d")]
-const COOLDOWN := [16.0,28.0,28.0,28.0]
+const COLORS := [Color("#187dae"),Color("#e9554c"),Color("#498fc4")]
+const COOLDOWN := [16.0,28.0,28.0]
 
 var ground: RefCounted
 var car: CharacterBody3D
@@ -25,7 +25,9 @@ func setup(terrain: RefCounted, vehicle: CharacterBody3D, start: Vector2) -> voi
 			if ground.material_at(at.x,at.y) != 0:
 				continue
 			used.append(at)
-			_add(at,0 if i%4 != 3 else 1+int(i/4)%3)
+			var type := 0 if i%4 != 3 else 1+int(i/4)%3
+			if type < COLORS.size():
+				_add(at,type)
 			break
 
 

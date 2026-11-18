@@ -1,5 +1,6 @@
 extends Node
 
+const HANDOFF := preload("res://delivery_handoff.gd")
 const GAS := &"accelerate"
 const REVERSE := &"reverse"
 const LEFT := &"steer_left"
@@ -23,6 +24,10 @@ var capture_index := 0
 var frame_intervals := PackedFloat64Array()
 var interval_start := 0
 var last_frame_usec := 0
+var slowest_interval := 0.0
+var slowest_at := Vector2.ZERO
+var stage_started_usec := 0
+var phase_name := ""
 var headless := false
 var finished := false
 var last_delivery_stage := 0
@@ -46,6 +51,7 @@ func _physics_process(delta: float) -> void:
 	if finished:
 		return
 	elapsed += delta
+	_note_phase()
 	if elapsed > 240.0:
 		push_error("Drive timed out at %s near waypoint %s of order %s" % [str(car.position), waypoint, order+1])
 		get_tree().quit(1)
@@ -62,6 +68,26 @@ func _physics_process(delta: float) -> void:
 		_walk_delivery()
 	else:
 		_drive()
+
+
+func _note_phase() -> void:
+	var next: String
+	if game.destination >= game.map_data.deliveries.size():
+		next = "свободная езда"
+	elif game.dispatch.active():
+		next = "погрузка"
+	elif game.back_to_depot:
+		next = "возврат на базу"
+	else:
+		next = str(HANDOFF.Stage.keys()[game.delivery.stage])
+	next = "%d · %s" % [game.destination + 1, next]
+	if next == phase_name:
+		return
+	var now := Time.get_ticks_usec()
+	if stage_started_usec > 0:
+		print("PHASE %s · %.2f s" % [phase_name, (now - stage_started_usec) * 0.000001])
+	phase_name = next
+	stage_started_usec = now
 
 
 func _drive() -> void:
@@ -150,7 +176,11 @@ func _frame_presented() -> void:
 			return
 	if ready_reported and elapsed > 2.0:
 		if last_frame_usec != 0:
-			frame_intervals.append(float(now - last_frame_usec) / 1000.0)
+			var interval := float(now - last_frame_usec) / 1000.0
+			frame_intervals.append(interval)
+			if interval > slowest_interval:
+				slowest_interval = interval
+				slowest_at = Vector2(car.position.x, car.position.z)
 		else:
 			interval_start = now
 		last_frame_usec = now
@@ -181,6 +211,7 @@ func _finish() -> void:
 		var count := frame_intervals.size()
 		var duration := float(last_frame_usec - interval_start) / 1000000.0
 		frame_intervals.sort()
+		print("FRAME_P95 %.2f ms, slowest at %s" % [frame_intervals[ceili(count*0.95)-1], slowest_at])
 		print("FRAMES %.1f s, %d intervals, %.1f FPS, p99 %.2f ms, >22.2 ms %d, >50 ms %d, max %.2f ms" %
 			[duration, count, count / duration, frame_intervals[ceili(count*0.99)-1], over_22, over_50, frame_intervals[-1]])
 	print("DRIVE_OK")

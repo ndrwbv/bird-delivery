@@ -12,17 +12,16 @@ var pace := 0.0
 var coast := Vector3.ZERO
 var going := false
 var brake := false
-var nose := 2.2
-var visual: MeshInstance3D
+const NOSE := 2.49
+var visual: Node3D
 var lamps: MeshInstance3D
 var lamp_off: Material
 var lamp_on: Material
 var ray := PhysicsRayQueryParameters3D.new()
 
 
-func setup(ground: RefCounted, object: Mesh, paint: Material, half_length: float, at: Vector2, yaw: float) -> void:
+func setup(ground: RefCounted, model: PackedScene, at: Vector2, yaw: float) -> void:
 	terrain = ground
-	nose = half_length
 	position = _surface(at)
 	rotation.y = yaw
 	collision_layer = ROAD_LAYER
@@ -31,14 +30,17 @@ func setup(ground: RefCounted, object: Mesh, paint: Material, half_length: float
 	ray.collision_mask = OBSTACLES
 	ray.exclude = [get_rid()]
 	var box := BoxShape3D.new()
-	box.size = Vector3(1.76,1.31,nose*2.0)
+	box.size = Vector3(2.02,1.46,NOSE*2.0)
 	var hull := CollisionShape3D.new()
 	hull.shape = box
-	hull.position.y = 0.76
+	hull.position.y = 0.88
 	add_child(hull)
-	visual = MeshInstance3D.new()
-	visual.mesh = object
-	visual.material_override = paint
+	visual = model.instantiate() as Node3D
+	visual.get_node("PizzaRoofLight").free()
+	for part: MeshInstance3D in visual.find_children("*", "MeshInstance3D", true, false):
+		part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		part.visibility_range_end = 95.0 if part.name == &"Car_Interior_0" else 250.0
+		part.visibility_range_end_margin = 8.0
 	add_child(visual)
 	set_physics_process(false)
 
@@ -61,7 +63,7 @@ func follow(path: Array, start: int, unlit: Material, lit: Material) -> void:
 	lamps.mesh = pair
 	lamps.material_override = lamp_off
 	lamps.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	lamps.position = Vector3(0.0,0.72,nose+0.02)
+	lamps.position = Vector3(0.0,0.72,NOSE+0.02)
 	add_child(lamps)
 	set_physics_process(true)
 	reset_physics_interpolation()
@@ -151,7 +153,7 @@ func _gap(distance: float) -> float:
 	var forward := -basis.z
 	var nearest := distance+7.0
 	for lane in [-0.67,0.0,0.67]:
-		ray.from = global_position+Vector3.UP*0.66+basis.x*float(lane)+forward*(nose-0.20)
+		ray.from = global_position+Vector3.UP*0.66+basis.x*float(lane)+forward*(NOSE-0.20)
 		ray.to = ray.from+forward*distance
 		var contact := get_world_3d().direct_space_state.intersect_ray(ray)
 		if not contact.is_empty():

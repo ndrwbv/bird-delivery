@@ -19,7 +19,7 @@ func setup(spec: Dictionary, bytes: PackedByteArray) -> void:
 	samples = bytes
 
 
-func at(x: float, z: float) -> float:
+func at(x: float, z: float, _previous_height := INF) -> float:
 	var gx := clampf((x - x0) / step, 0.0, columns - 1.0)
 	var gz := clampf((z - z0) / step, 0.0, rows - 1.0)
 	var ix := mini(floori(gx), columns - 2)
@@ -37,7 +37,7 @@ func material_at(x: float, z: float) -> int:
 	return samples[(iz * columns + ix) * 3 + 2]
 
 
-func wheel_height(x: float, z: float) -> float:
+func wheel_height(x: float, z: float, _previous_height := INF) -> float:
 	var y := at(x, z)
 	if material_at(x, z) != Surface.PAVEMENT:
 		y += sin(x * 2.73 + z * 1.31) * sin(z * 1.95 - x * 0.73) * 0.046

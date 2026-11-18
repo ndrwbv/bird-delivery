@@ -170,8 +170,6 @@ for(let i=0;i<4;i++) {
   const lower=i*1.95, upper=(i+1)*1.95;
   shadow(circle(area.home,Math.sqrt(9.25**2-lower**2),12),domeY+lower,domeY+upper);
 }
-const [a,b,c,d]=bounds;
-edges([[a,b],[c,b],[c,d],[a,d]],(x,z)=>wall(walls,x,z,-34,58));
 for(const o of obstacles) {
   const poly=rectangle(o);
   const ground=height(o.at);

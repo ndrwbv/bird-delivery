@@ -3,6 +3,7 @@ extends CharacterBody3D
 const GRIP := preload("res://hand_grip.gd")
 var grip := GRIP.new()
 var camera: Camera3D
+var region_edge: RefCounted
 var terrain: RefCounted
 var actor: Node3D
 var player: AnimationPlayer
@@ -75,7 +76,7 @@ func run_to(target: Vector3, speed: float, delta: float, with_bag: bool) -> bool
 	var moved := direction*minf(distance,speed*delta)
 	position.x += moved.x
 	position.z += moved.y
-	position.y = terrain.at(position.x,position.z)+0.02
+	position.y = terrain.at(position.x,position.z,position.y)+0.02
 	rotation.y = lerp_angle(rotation.y,atan2(direction.x,direction.y),1.0-exp(-18.0*delta))
 	var motion := &"carry_walk" if with_bag else &"walk"
 	if player.current_animation != motion:
@@ -101,8 +102,10 @@ func _physics_process(delta: float) -> void:
 	var right := Vector3(-control_forward.z,0.0,control_forward.x)
 	var wanted := (right*axes.x+control_forward*axes.y)*(5.5 if carrying else 6.25)
 	velocity = velocity.lerp(wanted,1.0-exp(-14.0*delta))
+	if region_edge != null:
+		velocity = region_edge.limit(position, velocity, delta)
 	move_and_slide()
-	position.y = terrain.at(position.x,position.z)+0.02
+	position.y = terrain.at(position.x,position.z,position.y)+0.02
 	if wanted.length_squared() > 0.08:
 		rotation.y = lerp_angle(rotation.y,atan2(wanted.x,wanted.z),1.0-exp(-14.0*delta))
 	_update_pose(wanted.length() > 0.18)

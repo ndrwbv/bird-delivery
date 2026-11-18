@@ -1,5 +1,9 @@
 extends Node3D
 
+const REGION_WORLD := preload("res://south_region_world.gd")
+const REGION_ROUTES := preload("res://south_region_routes.gd")
+const REGION_MAP := preload("res://south_region_map_ui.gd")
+const REGION_EDGE := preload("res://south_region_edge.gd")
 const DATA_PATH := "res://assets/south.json"
 const RESIDENTIAL_WINDOW := preload("res://residential_window.gdshader")
 const STREET_LIGHTING := preload("res://street_lighting.gd")
@@ -41,7 +45,17 @@ const ACTORS := [
 
 var map_data: Dictionary
 var leaves := LEAVES.new()
-var terrain := TERRAIN.new()
+var terrain: RefCounted
+var region_world := REGION_WORLD.new()
+var region_routes := REGION_ROUTES.new()
+var region_map := REGION_MAP.new()
+var region_edge := REGION_EDGE.new()
+var region_data: Dictionary
+var waypoint: Dictionary = {}
+var gps_path: Array = []
+var gps_stop: Array = []
+var last_gps_at := Vector2.ZERO
+var gps_timer := 0.0
 var street_lights := STREET_LIGHTING.new()
 var ground_material := ShaderMaterial.new()
 var window_material := ShaderMaterial.new()
@@ -71,8 +85,20 @@ var last_input_pad := false
 
 func _ready() -> void:
 	map_data = JSON.parse_string(FileAccess.get_file_as_string(DATA_PATH))
+	var warmup: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/south-warmup.json"))
+	map_data.deliveries.append(warmup)
 	var ground: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/south-ground.json"))
-	terrain.setup(ground,FileAccess.get_file_as_bytes("res://assets/south-ground.bin"))
+	var detail := TERRAIN.new()
+	detail.setup(ground,FileAccess.get_file_as_bytes("res://assets/south-ground.bin"))
+	region_data = JSON.parse_string(FileAccess.get_file_as_string("res://assets/south-region.json"))
+	add_child(region_world)
+	region_world.setup(region_data, map_data.bounds, detail, car)
+	terrain = region_world.ground
+	region_routes.setup(region_data, map_data)
+	shift.choose_first(map_data.deliveries, _v2(map_data.spawn), region_routes)
+	region_edge.setup(region_data.boundary)
+	car.region_edge = region_edge
+	courier.region_edge = region_edge
 	car.terrain = terrain
 	car.hit_handler = _vehicle_contact
 	car.person_handler = _people_contact
@@ -117,7 +143,10 @@ func _ready() -> void:
 	chase.set_parked_view(depot-front*5.1+heading.x*3.9+Vector3.UP*3.45,
 		depot+front*3.1-heading.x*0.64+Vector3.UP*1.12)
 	_reset_car()
-	hud.configure(map_data)
+	hud.configure(map_data, region_data)
+	add_child(region_map)
+	region_map.setup(region_data, map_data, region_routes)
+	region_map.waypoint_changed.connect(_set_waypoint)
 	_refresh_order()
 	_begin_dispatch()
 	for arg in OS.get_cmdline_user_args():
@@ -135,12 +164,16 @@ func _input(event: InputEvent) -> void:
 		last_input_pad = true
 	elif event is InputEventKey and event.pressed:
 		last_input_pad = false
+	if event.is_action_pressed(&"district_map"):
+		region_map.open_at(Vector2(car.position.x, car.position.z), waypoint, gps_path, gps_stop)
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed(&"ui_cancel"):
 		get_tree().quit()
 
 
 func _physics_process(delta: float) -> void:
-	var action := Input.is_action_just_pressed(&"deliver")
+	var action := Engine.get_physics_frames() > region_map.closed_on_frame + 1 and Input.is_action_just_pressed(&"deliver")
 	if Input.is_action_just_pressed(&"reset_car"):
 		dispatch.finish()
 		marker.visible = destination < customers.size()
@@ -199,6 +232,7 @@ func _begin_return(failed: bool) -> void:
 		_pay_for_order()
 	var spec: Dictionary = map_data.deliveries[destination]
 	hud.return_to_depot(spec.back_home,map_data.spawn,failed)
+	_set_waypoint({}, [])
 	marker.position = depot
 	marker_label.text = "Следующий заказ у пиццерии" if destination+1 < customers.size() else "Закрыть смену у пиццерии"
 
@@ -273,10 +307,11 @@ func _blood_hit(person: Node3D, direction: Vector3, speed: float) -> void:
 	car.damage.stain(at,speed)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	var pose := car.get_global_transform_interpolated()
 	var at := Vector2(pose.origin.x,pose.origin.z)
 	var forward := Vector2(-pose.basis.z.x,-pose.basis.z.z)
+	_update_gps(at, delta)
 	var meters := 0.0
 	if marker.visible:
 		var eye: Vector3 = courier.position if courier.active else pose.origin
@@ -284,6 +319,45 @@ func _process(_delta: float) -> void:
 		meters = Vector2(eye.x,eye.z).distance_to(Vector2(marker.position.x,marker.position.z))
 		marker_label.visible = meters < 115.0
 	hud.update_drive(at,forward,absf(car.speed)*3.6,meters,_delivery_hint(),last_input_pad,courier.active and not dispatch.active())
+
+
+func _set_waypoint(place: Dictionary, path: Array) -> void:
+	waypoint = place
+	last_gps_at = Vector2(car.position.x, car.position.z)
+	if not place.is_empty():
+		gps_path = path
+		gps_stop = place.stop
+	else:
+		gps_stop = []
+		if back_to_depot:
+			gps_stop = map_data.spawn
+		elif destination < map_data.deliveries.size():
+			gps_stop = map_data.deliveries[destination].stop
+		gps_path = [] if gps_stop.is_empty() else region_routes.route_between(last_gps_at, _v2(gps_stop))
+	hud.set_navigation(gps_path, gps_stop if not gps_path.is_empty() else [])
+
+
+func _update_gps(at: Vector2, delta: float) -> void:
+	if gps_stop.is_empty():
+		return
+	gps_timer += delta
+	if gps_timer < 1.0:
+		return
+	gps_timer = 0.0
+	if not waypoint.is_empty() and at.distance_to(_v2(gps_stop)) < 7.0:
+		_set_waypoint({}, [])
+		return
+	if at.distance_squared_to(last_gps_at) < 24.0 * 24.0:
+		return
+	last_gps_at = at
+	for i in range(1, gps_path.size()):
+		var near := Geometry2D.get_closest_point_to_segment(at, _v2(gps_path[i-1]), _v2(gps_path[i]))
+		if at.distance_squared_to(near) < 20.0 * 20.0:
+			return
+	var path := region_routes.route_between(at, _v2(gps_stop)) if waypoint.is_empty() else region_routes.route_to(at, waypoint)
+	if not path.is_empty():
+		gps_path = path
+		hud.set_navigation(gps_path, gps_stop)
 
 
 func _delivery_hint() -> String:
@@ -321,6 +395,7 @@ func _refresh_order() -> void:
 	if not marker.visible:
 		delivery.done = false
 		hud.free_drive(shift.delivered,shift.money)
+		_set_waypoint({}, [])
 		return
 	var order: Dictionary = map_data.deliveries[destination]
 	shift.accept(order)
@@ -330,6 +405,7 @@ func _refresh_order() -> void:
 	delivery.play_order(customers[destination],entrances[destination])
 	_update_marker()
 	hud.set_order(destination,order,true)
+	_set_waypoint({}, [])
 
 
 func _update_marker() -> void:
@@ -380,6 +456,10 @@ func _configure_materials() -> ShaderMaterial:
 	wood.set_shader_parameter(&"wood_grain",true)
 	for material in [city_material,prop_material,flat_material,ground_material,grass_material,wood]:
 		street_lights.bind(material)
+	var bounds: Array = map_data.bounds
+	var clip := Vector4(bounds[0], bounds[1], bounds[2], bounds[3])
+	for material in [city_material, prop_material, flat_material, ground_material, window_material]:
+		material.set_shader_parameter(&"core_bounds", clip)
 	var texture_cache: Dictionary = {}
 	for block: MeshInstance3D in $City.get_children()+$Verge.get_children()+$Crowns.get_children():
 		var paint: StandardMaterial3D = block.mesh.surface_get_material(0)
@@ -410,6 +490,7 @@ func _configure_materials() -> ShaderMaterial:
 			if not texture_cache.has(paint):
 				var replacement := ShaderMaterial.new()
 				replacement.shader = TEXTURED_CITY
+				replacement.set_shader_parameter(&"core_bounds", clip)
 				replacement.set_shader_parameter(&"surface_map",paint.albedo_texture)
 				replacement.set_shader_parameter(&"punched",paint.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED)
 				replacement.set_shader_parameter(&"cutoff",paint.alpha_scissor_threshold)

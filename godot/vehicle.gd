@@ -23,6 +23,7 @@ const TRACK := 1.73
 	model.get_node("wheelLB"), model.get_node("wheelRB"),
 ]
 
+var region_edge: RefCounted
 var terrain: RefCounted
 var controls_locked := false
 var hit_handler: Callable
@@ -32,7 +33,6 @@ var rear_slip := 0.0
 var nitro := 0.50
 var hearts := 7.0
 var shield_time := 0.0
-var beast_time := 0.0
 var knock_cooldown := 0.0
 var headlamps := false
 var lamps := LAMPS.new()
@@ -90,11 +90,7 @@ func _physics_process(delta: float) -> void:
 	var steer := Input.get_axis(&"steer_left", &"steer_right") if driving else 0.0
 	var handbrake := not driving or Input.is_action_pressed(&"handbrake")
 	var boosting := driving and Input.is_action_pressed(&"nitro")
-	var beast := beast_time > 0.0
-	var top_speed := MAX_SPEED*(1.6 if beast else 1.0)
-	var thrust := ACCELERATION*(1.8 if beast else 1.0)
 	shield_time = maxf(0.0,shield_time-delta)
-	beast_time = maxf(0.0,beast_time-delta)
 	knock_cooldown = maxf(0.0,knock_cooldown-delta)
 	var forward := -basis.z
 	var right := basis.x
@@ -108,22 +104,20 @@ func _physics_process(delta: float) -> void:
 	if throttle > 0.0 or brake > 0.0 or absf(longitudinal) > 1.2:
 		var grade := (wheel_at[0].y+wheel_at[1].y-wheel_at[2].y-wheel_at[3].y)/(2.0*WHEELBASE)
 		longitudinal -= clampf(grade,-0.3,0.3)*24.0*delta
-	longitudinal += thrust*throttle*maxf(0.25,1.0-longitudinal/top_speed)*delta
-	var ceiling := top_speed+14.0
-	if boosting and beast:
-		ceiling = MAX_SPEED*2.0
-		longitudinal += thrust*maxf(0.2,1.0-longitudinal/ceiling)*delta
-	elif boosting and nitro > 0.0:
-		var burn := minf(delta,nitro/0.2)
-		nitro -= burn*0.2
-		longitudinal += 55.0*burn
-	elif longitudinal > top_speed:
-		longitudinal -= (longitudinal-top_speed)*1.4*delta
+	var burning := boosting and nitro > 0.0
+	if burning:
+		nitro = maxf(0.0, nitro - 0.2 * delta)
+		longitudinal += 55.0 * delta
+	longitudinal += ACCELERATION * throttle * maxf(0.25, 1.0 - longitudinal / MAX_SPEED) * delta
 	if brake > 0.0:
 		var retard := BRAKES*(1.0-wet*0.25) if longitudinal > 0.4 else ACCELERATION*0.5
 		longitudinal -= retard*brake*delta
-	longitudinal = clampf(longitudinal,-MAX_REVERSE,ceiling)
-	longitudinal -= longitudinal*(0.3+(1.1 if handbrake else 0.0))*delta
+	longitudinal = clampf(longitudinal, -MAX_REVERSE, MAX_SPEED + 14.0)
+	if not burning and longitudinal > MAX_SPEED:
+		longitudinal -= (longitudinal - MAX_SPEED) * 1.4 * delta
+	longitudinal -= longitudinal * 0.3 * delta
+	if handbrake:
+		longitudinal -= longitudinal * 1.1 * delta
 	if not driving:
 		longitudinal = move_toward(longitudinal,0.0,12.0*delta)
 
@@ -192,6 +186,8 @@ func person_bump() -> void:
 
 
 func _drive_motion(delta: float) -> void:
+	if region_edge != null:
+		velocity = region_edge.limit(position, velocity, delta)
 	var start := position
 	var approach_velocity := velocity
 	var motion := velocity*delta
@@ -225,7 +221,7 @@ func _update_wheels(delta: float, rolling: float) -> void:
 	var support: Array[float] = []
 	for i in wheels.size():
 		var sample := position + basis * wheel_rest[i]
-		sample.y = terrain.wheel_height(sample.x, sample.z)
+		sample.y = terrain.wheel_height(sample.x, sample.z, position.y)
 		wheel_at[i] = sample
 		support.append(sample.y)
 	var average := (support[0]+support[1]+support[2]+support[3])*0.25
@@ -255,7 +251,6 @@ func collect_road_bonus(type: int) -> void:
 			hearts = minf(7.0,hearts+1.0)
 			damage.set_hearts(hearts)
 		2: shield_time = 10.0
-		3: beast_time = 15.0
 
 
 func collision_damage(impact: float, other_car: bool, contact: Vector3, normal: Vector3) -> void:

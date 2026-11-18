@@ -2,6 +2,7 @@ shader_type spatial;
 render_mode cull_disabled, diffuse_lambert, specular_disabled;
 
 #include "res://material_grade.gdshaderinc"
+#include "res://core_bounds.gdshaderinc"
 #include "res://street_light.gdshaderinc"
 
 uniform bool flat_city = false;
@@ -14,6 +15,7 @@ void vertex() {
 }
 
 void fragment() {
+	if (outside_core(actor_world.xz)) discard;
 	NORMAL = face_normal(VERTEX,VIEW);
 	ALBEDO = display_color(paint);
 	ROUGHNESS = 0.94;

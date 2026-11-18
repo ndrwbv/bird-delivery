@@ -2,6 +2,7 @@ shader_type spatial;
 render_mode cull_disabled, diffuse_lambert, specular_disabled;
 
 #include "res://material_grade.gdshaderinc"
+#include "res://core_bounds.gdshaderinc"
 #include "res://street_light.gdshaderinc"
 
 uniform sampler2D prop_mask : filter_nearest, repeat_disable;
@@ -35,6 +36,7 @@ void vertex() {
 }
 
 void fragment() {
+	if (outside_core(world.xz)) discard;
 	vec3 color = paint.rgb;
 	vec3 n = face_normal(VERTEX,VIEW);
 	vec3 up = VIEW_MATRIX[1].xyz;

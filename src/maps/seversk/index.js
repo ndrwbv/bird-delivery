@@ -71,6 +71,8 @@ const SOUTH = [
    область в сторону Томска»): Калинина, 96 и каток, Восточная, полустанок, Славского к Томску до Центрального
    КПП и посёлок у него. Раньше это был хвост Востока в 2—3,4 км от его пиццерии */
 const SE_Z = 1280;
+// Shared with the Godot district importer so both maps follow the same streets.
+export const southGeometry = { P0, AX, BANDS, RL0, RLU, SOUTH, SE_Z };
 function inPoly (x, z, p) {
   let c = false;
   for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
