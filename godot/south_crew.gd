@@ -20,13 +20,16 @@ var growth := 0
 var current_shift := 0
 var changed := 0
 var active := false
+var sheet := preload("res://crew_rank_sheet.gd").new()
 
 func setup(vehicles: Node, base: Vector2) -> void:
+	add_child(sheet)
 	traffic = vehicles
 	depot = base
 	var sample := traffic.SEMERKA.instantiate() as Node3D
 	roof = sample.get_node_or_null("PizzaRoofLight")
 	if roof:
+		roof.owner = null
 		sample.remove_child(roof)
 		roof.hide()
 		add_child(roof)
@@ -242,6 +245,8 @@ func finish(profile: Dictionary, full: bool, delivered: int, earned: int) -> Dic
 	return result
 
 func clear() -> void:
+	if sheet.is_inside_tree():
+		sheet.clear()
 	for r in working:
 		if is_instance_valid(r.vehicle):
 			r.vehicle.queue_free()

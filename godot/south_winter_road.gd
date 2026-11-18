@@ -95,7 +95,12 @@ class Cell:
 
 func setup(origin: Vector2) -> void:
 	city_origin = origin
+
+
+func _open_catalog() -> void:
 	file = FileAccess.open(FILE,FileAccess.READ)
+	if file == null:
+		return
 	var info := file.get_buffer(16)
 	from_cell = Vector2i(info.decode_s32(0),info.decode_s32(4))
 	size = Vector2i(info.decode_s32(8),info.decode_s32(12))
@@ -107,8 +112,10 @@ func _cell(p: Vector2) -> Cell:
 	if cache.has(key):
 		return cache[key]
 	var c := Cell.new()
+	if file == null and directory.is_empty():
+		_open_catalog()
 	var local := key-from_cell
-	if local.x>=0 and local.y>=0 and local.x<size.x and local.y<size.y:
+	if file != null and local.x>=0 and local.y>=0 and local.x<size.x and local.y<size.y:
 		var i := (local.y*size.x+local.x)*8
 		var len_bytes := directory.decode_u32(i+4)
 		if len_bytes > 0:

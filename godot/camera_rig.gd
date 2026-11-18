@@ -1,5 +1,16 @@
 extends Camera3D
 
+const VIEWS := ["high","near","cab"]
+const PREFS := "user://drive_camera.cfg"
+var mode := "near"
+var input_blocked: Callable
+var glance := preload("res://drive_look.gd").new()
+var cockpit: Node3D
+var filtered_eye := INF
+var temporary := false
+var eye_time := 0.0
+var eye_pitch := 0.0
+
 @onready var car: CharacterBody3D = $"../Car"
 
 var heading := 0.0
@@ -21,6 +32,71 @@ var exchange_zoom := 0.0
 var query := PhysicsRayQueryParameters3D.new()
 
 
+func _ready() -> void:
+	for arg in OS.get_cmdline_user_args():
+		temporary = temporary or arg in ["--test-profile","--benchmark"] or arg.begins_with("--capture-")
+	if not temporary:
+		var config := ConfigFile.new()
+		if config.load(PREFS)==OK:
+			var stored := str(config.get_value("camera","view","near"))
+			if stored in VIEWS:
+				mode = stored
+	get_window().focus_exited.connect(glance.reset)
+
+func set_mode(id: String, save := true) -> void:
+	if id not in VIEWS:
+		return
+	mode = id
+	glance.reset()
+	filtered_eye = INF
+	if cockpit:
+		cockpit.hide()
+	if save and not temporary:
+		var config := ConfigFile.new()
+		config.set_value("camera","view",mode)
+		config.save(PREFS)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not current or person or not car.active_shift or car.controls_locked or (input_blocked.is_valid() and input_blocked.call()):
+		return
+	var toggle: bool = (event is InputEventKey and event.pressed and not event.echo and event.physical_keycode==KEY_V) or (event is InputEventJoypadButton and event.pressed and event.button_index==JOY_BUTTON_BACK)
+	if toggle:
+		set_mode(VIEWS[(VIEWS.find(mode)+1)%3])
+		drove = true
+		show_parked = 0.0
+		get_viewport().set_input_as_handled()
+	elif glance.event(event):
+		get_viewport().set_input_as_handled()
+
+func _cab(delta: float, pose: Transform3D, pace: float) -> void:
+	if not cockpit:
+		cockpit = preload("res://drive_cockpit.gd").new()
+		car.visual.add_child(cockpit)
+	cockpit.show()
+	cockpit.step(delta,car)
+	var body: Transform3D = car.visual.get_global_transform_interpolated()
+	var head := Vector3(-.42,1.44,.07)
+	var yaw := glance.angles.x
+	head.x -= car.steer_visual/.42*pace*.05
+	if yaw<0:
+		head.x += smoothstep(1.2,2.4,-yaw)*.24-.09*sin(yaw)
+	head.z -= (cos(yaw)-1)*.09
+	var eye: Vector3 = body*head
+	if is_inf(filtered_eye):
+		filtered_eye = eye.y
+	eye_time += delta
+	filtered_eye = lerpf(filtered_eye,eye.y,1.0-exp(-16.0*delta))
+	eye.y += clampf((filtered_eye-eye.y)*.35,-.06,.06)+pace*(sin(eye_time*13.7)*.0025+sin(eye_time*7.1)*.0018)
+	position = eye
+	var ahead := -pose.basis.z.rotated(Vector3.UP,yaw)
+	eye_pitch = lerpf(eye_pitch,car.visual.rotation.x,1.0-exp(-4.0*delta))
+	var pitch := eye_pitch+.02+glance.angles.y-pow(sin(minf(absf(yaw),PI*.5)),2.0)*.10
+	ahead = Vector3(ahead.x,0,ahead.z).normalized()*cos(pitch)+Vector3.UP*sin(pitch)
+	look_at(eye+ahead)
+	fov = lerpf(66.0,72.0,pace)
+	near = .045
+
+
 func set_parked_view(at: Vector3, target: Vector3) -> void:
 	parked_position = at
 	parked_target = target
@@ -28,6 +104,13 @@ func set_parked_view(at: Vector3, target: Vector3) -> void:
 
 func reset_view() -> void:
 	person = null
+	dispatch_view = false
+	exchange_target = null
+	glance.reset()
+	filtered_eye = INF
+	if cockpit:
+		cockpit.hide()
+	near = .22
 	tether = car.position
 	var offset := parked_position - car.position
 	parked_heading = atan2(offset.x,offset.z)
@@ -43,6 +126,10 @@ func reset_view() -> void:
 
 
 func follow_person(who: Node3D) -> void:
+	if cockpit:
+		cockpit.hide()
+	glance.reset()
+	near = .22
 	dispatch_view = false
 	exchange_target = null
 	person = who
@@ -75,9 +162,17 @@ func _process(delta: float) -> void:
 	var on_foot := target != car
 	var pose := target.get_global_transform_interpolated()
 	var speed := absf(car.speed)
+	var pace := clampf(speed/maxf(1.0,car.tuned_speed),0.0,1.0)
+	glance.step(delta,mode=="cab",not on_foot and not car.controls_locked and (not input_blocked.is_valid() or not input_blocked.call()))
 	drove = drove or speed > 0.7
 	if not drove:
 		return
+	if mode=="cab" and not on_foot:
+		_cab(delta,pose,pace)
+		return
+	if cockpit and cockpit.visible:
+		cockpit.hide()
+	near = .22
 	show_parked = move_toward(show_parked, 0.0, delta*1.2)
 	var opening := smoothstep(0.0,1.0,show_parked)
 	var back := -pose.basis.z if on_foot else pose.basis.z
@@ -93,12 +188,15 @@ func _process(delta: float) -> void:
 		target_heading = lerp_angle(target_heading, travel_heading, 0.21)
 	target_heading = lerp_angle(target_heading,parked_heading,opening)
 	var difference := angle_difference(heading,target_heading)
-	var turn_rate := 4.5 if on_foot and not dispatch_view else 2.1
-	heading += clampf(difference*(1.0-exp(-6.0*delta)),-turn_rate*delta,turn_rate*delta)
+	if on_foot:
+		var turn_rate := 4.5 if not dispatch_view else 2.1
+		heading += clampf(difference*(1.0-exp(-6.0*delta)),-turn_rate*delta,turn_rate*delta)
+	else:
+		heading += difference*(1.0-exp(-(3.2 if mode=="near" else 4.5)*delta))
+	var orbit := heading + (0.0 if on_foot else glance.angles.x)
 
-	var pace := clampf(speed/24.0,0.0,1.0)
-	var horizontal := lerpf(6.4,8.6,pace)
-	var rise := lerpf(3.15,3.8,pace)
+	var horizontal := lerpf(6.6,9.2,pace) if mode=="near" else lerpf(12.5,17.0,pace)
+	var rise := 3.4-glance.angles.y*6 if mode=="near" else 6.2-glance.angles.y*10
 	if on_foot:
 		horizontal = 4.0 if dispatch_view else lerpf(6.4,2.85,close_up)
 		rise = 2.3 if dispatch_view else lerpf(3.15,1.66,close_up)
@@ -107,9 +205,9 @@ func _process(delta: float) -> void:
 		rise = 2.6
 	horizontal = lerpf(horizontal,parked_distance,opening)
 	rise = lerpf(rise,parked_position.y-car.position.y,opening)
-	tether = tether.lerp(pose.origin, 1.0-exp(-9.0*delta))
+	tether = tether.lerp(pose.origin,1.0-exp(-(20.0 if mode=="near" and not on_foot else 9.0)*delta))
 	tether = pose.origin + (tether-pose.origin).limit_length(1.15)
-	var offset := Vector3(sin(heading)*horizontal,rise,cos(heading)*horizontal)
+	var offset := Vector3(sin(orbit)*horizontal,rise,cos(orbit)*horizontal)
 	var pivot := tether + Vector3.UP * (1.15 if on_foot else 1.35)
 	var desired := tether + offset
 	desired.y = maxf(desired.y, car.terrain.at(desired.x,desired.z)+0.85)
@@ -126,20 +224,22 @@ func _process(delta: float) -> void:
 	var allowed := minf(arm,safe+0.06)
 	position = pivot.lerp(desired,allowed)
 
-	var down_road := -Vector3(sin(heading),0.0,cos(heading))
+	var down_road := -Vector3(sin(orbit),0.0,cos(orbit))
 	var look := tether + Vector3.UP*(1.23 if on_foot else 0.95)
 	if dispatch_view and dispatch_heading < 0.0:
 		look = look.lerp(car.position+Vector3.UP*1.15,0.36)
 	if exchanging:
 		look = look.lerp(exchange_target.position+Vector3.UP*1.18,close_up*0.47)
 	elif not on_foot:
-		look += down_road*lerpf(2.5,4.8,pace)
+		look += down_road*(9.0 if mode=="near" else 7.0)
+		if not car.airborne:
+			look.y = lerpf(tether.y,float(car.terrain.at(look.x,look.z)),.6)+(1.0 if mode=="near" else 2.2)
 	elif not dispatch_view:
 		look += down_road*0.86
 	look = look.lerp(parked_target,opening)
 	aim = aim.lerp(look,1.0-exp(-9.0*delta))
 	look_at(aim)
-	var lens := lerpf(61.0,50.0,close_up) if on_foot else lerpf(61.0,66.0,pace)
+	var lens := lerpf(61.0,50.0,close_up) if on_foot else (lerpf(68.0,75.0,pace) if mode=="near" else 64.0)
 	fov = lerpf(fov,lens,1.0-exp(-6.0*delta))
 
 

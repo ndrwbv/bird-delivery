@@ -149,10 +149,10 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventJoypadMotion or event is InputEventJoypadButton:
 		active_device = event.device
-	if event is InputEventJoypadMotion and event.axis in [JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y]:
+	if event is InputEventJoypadMotion and event.axis in [JOY_AXIS_LEFT_X,JOY_AXIS_LEFT_Y,JOY_AXIS_RIGHT_X,JOY_AXIS_RIGHT_Y]:
 		get_viewport().set_input_as_handled()
 		return
-	var back: bool = event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B
+	var back: bool = event is InputEventJoypadButton and event.pressed and event.button_index in [JOY_BUTTON_B,JOY_BUTTON_BACK]
 	if back or event.is_action_pressed(&"district_map") or event.is_action_pressed(&"ui_cancel"):
 		_close()
 
@@ -162,6 +162,9 @@ func _process(delta: float) -> void:
 	var axes := Vector2(Input.get_joy_axis(active_device, JOY_AXIS_LEFT_X), Input.get_joy_axis(active_device, JOY_AXIS_LEFT_Y))
 	if axes.length() < 0.20:
 		axes = Vector2.ZERO
+	var right := Vector2(Input.get_joy_axis(active_device,JOY_AXIS_RIGHT_X),Input.get_joy_axis(active_device,JOY_AXIS_RIGHT_Y))
+	if right.length()>=.20:
+		axes += right
 	if not search.has_focus():
 		axes += Vector2(float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)),
 			float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W)))

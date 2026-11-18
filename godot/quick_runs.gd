@@ -9,10 +9,7 @@ const SHIFT := preload("res://quick_shift.gd")
 const DISASTER := preload("res://quick_disaster.gd")
 const RESULT := preload("res://quick_result.gd")
 const SAVE := "user://quick_runs.cfg"
-const WEIGHTS := {
-	"winter":{"clear":65,"snowy":35}, "summer":{"clear":62,"heat":15,"rain":13,"storm":7,"hurricane":3},
-	"autumn":{"clear":48,"golden":30,"rain":12,"storm":6,"hurricane":4}, "spring":{"clear":64,"rain":25,"storm":8,"hurricane":3}
-}
+const CALENDAR := preload("res://south_calendar.gd")
 const TITLES := {"time":"заезд окончен","quit":"ты сам закончил заезд","pulled":"сняли с заезда","dead":"заезд сорвался"}
 
 var conditions := {}
@@ -26,7 +23,7 @@ var writable := true
 var car: CharacterBody3D
 var mode := ""
 
-func setup(vehicle: CharacterBody3D, terrain: RefCounted, region: Dictionary, traffic: Node3D, walkers: Array = []) -> void:
+func setup(vehicle: CharacterBody3D, terrain: RefCounted, region: Dictionary, traffic: Node3D, walkers: Array = [], memory_only := false) -> void:
 	car = vehicle
 	add_child(effects)
 	effects.setup(vehicle,terrain,region,traffic,walkers)
@@ -36,6 +33,9 @@ func setup(vehicle: CharacterBody3D, terrain: RefCounted, region: Dictionary, tr
 	paper.repeat_requested.connect(func(): repeat_requested.emit())
 	paper.conditions_requested.connect(func(): conditions_requested.emit())
 	paper.menu_requested.connect(func(): menu_requested.emit())
+	temporary = memory_only
+	if temporary:
+		return
 	var error := state.load(SAVE)
 	if error not in [OK, ERR_FILE_NOT_FOUND]:
 		writable = false
@@ -60,28 +60,16 @@ func begin(career: RefCounted, options: Dictionary) -> RefCounted:
 	mode = id
 	conditions.mode = id
 	if id == "normal":
-		var season := str(options.get("season","now"))
-		if not WEIGHTS.has(season):
-			season = str(career.data.get("season","winter"))
-		if not WEIGHTS.has(season):
-			season = "winter"
-		var weights: Dictionary = WEIGHTS[season]
-		var weather := str(options.get("weather","auto"))
-		if not weights.has(weather):
-			var roll := randi_range(1,100)
-			for name_: String in weights:
-				roll -= int(weights[name_])
-				if roll <= 0:
-					weather = name_
-					break
+		var weather := CALENDAR.summer_weather(str(options.get("weather","auto")),randf())
 		var length_id := str(options.get("len","medium"))
-		conditions.merge({"weather":weather, "season":season,"len":length_id if length_id in ["short","medium","long"] else "medium"},true)
+		conditions.merge({"weather":weather, "season":"summer","len":length_id if length_id in ["short","medium","long"] else "medium"},true)
 	else:
 		conditions.merge({"weather":"clear","season":"summer","len":"short"},true)
 	var sandbox := PROFILE.new()
 	sandbox.open(true)
 	sandbox.data = career.data.duplicate(true)
 	# Story customers and progression never enter the quick-run pool.
+	sandbox.data.season = "summer"
 	sandbox.data.gennady_paid = true
 	running = true
 	state.set_value("quick","runs",int(state.get_value("quick","runs",0))+1)

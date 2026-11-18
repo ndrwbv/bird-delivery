@@ -22,15 +22,11 @@ const LINE := Color("#cebea4")
 const CODES := ["ru","en","tr","de","es","pt","fr","it","pl","uk","kk","uz","be","ja","zh"]
 const LANG_NAMES := ["Русский","English","Türkçe","Deutsch","Español","Português","Français","Italiano","Polski","Українська","Қазақша","Oʻzbekcha","Беларуская","日本語","中文"]
 const MODE_NAMES := {"normal":"обычный заезд","hell":"Ад на земле","afterhell":"День после катастрофы"}
-const SEASONS := {"now":"как в карьере","summer":"лето","autumn":"осень","winter":"зима","spring":"весна"}
-const WEATHER := {"auto":"как выпадет","clear":"обычная","heat":"жара","golden":"золотая осень","snowy":"снежная зима","rain":"дождь","storm":"гроза","hurricane":"ураган"}
-const ALLOWED_WEATHER := {
-	"summer":["clear","heat","rain","storm","hurricane"],
-	"autumn":["clear","golden","rain","storm","hurricane"],
-	"winter":["clear","snowy"], "spring":["clear","rain","storm","hurricane"]
-}
+const CALENDAR := preload("res://south_calendar.gd")
+const WEATHER := {"auto":"как выпадет","clear":"обычная","heat":"жара","rain":"дождь","storm":"гроза","hurricane":"ураган"}
 const LENGTHS := {"short":"короткая","medium":"средняя","long":"длинная"}
 const DISPLAY_SIZES := [Vector2i(960,540),Vector2i(1280,720),Vector2i(1280,800),Vector2i(1600,900),Vector2i(1680,1050),Vector2i(1920,1080),Vector2i(1920,1200),Vector2i(2560,1440),Vector2i(2560,1600),Vector2i.ZERO]
+const DEFAULT_RENDER_SIZE := 6 # 1920 × 1200, with a 1:1 limit in smaller windows.
 const RANGES := [250,370,490]
 const TABS := ["игра","графика","звук","управление","язык"]
 
@@ -42,8 +38,7 @@ var dock := HBoxContainer.new()
 var bar_context := Label.new()
 var hint := Label.new()
 var mode_ids := PackedStringArray()
-var quick := {"mode":"normal", "season":"now", "weather":"auto", "len":"medium"}
-var career_season := "winter"
+var quick := {"mode":"normal", "weather":"auto", "len":"medium"}
 var selected_locale := ""
 var completed_shifts := 0
 var summary := {}
@@ -61,6 +56,7 @@ var stick_direction := Vector2i.ZERO
 var tab_buttons: Array[Button] = []
 var textures: Dictionary[String, Texture2D] = {}
 var shift_location: Dictionary = {}
+var steam_platform: Node
 var profile_tool: Node
 var achievement_board: CanvasLayer
 var game_audio: Node
@@ -147,6 +143,11 @@ func setup() -> void:
 	base.add_child(dock)
 	dock.add_theme_constant_override("separation",0)
 
+func bind_steam(platform: Node) -> void:
+	steam_platform = platform
+	if active() and current_page == "language":
+		_show_page("language")
+
 func bind_profile(owner: RefCounted, honors: CanvasLayer, modes: Node) -> void:
 	if profile_tool:
 		return
@@ -218,7 +219,7 @@ func _map_visibility() -> void:
 	if owns_focus_after_map and active() and not map_overlay.visible:
 		owns_focus_after_map = false
 		if is_instance_valid(focus_default):
-			focus_default.grab_focus.call_deferred()
+			_restore_default_focus.call_deferred()
 
 func open_start(_has_career := false, finished_shifts := 0, _hell_completed := false) -> void:
 	setup()
@@ -283,7 +284,12 @@ func _show_page(page: String) -> void:
 		"credits": _credits_page()
 		"profile": _profile_page()
 	if is_instance_valid(focus_default):
-		focus_default.grab_focus.call_deferred()
+		_restore_default_focus.call_deferred()
+
+func _restore_default_focus() -> void:
+	if active() and is_instance_valid(focus_default) and focus_default.is_inside_tree() and focus_default.is_visible_in_tree():
+		focus_default.grab_focus()
+
 
 func _clear(container: Container) -> void:
 	for child in container.get_children():
@@ -308,6 +314,8 @@ func _language_buttons(card: Container) -> void:
 	grid.add_theme_constant_override("v_separation",7)
 	card.add_child(grid)
 	var guess := selected_locale if not selected_locale.is_empty() else OS.get_locale_language()
+	if selected_locale.is_empty() and steam_platform and not steam_platform.suggested_locale().is_empty():
+		guess = steam_platform.suggested_locale()
 	if not guess in CODES:
 		guess = "en"
 	for i in CODES.size():
@@ -440,7 +448,7 @@ func _open_map() -> void:
 func quick_options() -> Dictionary:
 	var options := quick.duplicate()
 	if options.mode != "normal":
-		options.merge({"season":"summer","weather":"clear","len":"short"},true)
+		options.merge({"weather":"clear","len":"short"},true)
 	return options
 
 func _available_quick() -> PackedStringArray:
@@ -459,14 +467,10 @@ func _quick_page() -> void:
 	var card := _sheet(stage,"путевой лист",550)
 	_quick_field(card,"режим заезда","mode",available,MODE_NAMES)
 	if quick.mode == "normal":
-		if not SEASONS.has(quick.season):
-			quick.season = "now"
 		if not LENGTHS.has(quick.len):
 			quick.len = "medium"
-		_quick_field(card,"сезон","season",SEASONS.keys(),SEASONS)
-		var season: String = career_season if quick.season == "now" else quick.season
 		var weather := PackedStringArray(["auto"])
-		weather.append_array(PackedStringArray(ALLOWED_WEATHER.get(season,ALLOWED_WEATHER.winter)))
+		weather.append_array(PackedStringArray(CALENDAR.PROBABILITY.summer.keys()))
 		if not quick.weather in weather:
 			quick.weather = "auto"
 		_quick_field(card,"погода","weather",weather,WEATHER)
@@ -483,7 +487,7 @@ func _quick_field(card: Container, title: String, key: String, ids: PackedString
 		labels.append(names[id])
 	_option(card,title,labels,ids.find(quick[key]),func(i: int):
 		quick[key] = ids[i]
-		if key in ["mode","season"]:
+		if key == "mode":
 			_show_page("quick")
 	)
 
@@ -529,7 +533,7 @@ func _graphics(card: Container) -> void:
 	var display_labels := PackedStringArray()
 	for pixels: Vector2i in DISPLAY_SIZES:
 		display_labels.append("%d × %d" % [pixels.x,pixels.y] if pixels != Vector2i.ZERO else "как у экрана")
-	var resolution := int(prefs.get_value("graphics","resolution",DISPLAY_SIZES.size()-1))
+	var resolution := int(prefs.get_value("graphics","resolution",DEFAULT_RENDER_SIZE))
 	var aa := 1 if get_viewport().msaa_3d != Viewport.MSAA_DISABLED else 0
 	_option(card,"качество",["низкая","средняя","высокая","своя"],int(prefs.get_value("graphics","preset",3)),_preset)
 	if is_instance_valid(driving_camera):
@@ -563,6 +567,7 @@ func _apply_saved() -> void:
 	for key: String in ["fps","resolution","aa","range","shadow"]:
 		if prefs.has_section_key("graphics",key):
 			_apply_graphic(key,prefs.get_value("graphics",key))
+	_apply_resolution()
 	if not get_viewport().size_changed.is_connected(_apply_resolution):
 		get_viewport().size_changed.connect(_apply_resolution)
 
@@ -582,16 +587,16 @@ func _apply_graphic(key: String, value: Variant) -> void:
 		"shadow":
 			if is_instance_valid(sunlight):
 				sunlight.shadow_enabled = bool(value)
-		"aa": get_viewport().msaa_3d = Viewport.MSAA_4X if value else Viewport.MSAA_DISABLED
+		"aa": get_viewport().msaa_3d = Viewport.MSAA_2X if value else Viewport.MSAA_DISABLED
 
 func _apply_resolution() -> void:
-	var index := clampi(int(prefs.get_value("graphics","resolution",DISPLAY_SIZES.size()-1)),0,DISPLAY_SIZES.size()-1)
+	var index := clampi(int(prefs.get_value("graphics","resolution",DEFAULT_RENDER_SIZE)),0,DISPLAY_SIZES.size()-1)
 	var target: Vector2i = DISPLAY_SIZES[index]
 	var window_size := get_window().size
 	if target == Vector2i.ZERO or window_size.x <= 0 or window_size.y <= 0:
 		get_viewport().scaling_3d_scale = 1.0
 	else:
-		get_viewport().scaling_3d_scale = clampf(minf(float(target.x)/window_size.x,float(target.y)/window_size.y),0.25,2.0)
+		get_viewport().scaling_3d_scale = clampf(minf(float(target.x)/window_size.x,float(target.y)/window_size.y),0.25,1.0)
 
 func _sound(card: Container) -> void:
 	if not game_audio:

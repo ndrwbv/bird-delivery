@@ -16,9 +16,11 @@ var waypoint := 1
 var order := -1
 var returning := false
 var elapsed := 0.0
+var previous_draw_calls := 0
 var next_report := 20.0
 var ready_reported := false
 var capture_dir := ""
+var straight_road := false
 var matched_input := false
 var sample_clock := 0.0
 var next_speed_sample := 0.0
@@ -41,7 +43,8 @@ var last_delivery_stage := 0
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	headless = DisplayServer.get_name() == "headless"
-	matched_input = "--matched-input" in args
+	straight_road = "--straight-road" in args
+	matched_input = straight_road or "--matched-input" in args
 	startup_only = "--startup-only" in args
 	first_order_only = "--first-order" in args
 	for arg in args:
@@ -51,11 +54,17 @@ func _ready() -> void:
 			capture_dir = arg.trim_prefix("--capture-dir=")
 	if not headless:
 		RenderingServer.frame_post_draw.connect(_frame_presented)
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	process_physics_priority = 1
 
 
 func _physics_process(delta: float) -> void:
 	if finished:
+		return
+	if game.choices.visible:
+		print("CHOICE at ",car.position," · hearts ",car.hearts," · sinking ",car.sinking)
+		game.choices._pick(0)
+	if get_tree().paused:
 		return
 	elapsed += delta
 	if elapsed >= next_report:
@@ -71,8 +80,6 @@ func _physics_process(delta: float) -> void:
 		return
 	if game.papers.active() and not game.papers.blocking():
 		game.papers.accept_invoice()
-	if game.choices.visible:
-		game.choices._pick(0)
 	if game.papers.blocking():
 		_finish()
 		return
@@ -90,11 +97,18 @@ func _physics_process(delta: float) -> void:
 		_set_path()
 	if matched_input:
 		if not game.dispatch.active():
+			if straight_road and sample_clock == 0.0:
+				var axis := Vector2(-31.22,156.08)
+				car.park(Vector2(-82.78,75.92)+axis*.36,atan2(axis.x,axis.y)+PI)
+				game.chase.reset_view()
 			sample_clock += delta
 			_action(GAS, float(sample_clock < 2.8))
 			_action(REVERSE, float(sample_clock >= 2.8 and sample_clock < 4.4))
-			if sample_clock <= 7.5 and sample_clock >= next_speed_sample:
-				print("SPEED %.2f %.3f" % [sample_clock, Vector2(car.velocity.x,car.velocity.z).length()])
+			if headless and matched_input and sample_seconds > 0 and sample_clock >= sample_seconds:
+				_finish()
+				return
+			if sample_clock <= 7.5 and sample_clock+.000001 >= next_speed_sample:
+				print("SPEED %.2f %.3f at %s HP %.2f" % [sample_clock, Vector2(car.velocity.x,car.velocity.z).length(), car.position,car.hearts])
 				next_speed_sample += .5
 	elif not game.courier.active and not path.is_empty():
 		_drive()
@@ -191,7 +205,8 @@ func _frame_presented() -> void:
 	var now := Time.get_ticks_usec()
 	if not ready_reported and absf(car.speed) > 0.01:
 		ready_reported = true
-		print("PLAYABLE %.3f seconds from process start · %s · %s" % [Time.get_ticks_msec()*.001,get_viewport().get_visible_rect().size,RenderingServer.get_video_adapter_name()])
+		print("PLAYABLE %.3f seconds · output %s · 3D scale %.3f · %s" %
+			[Time.get_ticks_msec()*.001,get_viewport().get_texture().get_size(),get_viewport().scaling_3d_scale,RenderingServer.get_video_adapter_name()])
 		_capture("start")
 		if startup_only:
 			get_tree().quit()
@@ -201,13 +216,17 @@ func _frame_presented() -> void:
 			var interval := float(now - last_frame_usec) / 1000.0
 			frame_intervals.append(interval)
 			if interval > 50:
-				print("LONG_FRAME %.2f ms · %s · %s · tile %s · loaded %d" % [interval,car.position,phase_name,game.region_world.last_tile,game.region_world.loaded.size()])
+				print("LONG_FRAME %.2f ms · %s · %s · %d tiles · CPU %.2f ms · physics %.2f ms · draws %d → %d" %
+					[interval,car.position,phase_name,game.region_world.loaded.size(),Performance.get_monitor(Performance.TIME_PROCESS)*1000.0,
+					Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)*1000.0,previous_draw_calls,
+					int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))])
 			if interval > slowest_interval:
 				slowest_interval = interval
 				slowest_at = Vector2(car.position.x, car.position.z)
 		else:
 			interval_start = now
 		last_frame_usec = now
+		previous_draw_calls = int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
 	if sample_seconds > 0 and interval_start > 0 and (now-interval_start)*.000001 >= sample_seconds:
 		_finish()
 		return

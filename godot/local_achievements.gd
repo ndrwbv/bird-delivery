@@ -215,8 +215,12 @@ func _process(dt: float) -> void:
 		for def: Dictionary in definitions:
 			if def.id == note.id:
 				toast.text = tr("достижение")+"  ·  "+tr(def.name)
-				toast_time = 4.0
-				toast.show()
+				var ride := get_tree().get_first_node_in_group("ride_notifications")
+				if ride != null and ride.visible:
+					ride.queue_notice(toast.text,"ach",4.0)
+				else:
+					toast_time = 4.0
+					toast.show()
 				break
 		break
 

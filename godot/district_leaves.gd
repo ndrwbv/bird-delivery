@@ -104,7 +104,9 @@ func _load(request: Vector2i) -> void:
 	batch.multimesh = multimesh
 	batch.position = Vector3(row[0],0,row[1])
 	batch.material_override = near_paint if near else far_only
-	batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if near else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# The matching solid crown already shades the road. The alpha cards
+	# add detail to the view without redrawing the canopy in every shadow split.
+	batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(batch)
 	if near:
 		cached_tiles[request.x] = batch

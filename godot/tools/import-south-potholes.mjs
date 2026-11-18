@@ -47,8 +47,20 @@ try {
   (await load('game/roadsmooth')).smooth(city,{on:true,circles:rings.found(city)});
   const maps = await load('game/mapcheck');
   (await load('game/beach')).prepare(map,city);
-  maps.fixMap(city,maps.decodeHeights(city.terrain));
+  const mapHeights=maps.decodeHeights(city.terrain);
+  maps.fixMap(city,mapHeights);
   const {roadWidth} = maps;
+  const ZN = await load('game/zones');
+  const depot = JSON.parse(await readFile(new URL('south-original.json',assets))).home;
+  const safe = (x,z) => inside(x,z) && Math.hypot(x-ox-depot[0], z-oz-depot[1]) >= 150;
+  const heightAt = maps.groundFn(city.terrain,mapHeights);
+  const danger = ZN.buildZone({x:ox+region.garage[0],z:oz+region.garage[1],r:450},{
+    roads:city.roads,houses:city.buildings,distAt:(x,z)=>safe(x,z)?1:0,pizzas:[[ox+depot[0],oz+depot[1]]],
+    wet:(x,z)=>heightAt(x,z)<0});
+  for (let i=0;i<danger.nx;i++) for (let j=0;j<danger.nz;j++)
+    if (!safe(danger.x0+(i+0.5)*danger.C,danger.z0+(j+0.5)*danger.C)) danger.v[i*danger.nz+j]=0;
+  await writeFile(new URL('south-danger.json',assets),JSON.stringify({x:danger.x0-ox,z:danger.z0-oz,
+    nx:danger.nx,nz:danger.nz,cell:danger.C,values:Buffer.from(danger.v).toString('base64')})+'\n');
   const RW = await load('game/roadwear');
   RW.init({CITY:city,MAP:map,nearestRoad});
   for (const road of city.roads) {

@@ -1,7 +1,7 @@
 extends RefCounted
 
 ## Road approaches in the original South delivery district, in local (x, z) metres.
-## Only the stops already authored in south.json include a drivable parking spur.
+## Stops with a validated courtyard approach include the two-way parking spur.
 const CELL := 128.0
 const CORE_HOUSES := {
 	"Южный проезд, 23": 118887128,
@@ -14,6 +14,9 @@ const GENNADY_HOUSE := 119208348
 
 var destinations: Array[Dictionary] = []
 var _graph := AStar2D.new()
+var revision := 0
+var _closed := {}
+var _decks := {}
 var _edges: Array[Vector2i] = []
 var _cells: Dictionary = {}
 var _parking: Array[Dictionary] = []
@@ -22,6 +25,9 @@ var _building_cells: Dictionary
 
 func setup(region: Dictionary, core: Dictionary) -> void:
 	destinations.clear()
+	_closed.clear()
+	_decks.clear()
+	revision += 1
 	_parking.clear()
 	_cells.clear()
 	_graph.clear()
@@ -54,7 +60,10 @@ func setup(region: Dictionary, core: Dictionary) -> void:
 					_link(id, previous, incoming)
 					if int(road["class"]) <= 5:
 						flow[Vector2i(id,previous)] = true
-				edges[Vector2i(mini(previous, id), maxi(previous, id))] = true
+				var key := Vector2i(mini(previous,id),maxi(previous,id))
+				edges[key] = true
+				if road.has("deck_y"):
+					_decks[key] = true
 			previous = id
 	if edges.is_empty():
 		return
@@ -125,13 +134,13 @@ func setup(region: Dictionary, core: Dictionary) -> void:
 		_add_approach("garage", "Мастерская", _vec(region.garage), "garage")
 
 
-func route_to(car_xz: Vector2, destination: Dictionary) -> Array:
+func route_to(car_xz: Vector2, destination: Dictionary, forward := Vector2.ZERO, on_deck := false) -> Array:
 	if _edges.is_empty() or not destination.has("stop"):
 		return []
 	var finish: Dictionary = destination.get("_snap", {})
 	if finish.is_empty():
 		finish = _nearest(_vec(destination.stop))
-	var start := _car_snap(car_xz)
+	var start := _car_snap(car_xz,forward,on_deck)
 	if start.has("parking") and start.parking == destination.get("id", ""):
 		if car_xz.distance_squared_to(_vec(destination.stop)) < 0.0064:
 			return [destination.stop]
@@ -148,11 +157,55 @@ func route_to(car_xz: Vector2, destination: Dictionary) -> Array:
 
 ## Arbitrary map points resolve to reachable roads. Recognized parking stops include
 ## the authored driveway segment, so returning to the depot ends beside the pizzeria.
-func route_between(car_xz: Vector2, target_xz: Vector2) -> Array:
+func route_between(car_xz: Vector2, target_xz: Vector2, forward := Vector2.ZERO, on_deck := false) -> Array:
 	for stop: Dictionary in _parking:
 		if target_xz.distance_squared_to(_vec(stop.stop)) < 1.0:
-			return route_to(car_xz, stop)
-	return route_to(car_xz, {"stop": _xy(target_xz)})
+			return route_to(car_xz, stop, forward, on_deck)
+	return route_to(car_xz, {"stop": _xy(target_xz)}, forward, on_deck)
+
+
+## Accept a temporary barrier only when both previously allowed directions retain a detour.
+func set_road_closed(from: Vector2, to: Vector2, closed: bool) -> bool:
+	var midpoint := (from+to)*.5
+	var edge := Vector2i(-1,-1)
+	if not closed:
+		for blocked: Vector2i in _closed:
+			if midpoint.distance_squared_to(_closed[blocked].at) < 1.0:
+				edge = blocked
+				break
+		if edge.x < 0:
+			return false
+		_restore_edge(edge,_closed[edge])
+		_closed.erase(edge)
+	else:
+		var snap := _nearest(midpoint)
+		if snap.is_empty() or midpoint.distance_squared_to(snap.at) > 36.0:
+			return false
+		edge = snap.edge
+		if _decks.has(edge):
+			return false
+		# A delivery projected onto a closed road must also stay reachable.
+		for destination: Dictionary in destinations:
+			if destination._snap.edge == edge:
+				return false
+		var directions := {"a":_graph.are_points_connected(edge.x,edge.y,false),"b":_graph.are_points_connected(edge.y,edge.x,false),"at":midpoint}
+		if directions.a:
+			_graph.disconnect_points(edge.x,edge.y,false)
+		if directions.b:
+			_graph.disconnect_points(edge.y,edge.x,false)
+		if (directions.a and _graph.get_id_path(edge.x,edge.y).is_empty()) or (directions.b and _graph.get_id_path(edge.y,edge.x).is_empty()):
+			_restore_edge(edge,directions)
+			return false
+		_closed[edge] = directions
+	revision += 1
+	return true
+
+
+func _restore_edge(edge: Vector2i, directions: Dictionary) -> void:
+	if directions.a:
+		_graph.connect_points(edge.x,edge.y,false)
+	if directions.b:
+		_graph.connect_points(edge.y,edge.x,false)
 
 
 func _link(a: int, b: int, incoming: Dictionary) -> void:
@@ -231,28 +284,37 @@ func _index_edge(edge: Vector2i) -> void:
 			_cells[key].append(edge)
 
 
-func _nearest(point: Vector2) -> Dictionary:
+func _nearest(point: Vector2, forward := Vector2.ZERO, on_deck := false) -> Dictionary:
 	var close: Dictionary = {}
 	var cell := _cell(point)
 	for dx in range(-1, 2):
 		for dz in range(-1, 2):
 			for edge: Vector2i in _cells.get(cell + Vector2i(dx, dz), []):
 				close[edge] = true
-	var result := _nearest_on_edges(point, close.keys())
+	var result := _nearest_on_edges(point, close.keys(), forward, on_deck)
 	# Every segment within CELL metres intersects one of those nine cells.
 	if not result.is_empty() and point.distance_squared_to(result.at) < CELL * CELL:
 		return result
-	return _nearest_on_edges(point, _edges)
+	return _nearest_on_edges(point, _edges, forward, on_deck)
 
 
-func _nearest_on_edges(point: Vector2, edges: Array) -> Dictionary:
+func _nearest_on_edges(point: Vector2, edges: Array, forward := Vector2.ZERO, on_deck := false) -> Dictionary:
 	var best := INF
 	var result: Dictionary = {}
 	for edge: Vector2i in edges:
 		var a := _graph.get_point_position(edge.x)
 		var b := _graph.get_point_position(edge.y)
 		var at := Geometry2D.get_closest_point_to_segment(point, a, b)
-		var distance := point.distance_squared_to(at)
+		if _closed.has(edge):
+			continue
+		var distance := point.distance_to(at)
+		if not forward.is_zero_approx():
+			var along := (b-a).normalized().dot(forward)
+			distance += 3.0*(1.0-absf(along))
+			if _decks.has(edge) != on_deck:
+				distance += 12.0
+			if (along < -.3 and not _graph.are_points_connected(edge.y,edge.x,false)) or (along > .3 and not _graph.are_points_connected(edge.x,edge.y,false)):
+				distance += 4.0
 		if distance < best:
 			best = distance
 			result = {"edge": edge, "at": at}
@@ -283,6 +345,13 @@ func _add_approach(id: String, label: String, site: Vector2, kind: String) -> Di
 	return item
 
 
+func register_yard(place: Dictionary, stop: Vector2, driveway: Vector2) -> void:
+	place.stop = _xy(stop)
+	place._snap = _nearest(driveway)
+	place.parking = true
+	_parking.append(place)
+
+
 func _add_parking(id: String, label: String, stop: Vector2, driveway: Vector2, kind: String, house: int) -> void:
 	var item := {"id": id, "name": label, "kind": kind, "site": _xy(stop), "stop": _xy(stop),
 			"_snap": _nearest(driveway), "parking": true, "building_id": house}
@@ -290,7 +359,7 @@ func _add_parking(id: String, label: String, stop: Vector2, driveway: Vector2, k
 	_parking.append(item)
 
 
-func _car_snap(point: Vector2) -> Dictionary:
+func _car_snap(point: Vector2, forward := Vector2.ZERO, on_deck := false) -> Dictionary:
 	for stop: Dictionary in _parking:
 		var parked := _vec(stop.stop)
 		var road: Vector2 = stop._snap.at
@@ -299,7 +368,7 @@ func _car_snap(point: Vector2) -> Dictionary:
 		var spur := Geometry2D.get_closest_point_to_segment(point, parked, road)
 		if point.distance_squared_to(spur) < 2.25 and point.distance_squared_to(road) > 0.04:
 			return {"edge": stop._snap.edge, "at": road, "parking": stop.id}
-	return _nearest(point)
+	return _nearest(point,forward,on_deck)
 
 
 func _road_path(start: Dictionary, finish: Dictionary) -> Array:

@@ -33,14 +33,14 @@ func _ready() -> void:
 	hide()
 
 
-func offer(person: String, question: String, answers: Array, timeout := -1.0, on_timeout := -1) -> void:
+func offer(person: String, question: String, answers: Array, timeout := -1.0, on_timeout := -1, freeze_world := true) -> void:
 	remaining = timeout
 	default_answer = on_timeout
 	if not visible:
 		previous_pause = get_tree().paused
 		var focused := get_viewport().gui_get_focus_owner()
 		previous_focus = weakref(focused) if focused else null
-	get_tree().paused = true
+	get_tree().paused = previous_pause or freeze_world
 	for item in body.get_children():
 		body.remove_child(item)
 		item.queue_free()

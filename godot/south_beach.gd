@@ -111,6 +111,7 @@ func _sand() -> void:
 func _spots() -> void:
 	var toward := -Vector2(AXIS.y,-AXIS.x).normalized()
 	var base_angle := atan2(toward.x,toward.y)
+	var props: Array = JSON.parse_string(FileAccess.get_file_as_string("res://assets/summer_shore.json")).avoid
 	for i in 34:
 		var a := -58+i*3.5
 		for j in 10:
@@ -118,7 +119,8 @@ func _spots() -> void:
 			var aa := a+(_hash(a,b,11)-.5)*2
 			var bb := b+(_hash(a,b,12)-.5)*2
 			var at := _world(aa,bb)
-			if terrain.land_height(at.x,at.y) >= water_y+.4:
+			if terrain.land_height(at.x,at.y) >= water_y+.4 and not props.any(func(prop: Dictionary):
+					return at.distance_squared_to(Vector2(prop.x,prop.z)) < (prop.r+1.6)**2):
 				options.append({"at":at,"yaw":base_angle+(_hash(aa,bb,13)-.5)*.5})
 
 static func _xz(point: Array) -> Vector2:

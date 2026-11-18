@@ -51,6 +51,7 @@ var terrain: RefCounted
 var controls_locked := false
 var hit_handler: Callable
 var person_handler: Callable
+var pad_nitro_available: Callable
 var person_kick := 0.0
 var rear_slip := 0.0
 var nitro := 0.50
@@ -180,7 +181,8 @@ func _physics_process(delta: float) -> void:
 	var stick := Input.get_action_raw_strength(&"steer_right")-Input.get_action_raw_strength(&"steer_left") if driving else 0.0
 	var steer := signf(stick)*pow(clampf((absf(stick)-0.12)/0.85,0.0,1.0),1.6)
 	var handbrake := not driving or Input.is_action_pressed(&"handbrake")
-	var boosting := driving and Input.is_action_pressed(&"nitro")
+	var pad_boost: bool = driving and pad_nitro_available.is_valid() and Input.is_action_pressed(&"pad_nitro") and pad_nitro_available.call()
+	var boosting := driving and (Input.is_action_pressed(&"nitro") or pad_boost)
 	if active_shift and hearts > 0.0:
 		engine.step(delta,speed,driving)
 	if active_shift and not controls_locked and engine.restarting:
@@ -198,12 +200,13 @@ func _physics_process(delta: float) -> void:
 	var lateral := right.dot(velocity)
 	var old_speed := speed
 	surface.step(position,terrain,delta)
-	surface.winter.sample(position,Vector2(forward.x,forward.z),terrain,surface.snow,delta,
-		not airborne and surface.wade <= 0.0 and not surface.ice,wheel_rest)
-	surface.loose_snow = surface.winter.result.x
-	surface.grit = surface.winter.result.y
-	surface.rut = surface.winter.result.z
-	surface.snow_cover = surface.winter.result.w
+	if surface.snow > 0.0:
+		surface.winter.sample(position,Vector2(forward.x,forward.z),terrain,surface.snow,delta,
+			not airborne and surface.wade <= 0.0 and not surface.ice,wheel_rest)
+		surface.loose_snow = surface.winter.result.x
+		surface.grit = surface.winter.result.y
+		surface.rut = surface.winter.result.z
+		surface.snow_cover = surface.winter.result.w
 	if driving and not airborne and ((not surface.frozen and surface.water_depth > (0.75 if surface.wading_beach else 0.15)) or surface.breaks_ice(delta,speed,position.y)):
 		sinking = 0.0
 		motor_audio.step(delta,engine,false,false)

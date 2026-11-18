@@ -25,23 +25,20 @@ var street_lights: Node3D
 var night := 0.0
 var elapsed := 0.0
 var weather := "clear"
-var season := "winter"
-var season_value := 2.5
-var holiday := ""
-var snow := 1.0
-var ice := 1.0
+const season := "summer"
+const season_value := 0.45
+const holiday := ""
+const snow := 0.0
+const ice := 0.0
 var wet := 0.0
 var grip := 1.0
 var puddles := 0.0
 var wind := Vector2.ZERO
 var rain_material: ShaderMaterial
 var streaks: MultiMeshInstance3D
-var calendar := CALENDAR.new()
 var precipitation := PRECIPITATION.new()
 var storm := STORM.new()
 var season_materials: Array[ShaderMaterial] = []
-var _date := {}
-var _last_career := {}
 var _clock := 0.06
 var _external_clock := false
 var _force_night := false
@@ -77,63 +74,35 @@ func configure(vehicle: CharacterBody3D, view: Camera3D, paint: ShaderMaterial, 
 		if arg == "--night":
 			_force_night = true
 		elif arg.begins_with("--weather="):
-			_force_weather = arg.trim_prefix("--weather=")
+			var override := arg.trim_prefix("--weather=")
+			if CALENDAR.PROBABILITY.summer.has(override) or override == "downpour":
+				_force_weather = override
 	start_career(1,1)
 
 func start_career(number: int, seed_value := 1, first_in_session := false) -> void:
-	_date = calendar.at(number,seed_value)
-	_last_career = _date.duplicate()
-	if first_in_session and _date.weather == "hurricane":
-		_date.weather = "storm"
 	_external_clock = true
-	_begin(_date,number==1,int(CALENDAR.random01(seed_value,number)*2147483647))
+	var chosen := CALENDAR.summer_shift_weather(number,seed_value,not first_in_session)
+	_begin(chosen,number==1,int(CALENDAR.random01(seed_value,number)*2147483647))
 
-func start_quick(season_id := "now", weather_id := "auto", seed_value := 1) -> void:
-	var state: Dictionary = _last_career.duplicate() if not _last_career.is_empty() else calendar.at(1,seed_value)
-	state.holiday = ""
-	if CALENDAR.QUICK.has(season_id):
-		state.season = season_id
-		state.value = CALENDAR.QUICK[season_id]
-	if weather_id in ["","calendar","auto"]:
-		state.weather = CALENDAR.pick(CALENDAR.PROBABILITY[state.season], CALENDAR.random01(seed_value,5003))
-	else:
-		state.weather = weather_id
+
+func start_quick(weather_id := "auto", seed_value := 1) -> void:
 	_external_clock = false
-	_begin(state,false,seed_value)
+	_begin(CALENDAR.summer_weather(weather_id,CALENDAR.random01(seed_value,5003)),false,seed_value)
+
 
 func set_clock(env_time: float) -> void:
 	_external_clock = true
 	_clock = fposmod(env_time,1.0)
 
-func _begin(state: Dictionary, novice: bool, seed_value: int) -> void:
-	season = state.season
-	season_value = state.value
-	holiday = state.holiday
-	weather = state.weather if _force_weather.is_empty() else _force_weather
-	var peak := weather in ["blizzard","downpour"]
-	if weather == "blizzard":
-		weather = "snowy"
-		season = "winter"
-		season_value = 2.5
-	elif weather == "downpour":
+func _begin(chosen: String, novice: bool, seed_value: int) -> void:
+	weather = chosen if _force_weather.is_empty() else _force_weather
+	var peak := weather == "downpour"
+	if peak:
 		weather = "rain"
-	elif not _force_weather.is_empty():
-		var homes := {"heat":"summer","golden":"autumn","snowy":"winter","rain":"spring","storm":"summer","hurricane":"autumn"}
-		if homes.has(weather) and not CALENDAR.PROBABILITY[season].has(weather):
-			season = homes[weather]
-			season_value = CALENDAR.QUICK[season]
 	var cover := CALENDAR.cover(season_value,weather)
-	snow = cover.snow
-	ice = cover.ice
 	_soil_wet = cover.soil_wet
-	var params := Vector4(snow,cover.leaves,cover.yellow,cover.dry)
 	for paint in season_materials:
-		paint.set_shader_parameter(&"season_surface",params)
-	if is_instance_valid(car):
-		car.surface.snow = snow
-		car.surface.frozen = snow >= 0.318
-		get_node("../CurbGrowth").visible = snow < 0.65
-		get_node("../Grass").visible = snow < 0.95
+		paint.set_shader_parameter(&"season_surface",Vector4(0.0,1.0,0.0,cover.dry))
 	precipitation.start(weather,season,novice and _force_weather.is_empty(),seed_value,peak)
 	if (weather != "clear" or not novice) and not streaks:
 		_make_rain()
@@ -165,10 +134,10 @@ func _process(delta: float) -> void:
 
 func _update_precipitation(delta: float) -> void:
 	wet = precipitation.rain
-	grip = 1-minf(1.0,wet+snow*0.32)
+	grip = 1-minf(1.0,wet)
 	if not is_instance_valid(car):
 		return
-	puddles = move_toward(puddles,wet if wet>0.5 else 0.0,delta/(70.0 if wet>0.5 else 150.0)) if snow<=0.45 else 0.0
+	puddles = move_toward(puddles,wet if wet>0.5 else 0.0,delta/(70.0 if wet>0.5 else 150.0))
 	car.wet = wet
 	var gust := 0.0
 	if weather == "hurricane":
@@ -177,11 +146,10 @@ func _update_precipitation(delta: float) -> void:
 	car.surface.wind = wind
 	if not streaks:
 		return
-	var intensity := maxf(wet,precipitation.flakes)
+	var intensity := wet
 	streaks.visible = intensity > 0.012
 	if streaks.visible:
 		rain_material.set_shader_parameter(&"rain_amount",intensity)
-		rain_material.set_shader_parameter(&"snowfall",snow>0.45 or precipitation.flakes>wet)
 		rain_material.set_shader_parameter(&"crosswind",Vector2.from_angle(_gale_angle)*(gust+precipitation.top))
 		var point := camera.global_position
 		streaks.position = Vector3(point.x,car.global_position.y-2.0,point.z)
@@ -201,7 +169,7 @@ func _apply_sun() -> void:
 	var old_dir := Vector3(cos(TAU*t)*160,60+maxf(0,sin(PI*t+0.3))*140,90).normalized()
 	dir = dir.lerp(old_dir,smoothstep(0.5,1.0,night)).normalized()
 	sun.look_at(sun.position-dir)
-	var overcast := maxf(wet,precipitation.flakes*0.70)
+	var overcast := wet
 	var shade := 1.0-0.55*wet
 	if weather == "storm":
 		shade *= 1.0-0.55*wet
@@ -210,30 +178,22 @@ func _apply_sun() -> void:
 	sun.light_energy = lerpf(SUN_POWER[i],SUN_POWER[i+1],k)*shade*0.70+storm.flash*0.60
 	sun.light_color = SUN_COLORS[i].lerp(SUN_COLORS[i+1],k)
 	var mist: Color = FOG_COLORS[i].lerp(FOG_COLORS[i+1],k)
-	mist = mist.lerp(Color("#dfe5ec"),snow*0.42*(1-night))
 	mist = mist.lerp(Color("#8393a4"), wet*0.6*(1-night*0.6))
 	if weather == "heat":
 		mist = mist.lerp(Color("#e5bd8c"),0.35*(1.0-night))
 		sun.light_color = sun.light_color.lerp(Color("#ffbf70"),0.5)
-	elif weather == "golden":
-		sun.light_color = sun.light_color.lerp(Color("#ffd9a0"),0.45)
-	elif weather == "snowy":
-		mist = mist.lerp(Color("#dfe5ec"),(0.4+0.5*precipitation.top)*(1-night))
 	elif weather in ["storm","hurricane"]:
 		mist = mist.lerp(Color("#646b62") if weather=="hurricane" else Color("#4a525f"),0.45*wet)
 	environment.fog_light_color = mist.lerp(Color("#bfc8e6"),storm.flash*0.5)
 	environment.ambient_light_color = HEMI_COLORS[i].lerp(HEMI_COLORS[i+1],k)
 	environment.ambient_light_energy = lerpf(0.35,0.47,night)*(1-0.18*wet)+storm.flash*0.8
 	var reach := 1.0-0.20*wet
-	if weather == "snowy":
-		reach = 0.82-0.12*precipitation.flakes-0.42*precipitation.top
-	environment.fog_depth_begin = (195.0-105.0*wet)*(1.0-0.85*precipitation.top if weather=="snowy" else 1.0)
+	environment.fog_depth_begin = 195.0-105.0*wet
 	environment.fog_depth_end = 590.0*reach
 	sky.set_shader_parameter(&"sun_vector",dir)
 	sky.set_shader_parameter(&"daylight",smoothstep(0.32,0.735,t))
 	sky.set_shader_parameter(&"darkness",night)
 	sky.set_shader_parameter(&"overcast",overcast)
-	sky.set_shader_parameter(&"snow_cover",snow)
 	sky.set_shader_parameter(&"heat",1.0 if weather=="heat" else 0.0)
 	sky.set_shader_parameter(&"flash",storm.flash)
 	if window_paint:

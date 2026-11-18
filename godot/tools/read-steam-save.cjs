@@ -133,6 +133,13 @@ async function convert(source) {
     seed:int(cycle.seed)||parseInt(crypto.createHash('sha256').update(mark.saveId).digest('hex').slice(0,7),16),
     crew_earned:int(crew.me)*cashMultiplier,crew_count:int(crew.n),crew_totals:crewTotals,
     semerka:{armor:num(tune.armor,0,3)|0,engine:num(tune.engine,0,3)|0,wings:!!tune.wings,gun:!!tune.gun,paint:validPaint?hex:'#ebe6d8'}};
+  const oldBoard=array(get('lb-local'));
+  if(oldBoard.length){
+    career.imported_scores=oldBoard.slice(0,50).map(item=>{
+      const row=object(item);
+      return {owner:safeText(row.ownerId).slice(0,128),name:safeText(row.name).slice(0,80),score:int(row.score),delivered:int(row.delivered),level:int(row.level),ts:int(row.ts)};
+    }).filter(row=>row.score>0);
+  }
   if(get('route')!=null) career.road_path=!['0','off','false'].includes(String(get('route')));
   if(get('doorgames')!=null) career.door_games=!['0','off','false'].includes(String(get('doorgames')));
   return {version:1,career,quick:{best:int(quick.best),history},awards:{got,seen,n:cleanCounters}};

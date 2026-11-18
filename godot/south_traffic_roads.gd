@@ -9,6 +9,8 @@ class Edge:
 	var right: Vector2
 	var width: float
 	var rank: int
+	var bridge := false
+	var blocked := false
 	var offset: float
 	var length: float
 	var entry: float
@@ -52,7 +54,10 @@ func setup(data: Array) -> void:
 		var b := navigation.get_point_position(pair.y)
 		for original: Edge in exits.get(b,[]):
 			if original.b == a:
-				_edge(a,b,{"width":original.width,"class":original.rank},0)
+				var attributes := {"width":original.width,"class":original.rank}
+				if original.bridge:
+					attributes.deck_y = true
+				_edge(a,b,attributes,0)
 				original.offset = 0.0 if original.width < 7.0 else original.width*(0.375 if original.width >= 12.5 else 0.25)
 				break
 	for edge in edges:
@@ -93,6 +98,7 @@ func _edge(a: Vector2, b: Vector2, road: Dictionary, way: int) -> void:
 	e.right = Vector2(-e.dir.y,e.dir.x)
 	e.width = road.width
 	e.rank = int(road["class"])
+	e.bridge = road.has("deck_y")
 	if way == 0:
 		e.offset = 0.0 if e.width < 7.0 else e.width*(0.375 if e.width >= 12.5 else 0.25)
 	else:
@@ -127,6 +133,61 @@ func around(at: Vector2, radius: float) -> Array[Edge]:
 	return found
 
 
+func lookup(a: Vector2, b: Vector2) -> Edge:
+	for e: Edge in exits.get(a,[]):
+		if e.b==b:
+			return e
+	return null
+
+
+func nearest(at: Vector2, heading := Vector2.ZERO) -> Edge:
+	var best: Edge
+	var score := INF
+	for e in around(at,36.0):
+		if e.blocked:
+			continue
+		var p := Geometry2D.get_closest_point_to_segment(at,e.a,e.b)
+		var d := p.distance_squared_to(at)+(1.0-e.dir.dot(heading))*5.0
+		if d<score:
+			score = d
+			best = e
+	return best
+
+
+func set_closed(a: Vector2,b: Vector2,closed: bool) -> void:
+	for pair: Array in [[a,b],[b,a]]:
+		var e := lookup(pair[0],pair[1])
+		if e==null or e.blocked==closed:
+			continue
+		e.blocked = closed
+		if closed:
+			navigation.disconnect_points(node_ids[e.a],node_ids[e.b],false)
+		else:
+			navigation.connect_points(node_ids[e.a],node_ids[e.b],false)
+
+
+func short_detour(e: Edge) -> bool:
+	if e==null or e.blocked or e.bridge:
+		return false
+	var ap: int = node_ids[e.a]
+	var bp: int = node_ids[e.b]
+	set_closed(e.a,e.b,true)
+	var forward := navigation.get_point_path(ap,bp)
+	var backward := PackedVector2Array()
+	if lookup(e.b,e.a)!=null:
+		backward = navigation.get_point_path(bp,ap)
+	set_closed(e.a,e.b,false)
+	if forward.size()<2 or (lookup(e.b,e.a)!=null and backward.size()<2):
+		return false
+	for path: PackedVector2Array in [forward,backward]:
+		var distance := 0.0
+		for i in range(1,path.size()):
+			distance += path[i].distance_to(path[i-1])
+			if distance>1400.0:
+				return false
+	return true
+
+
 func choose_after(edge: Edge) -> Edge:
 	var options: Array = exits.get(edge.b,[])
 	if options.is_empty():
@@ -135,6 +196,8 @@ func choose_after(edge: Edge) -> Edge:
 	var reverse: Edge
 	var weight := 0.0
 	for e: Edge in options:
+		if e.blocked:
+			continue
 		if e.b == edge.a:
 			reverse = e
 			continue

@@ -40,10 +40,17 @@ void vertex() {
 
 void fragment() {
 	if (leaf_mode == 1 || leaf_mode == 2) {
-		float blend = smoothstep(42.0,56.0,distance(view_origin,world));
-		float pick = facet_pick(floor(world*4.0));
-		if ((leaf_mode == 1 && pick < blend) || (leaf_mode == 2 && pick >= blend)) {
+		vec3 offset = view_origin-world;
+		float distance_sq = dot(offset,offset);
+		if ((leaf_mode == 1 && distance_sq >= 3136.0) || (leaf_mode == 2 && distance_sq <= 1764.0)) {
 			discard;
+		}
+		if (distance_sq > 1764.0 && distance_sq < 3136.0) {
+			float blend = smoothstep(42.0,56.0,sqrt(distance_sq));
+			float pick = facet_pick(floor(world*4.0));
+			if ((leaf_mode == 1 && pick < blend) || (leaf_mode == 2 && pick >= blend)) {
+				discard;
+			}
 		}
 	}
 	vec4 surface = dense_leaf > 0.5 ? texture(canopy_atlas,atlas_uv) : texture(leaf_atlas,atlas_uv);
@@ -55,7 +62,7 @@ void fragment() {
 	float shade = dense_leaf > 0.5 ? mix(0.47,1.14,surface.g) : mix(0.26,0.89,surface.g);
 	vec3 tone = paint*shade;
 	float twig = step(0.025,surface.r-surface.b)*(1.0-dense_leaf);
-	if (twig < 0.5 && facet_pick(floor(world*3.0)) > season_surface.y) discard;
+	if (season_surface.y < 1.0 && twig < 0.5 && facet_pick(floor(world*3.0)) > season_surface.y) discard;
 	tone = mix(seasonal_leaf(tone),vec3(0.17,0.098,0.04),twig*0.81);
 	ALBEDO = display_color(tone);
 	ROUGHNESS = 1.0;

@@ -20,6 +20,7 @@ func setup(region: Dictionary, core: Dictionary, graph: RefCounted) -> void:
 		candidates.append(order)
 	if warmup.is_empty():
 		warmup = candidates.back()
+	var yards: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/south-yards.json"))
 	var buildings := {}
 	for building: Dictionary in region.buildings:
 		buildings[int(building.id)] = building
@@ -32,24 +33,12 @@ func setup(region: Dictionary, core: Dictionary, graph: RefCounted) -> void:
 			story = {"name": place.name, "stop": site.parking, "entrance": {"at": site.door, "front": site.normal},
 				"customer": site.spot, "approach": site.approach, "story": true, "building_id": GENNADY}
 			continue
-		if building.kind != "res" or building.get("doors", []).is_empty():
-			continue
-		# Use a real entrance with a clear path between its doorstep and the street.
-		var best := INF
-		var order := {}
-		for door: Dictionary in building.doors:
-			var normal := _v(door.normal)
-			var wait := _v(door.at) + normal * 1.45
-			var approach := _v(place.stop) - wait
-			if approach.length() > 42.0 or approach.length() >= best or approach.dot(normal) < 0:
-				continue
-			if not routes.walk_clear(wait, _v(place.stop)):
-				continue
-			best = approach.length()
-			order = {"name": place.name, "stop": place.stop, "building_id": int(building.id),
-				"entrance": {"at": door.at, "front": door.normal}, "customer": [wait.x,wait.y]}
-		if not order.is_empty():
-			candidates.append(order)
+		var yard: Dictionary = yards.get(str(int(building.id)),{})
+		if not yard.is_empty():
+			routes.register_yard(place,_v(yard.stop),_v(yard.driveway))
+			candidates.append({"name":place.name,"stop":yard.stop,"building_id":int(building.id),
+				"entrance":yard.entrance,"customer":yard.customer})
+
 
 
 func next_order(first: bool, story_due: bool, recent: Array, level: int, number: int) -> Dictionary:
@@ -84,7 +73,7 @@ func next_order(first: bool, story_due: bool, recent: Array, level: int, number:
 
 
 func _routed(template: Dictionary) -> Dictionary:
-	if not template.has("route_cached"):
+	if template.get("route_revision",-1) != routes.revision:
 		var endpoint := _v(template.get("approach", template.stop))
 		var there: Array = routes.route_between(home, endpoint)
 		var back: Array = routes.route_between(endpoint, home)
@@ -93,7 +82,7 @@ func _routed(template: Dictionary) -> Dictionary:
 		if template.has("approach"):
 			there.append(template.stop)
 			back.push_front(template.stop)
-		template.merge({"route_cached": true, "route": there, "from_home": there, "back_home": back,
+		template.merge({"route_revision": routes.revision, "route": there, "from_home": there, "back_home": back,
 			"meters": length_of(there), "back_meters": length_of(back)}, true)
 	return template.duplicate(false)
 

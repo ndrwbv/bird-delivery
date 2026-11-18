@@ -4,6 +4,15 @@ signal event_started(kind: String)
 signal event_ended(kind: String)
 signal notice(text: String)
 signal road_thump(strength: float)
+signal money_changed(delta: int, reason: String)
+signal heart_hit(hearts: float, at: Vector3)
+signal rival_defeated
+signal respect_earned(reason: String)
+signal run_bonus(amount: int, reason: String)
+signal road_closed(from: Vector2, to: Vector2, closed: bool)
+
+var request_closure := Callable()
+var route_provider := Callable()
 
 const TIER := {"gig":"light","crew":"light","thugs":"light","flirt":"light","moose":"light","odd":"light",
 	"story":"story","errand":"story","march":"medium","gang":"medium","mafia":"medium",
@@ -51,9 +60,18 @@ var road_cells := {}
 var _decoration_materials := {}
 var clock_write := 60.0
 var dialogue: Dictionary
+var street_works := preload("res://south_roadworks.gd").new()
+var cast := preload("res://south_event_people.gd").new()
+var brand_crews := preload("res://south_brand_crews.gd").new()
+var rivals := preload("res://south_rival_deliveries.gd").new()
+var drivers := preload("res://south_angry_drivers.gd").new()
+var robbery := preload("res://south_street_robbery.gd").new()
+var thief := preload("res://south_pizza_thief.gd").new()
+var garage_zone := preload("res://south_garage_zone.gd").new()
 var winter_view := preload("res://south_winter_view.gd").new()
 var holes := preload("res://south_potholes.gd").new()
 var translation: Translation
+var profile_id := ""
 var protest_topic := {}
 var last_cycle := -1
 var protest_history: Array = []
@@ -66,8 +84,24 @@ func setup(player: CharacterBody3D, terrain: RefCounted, population: Node3D, map
 	region = map_data
 	profile = career
 	factory = create_person
+	cast.host = self
+	thief.host = self
+	thief.cast = cast
+	robbery.host = self
+	robbery.cast = cast
+	brand_crews.host = self
+	brand_crews.cast = cast
+	drivers.host = self
+	drivers.cast = cast
+	traffic.vehicle_struck.connect(drivers.struck)
 	var shared: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/south-event-sites.json"))
 	dialogue = shared
+	add_child(street_works)
+	street_works.setup(self)
+	add_child(rivals)
+	rivals.setup(self)
+	add_child(garage_zone)
+	garage_zone.setup(self)
 	add_child(winter_view)
 	winter_view.setup(car,ground)
 	add_child(holes)
@@ -113,6 +147,16 @@ func setup(player: CharacterBody3D, terrain: RefCounted, population: Node3D, map
 				if not footprints.has(key):
 					footprints[key] = []
 				footprints[key].append(poly)
+	_read_profile()
+
+
+func _read_profile() -> void:
+	profile_id = str(profile.data.get("save_id",""))
+	session_deliveries = 0
+	session_shifts = 0
+	last_cycle = -1
+	protest_history = []
+	protest_topic = {}
 	var save: Dictionary = profile.data.get("event_session",{})
 	var now := Time.get_unix_time_from_system()
 	if str(save.get("date","")) == Time.get_date_string_from_system() and now-float(save.get("at",0)) < 4.0*3600.0:
@@ -135,7 +179,7 @@ func _exit_tree() -> void:
 
 
 func _stamp() -> void:
-	if profile == null or quick:
+	if profile == null or quick or str(profile.data.get("save_id",""))!=profile_id:
 		return
 	career_n = session_deliveries
 	career_shifts = session_shifts
@@ -145,7 +189,14 @@ func _stamp() -> void:
 
 func begin_shift(shift_number: int, seconds: float, free_drive := false, quick_run := false) -> void:
 	finish()
+	if str(profile.data.get("save_id",""))!=profile_id:
+		_read_profile()
 	number = shift_number
+	garage_zone.begin()
+	thief.begin()
+	robbery.begin()
+	street_works.begin()
+	rivals.begin(int(profile.data.get("shifts",0)))
 	duration = seconds
 	ride = free_drive
 	quick = quick_run
@@ -180,6 +231,7 @@ func order(index: int, remaining: float, client_at: Vector2, is_story := false) 
 	order_index = index
 	safe_stop = client_at
 	story = is_story
+	garage_zone.order(client_at,is_story)
 	var fraction := clampf(1.0-remaining/maxf(duration,1.0),0.0,1.0)
 	role = "rise"
 	if index == 1:
@@ -194,7 +246,34 @@ func order(index: int, remaining: float, client_at: Vector2, is_story := false) 
 	tension = 1.0 if role == "peak" else (minf(1.0,fraction/0.7) if role == "rise" else 0.0)
 
 
+func person_hit(actor: Node3D, impact_kmh: float) -> void:
+	garage_zone.person_hit(actor,impact_kmh)
+	thief.hit(actor,impact_kmh)
+	drivers.hit(actor,impact_kmh)
+	rivals.hit(actor,impact_kmh)
+	brand_crews.hit(actor,impact_kmh)
+	robbery.hit(actor,impact_kmh)
+
+
+func honk() -> void:
+	robbery.honk()
+	brand_crews.honk()
+
+
+func reward(amount: int, why: String, respect_key := "") -> void:
+	if ride or quick:
+		if amount>0:
+			run_bonus.emit(amount,tr(why))
+		return
+	if not respect_key.is_empty():
+		respect_earned.emit(respect_key)
+	if amount>0:
+		money_changed.emit(amount,tr(why))
+
+
 func delivered() -> void:
+	garage_zone.delivered()
+	street_works.delivered()
 	session_deliveries += 1
 	_stamp()
 
@@ -292,6 +371,14 @@ func _end(index: int) -> void:
 
 
 func finish() -> void:
+	garage_zone.clear()
+	thief.clear()
+	robbery.clear()
+	drivers.clear()
+	rivals.clear()
+	brand_crews.clear()
+	cast.clear()
+	street_works.clear()
 	for scene in scenes:
 		_dispose(scene)
 	scenes.clear()
@@ -305,6 +392,16 @@ func step(delta: float, live: bool, hour: float) -> void:
 		return
 	elapsed += delta
 	holes.step(delta)
+	garage_zone.step(delta,hour)
+	street_works.step(delta)
+	cast.tick(delta)
+	if factory.is_valid():
+		drivers.step(delta,cast.at(car))
+		robbery.step(delta,cast.at(car))
+		var calm := not ride and (story or not bool(profile.data.get("gennady_paid",false)))
+		rivals.step(delta,cast.at(car),calm)
+		brand_crews.step(delta,cast.at(car),calm)
+		thief.step(delta,cast.at(car),calm)
 	winter_view.step()
 	pause = maxf(0.0,pause-delta)
 	clock_write -= delta

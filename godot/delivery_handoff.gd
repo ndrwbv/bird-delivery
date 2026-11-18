@@ -82,6 +82,15 @@ func reset_order() -> bool:
 	return true
 
 
+func cancel_order() -> void:
+	queue.clear()
+	_clear_presentation()
+	stage = Stage.RETURNING
+	paid = false
+	done = false
+	failed = false
+
+
 func customer_hit(result: int) -> void:
 	if stage != Stage.DRIVING or paid or done:
 		return

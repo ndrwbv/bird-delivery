@@ -20,6 +20,9 @@ var scan_in := 0.0
 var scanned_gap := 0.0
 var route_complete := false
 signal at_stop(vehicle: CharacterBody3D)
+signal player_impact(vehicle: CharacterBody3D, strength: float)
+var incident := false
+var owner_lost := false
 var terrain: RefCounted
 var route := PackedVector3Array()
 var limits := PackedFloat32Array()
@@ -66,6 +69,8 @@ func start_flow(graph: RefCounted, first: RefCounted, lights: Node3D, s: float, 
 	roads = graph
 	edge = first
 	signals = lights
+	if not signals.changed_route.is_connected(_road_changed):
+		signals.changed_route.connect(_road_changed)
 	cruise = desired
 	route_complete = false
 	stop_served = false
@@ -115,7 +120,7 @@ func _extend_flow() -> void:
 			planned_at += 1
 			var to: Vector2 = roads.navigation.get_point_position(planned_nodes[planned_at])
 			for candidate: RefCounted in roads.exits.get(edge.b,[]):
-				if candidate.b == to:
+				if candidate.b == to and not candidate.blocked:
 					next = candidate
 					break
 			if next == null:
@@ -171,10 +176,11 @@ func struck(strength: float, shot: Vector3) -> void:
 	going = false
 	coast += shot.normalized()*clampf(strength*0.26,1.0,9.0)
 	visual.rotation.z = clampf(shot.normalized().dot(basis.x)*strength*0.004,-0.12,0.12)
-	visual.position.y -= minf(0.085,strength*0.003)
+	visual.position.y = maxf(-0.10,visual.position.y-minf(0.085,strength*0.003))
 	if lamps:
 		lamps.material_override = lamp_on
 	set_physics_process(true)
+	player_impact.emit(self,strength)
 
 
 func _physics_process(delta: float) -> void:
@@ -257,6 +263,10 @@ func _follow_step(meters: float, delta: float) -> void:
 	var forward := route[next]-route[point]
 	var wanted := atan2(-forward.x,-forward.z)
 	rotation.y = rotate_toward(rotation.y,wanted,delta*1.75)
+	if signals!=null and signals.lane_shift.is_valid():
+		var offset: Vector2 = signals.lane_shift.call(Vector2(target.x,target.z),Vector2(forward.x,forward.z).normalized())
+		target.x += offset.x
+		target.z += offset.y
 	if roads != null:
 		target.y = terrain.at(target.x,target.z,position.y)+0.04
 	var move := target-position
@@ -298,3 +308,78 @@ func _gap(distance: float) -> float:
 
 func _surface(at: Vector2) -> Vector3:
 	return Vector3(at.x,terrain.at(at.x,at.y)+0.04,at.y)
+
+
+func _road_changed(a: Vector2,b: Vector2) -> void:
+	if not going or roads==null:
+		return
+	var here := Vector2(position.x,position.z)
+	var mid := (a+b)*0.5
+	if here.distance_squared_to(mid)>180.0*180.0:
+		return
+	var soon := false
+	for i in range(point,route.size()-1):
+		var p := Vector2(route[i].x,route[i].z)
+		var q := Vector2(route[i+1].x,route[i+1].z)
+		if p.distance_squared_to(q)>0.01 and Geometry2D.get_closest_point_to_segment(mid,p,q).distance_to(mid)<12.0:
+			soon = true
+			break
+	if not soon:
+		return
+	var start: RefCounted = roads.nearest(here,Vector2(-basis.z.x,-basis.z.z))
+	if start==null:
+		return
+	var lane_end: Vector2 = start.lane(start.exit)
+	if lane_end.distance_squared_to(here)<1.0:
+		return
+	edge = start
+	route_complete = false
+	route = PackedVector3Array([position,_surface(lane_end)])
+	limits = PackedFloat32Array([cruise,cruise])
+	point = 0
+	fraction = 0.0
+	planned_nodes.clear()
+	if service_edge!=null and dwell_stop.is_finite():
+		aim_for(service_edge,dwell_stop)
+	_extend_flow()
+
+# Return from the current physical position after being pushed off the route.
+func resume_flow(goal: RefCounted = null) -> bool:
+	if roads==null or owner_lost:
+		return false
+	var here := Vector2(position.x,position.z)
+	var start: RefCounted = roads.nearest(here,Vector2(-basis.z.x,-basis.z.z))
+	if start==null:
+		route_complete = true
+		return false
+	var along := clampf((here-Vector2(start.a)).dot(start.dir)+3.0,start.entry,start.exit)
+	var end: Vector2 = start.lane(start.exit)
+	var merge: Vector2 = start.lane(along)
+	route = PackedVector3Array([position])
+	limits = PackedFloat32Array([cruise])
+	for p: Vector2 in [merge,end]:
+		var world := _surface(p)
+		if world.distance_squared_to(route[-1])>.01:
+			route.append(world)
+			limits.append(cruise)
+	edge = start
+	point = 0
+	fraction = 0
+	dwelling = 0
+	dwell_stop = Vector2.INF
+	planned_nodes.clear()
+	planned_at = 0
+	service_edge = null
+	stop_served = false
+	route_complete = false
+	coast = Vector3.ZERO
+	if goal!=null and start!=goal:
+		planned_nodes = roads.navigation.get_id_path(roads.node_ids[start.b],roads.node_ids[goal.a])
+		if not planned_nodes.is_empty():
+			service_edge = goal
+	_extend_flow()
+	going = route.size()>1
+	if going:
+		scan_in = 0.0
+		set_physics_process(true)
+	return going

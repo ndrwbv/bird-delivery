@@ -43,6 +43,20 @@ static func pick(table: Dictionary, r: float) -> String:
 			return id
 	return str(table.keys().back())
 
+static func summer_weather(requested: String, roll: float) -> String:
+	var weights: Dictionary = PROBABILITY.summer
+	return requested if weights.has(requested) else pick(weights,roll)
+
+
+static func summer_shift_weather(number: int, seed_value: int, allow_hurricane: bool) -> String:
+	if number <= 1:
+		return "clear"
+	var id := summer_weather("",random01(seed_value ^ 0x71e2,number))
+	if id == "hurricane" and (number <= 8 or not allow_hurricane):
+		return "storm"
+	return id
+
+
 func _entry(key: String, fraction: float, holiday := "") -> Dictionary:
 	var span: Array = POSITIONS[key]
 	return {"key":key, "season":TRANSITION_SEASONS.get(key,key),

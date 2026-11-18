@@ -10,9 +10,19 @@ var polygon := PackedVector2Array()
 var safe_center := Vector2.ZERO
 var safe_radius := 0.0
 
-func setup(vertices: Array) -> void:
+func setup(vertices: Array, frequent_point := Vector2.ZERO) -> void:
+	polygon.clear()
 	for vertex: Array in vertices:
-		polygon.append(Vector2(vertex[0], vertex[1]))
+		polygon.append(Vector2(vertex[0],vertex[1]))
+	safe_radius = 0.0
+	if polygon.size() < 3 or not Geometry2D.is_point_in_polygon(frequent_point,polygon):
+		return
+	safe_center = frequent_point
+	var radius := INF
+	for i in polygon.size():
+		var edge := Geometry2D.get_closest_point_to_segment(safe_center,polygon[i-1],polygon[i])
+		radius = minf(radius,safe_center.distance_to(edge))
+	safe_radius = maxf(0.0,radius-WINDOW)
 
 func limit(at: Vector3, velocity: Vector3, delta: float) -> Vector3:
 	var point := Vector2(at.x, at.z)

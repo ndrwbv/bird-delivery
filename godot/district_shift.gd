@@ -1,5 +1,6 @@
 extends RefCounted
 
+const RESPECT := preload("res://district_respect.gd")
 const DEPOT_RADIUS := 7.0
 const FINAL_WINDOW := 75.0
 const T0 := 0.06
@@ -144,7 +145,7 @@ func settle(tips_allowed: bool, failed: bool, story: bool) -> void:
 		var late := deadline <= 0
 		var base := roundi(fee * .45) if late else fee
 		var chance := .25 + (.25 if pace == "generous" else (-.05 if pace == "tight" else 0.0))
-		var multiplier := 1.5 if pace == "generous" else 1.0
+		var multiplier: float = RESPECT.TIPS[RESPECT.rank(profile.data)] * (1.5 if pace == "generous" else 1.0)
 		if lunch_tips:
 			chance += .2
 			multiplier *= 1.3

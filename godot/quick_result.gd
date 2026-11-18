@@ -14,6 +14,20 @@ var paused_before := false
 var results := false
 var gate := -1
 var animation: Tween
+var leaders: Node
+var current_tab := "world"
+var list: VBoxContainer
+var board_hint: Label
+var board_tabs: HBoxContainer
+var board_buttons: Array[Button] = []
+var own_quick := 0
+var own_count := 0
+
+func bind_leaders(source: Node) -> void:
+	leaders = source
+	leaders.rows_ready.connect(_scores)
+
+
 
 func setup() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -98,15 +112,66 @@ func result(stats: Dictionary) -> void:
 func records(career: Dictionary, quick_best: int, deliveries: int) -> void:
 	_open()
 	results = false
+	current_tab = "world"
+	own_quick = quick_best
+	own_count = deliveries
 	_label(tr("таблица рекордов"),26,INK)
-	_label(tr("Личные"),18,SUB)
-	if not career.is_empty():
-		_stat("лучшая смена","%d ₽" % int(career.get("earned",0)))
-		_stat("доставлено",str(career.get("delivered",0)))
-	_stat("быстрый заезд",("%d ₽" % quick_best) if quick_best>0 else "—")
-	if quick_best>0:
-		_stat("доставлено",str(deliveries))
-	_button(sheet,"назад",menu_requested).grab_focus.call_deferred()
+	board_tabs = HBoxContainer.new()
+	sheet.add_child(board_tabs)
+	board_buttons.clear()
+	for id: String in ["world","friends"]:
+		var button := Button.new()
+		board_tabs.add_child(button)
+		button.text = tr("весь мир" if id=="world" else "друзья")
+		button.custom_minimum_size = Vector2(150,35)
+		button.pressed.connect(_tab.bind(id))
+		board_buttons.append(button)
+	board_hint = _text("",14,SUB)
+	sheet.add_child(board_hint)
+	list = VBoxContainer.new()
+	sheet.add_child(list)
+	if own_quick>0:
+		_stat("быстрый заезд","%d ₽   ·   %s %d" % [own_quick,tr("Доставок"),own_count])
+	var back := _button(sheet,"назад",menu_requested)
+	back.grab_focus.call_deferred()
+	if leaders:
+		_tab("world")
+	else:
+		var rows := []
+		if int(career.get("earned",0))>0:
+			rows.append({"rank":1,"name":tr("Женя"),"score":career.earned,"me":true,"level":0})
+		_scores("world",rows,false)
+
+func _tab(tab: String) -> void:
+	current_tab = tab
+	board_buttons[0].disabled = tab=="world"
+	board_buttons[1].disabled = tab=="friends"
+	board_tabs.visible = leaders.available()
+	board_hint.text = tr("Проверяю таблицу Steam…")
+	leaders.request(tab)
+
+func _scores(tab: String, rows: Array, remote: bool) -> void:
+	if not visible or results or current_tab!=tab or not is_instance_valid(list):
+		return
+	for old in list.get_children():
+		list.remove_child(old)
+		old.queue_free()
+	board_tabs.visible = remote
+	board_hint.text = tr("лучшая смена") if remote else tr("Лучшие смены на этом компьютере")
+	if rows.is_empty():
+		list.add_child(_text(tr("друзей в таблице пока нет — позови их в Солнечный") if remote and tab=="friends" else tr("пока никто не играл"),15,SUB))
+	for row: Dictionary in rows:
+		var line := HBoxContainer.new()
+		list.add_child(line)
+		var name_ := _text("#%d   %s" % [row.rank,str(row.name)],16,ACCENT if row.get("me",false) else INK)
+		name_.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		line.add_child(name_)
+		if int(row.get("level",0))>0:
+			line.add_child(_text(tr("уровень курьера")+" "+str(row.level)+"     ",13,SUB))
+		line.add_child(_text("%d ₽" % int(row.score),16,ACCENT))
+	if not remote and not rows.is_empty():
+		board_hint.text = tr("Лучшие смены на этом компьютере")
 
 func _stat(key: String, value: String) -> Label:
 	var row := HBoxContainer.new()
@@ -154,6 +219,9 @@ func _input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"ui_cancel") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B):
 		get_viewport().set_input_as_handled()
 		_choose(menu_requested)
+	elif not results and is_instance_valid(board_tabs) and board_tabs.visible and event is InputEventJoypadButton and event.pressed and event.button_index in [JOY_BUTTON_LEFT_SHOULDER,JOY_BUTTON_RIGHT_SHOULDER]:
+		get_viewport().set_input_as_handled()
+		_tab("friends" if current_tab=="world" else "world")
 	elif results and event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_X:
 		get_viewport().set_input_as_handled()
 		_choose(conditions_requested)

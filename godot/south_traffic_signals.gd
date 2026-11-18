@@ -1,6 +1,10 @@
 extends Node3D
 
+signal changed_route(a: Vector2, b: Vector2)
+
 var march_speed := Callable()
+var lane_shift := Callable()
+var extra_speed_limits: Array[Callable] = []
 
 const TIME := [14.0,2.5,2.0,11.0,2.5,2.0]
 const ACTIVE := [0,0,-1,1,1,-1]
@@ -131,6 +135,9 @@ func _lights() -> void:
 
 func road_speed(at: Vector2, dir: Vector2, speed: float) -> float:
 	var gain := float(march_speed.call(at,dir)) if march_speed.is_valid() else 1.0
+	for limit in extra_speed_limits:
+		if limit.is_valid():
+			gain = minf(gain,float(limit.call(at,dir,speed)))
 	var key := Vector2i((at/80.0).floor())
 	for post: Dictionary in signals.get(key,[]):
 		var state := light(post.phase)

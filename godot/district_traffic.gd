@@ -8,6 +8,8 @@ const AMBULANCE := preload("res://south_ambulance.gd")
 const PEOPLE := preload("res://south_street_people.gd")
 const BY_HOUR := [8,6,5,4,4,6,10,18,28,26,22,21,22,22,21,21,23,27,28,27,20,16,13,10]
 
+signal vehicle_struck(vehicle: CharacterBody3D, strength: float)
+
 var terrain: RefCounted
 var observer: Node3D
 var off := StandardMaterial3D.new()
@@ -87,12 +89,12 @@ func _physics_process(delta: float) -> void:
 	for i in range(moving.size()-1,-1,-1):
 		var vehicle := moving[i]
 		var p := Vector2(vehicle.position.x,vehicle.position.z)
-		if p.distance_squared_to(at) > 520.0*520.0 or (moving.size() > target and _out_of_view(vehicle.position,at)):
+		if p.distance_squared_to(at) > 520.0*520.0 or (moving.size() > target and not vehicle.incident and _out_of_view(vehicle.position,at)):
 			moving.remove_at(i)
 			vehicle.queue_free()
 			evicted = true
 			break
-		if vehicle.route_complete and not vehicle.going and _out_of_view(vehicle.position,at):
+		if (vehicle.route_complete or vehicle.owner_lost) and not vehicle.going and _out_of_view(vehicle.position,at):
 			moving.remove_at(i)
 			vehicle.queue_free()
 			evicted = true
@@ -134,7 +136,7 @@ func _spawn_flow(at: Vector2) -> void:
 		return
 	for k in 48:
 		var e: RefCounted = options.pick_random()
-		if e.exit-e.entry < 9.0:
+		if e.blocked or e.exit-e.entry < 9.0:
 			continue
 		var distance := randf_range(e.entry,e.exit-4.0)
 		var p: Vector2 = e.lane(distance)
@@ -150,6 +152,7 @@ func _spawn_flow(at: Vector2) -> void:
 		var taxi := randf() < (0.5 if night else 0.2)
 		var cruise := randf_range(12.0,17.0) if taxi else randf_range(9.0,14.0)
 		vehicle.start_flow(roads,e,signals,distance,off,on,cruise*(1.3 if night else 1.0))
+		vehicle.player_impact.connect(vehicle_struck.emit)
 		moving.append(vehicle)
 		var has_shuttle := false
 		for v in moving:
@@ -223,3 +226,12 @@ func _instance(at: Vector2, yaw: float) -> CharacterBody3D:
 	add_child(vehicle)
 	vehicle.setup(terrain,SEMERKA,at,yaw)
 	return vehicle
+
+
+func set_road_closed(a: Vector2,b: Vector2,closed: bool) -> void:
+	var site := roads.lookup(a,b)
+	if site==null or site.blocked==closed:
+		return
+	roads.set_closed(a,b,closed)
+	if closed:
+		signals.changed_route.emit(a,b)
