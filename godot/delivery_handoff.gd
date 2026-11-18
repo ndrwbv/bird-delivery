@@ -5,6 +5,7 @@ signal payment_started
 
 # The public phases are also used by the shift, HUD and benchmark.
 enum Stage { DRIVING, TAKING, CARRYING, HANDOFF, CASH, RETURNING }
+const CARGO := preload("res://pizza_cargo.gd")
 const HANDOFF_CAMERA := preload("res://delivery_handoff_camera.gd")
 const ARRIVAL_RADIUS := 6.0
 const ARRIVAL_SPEED := 6.0
@@ -28,9 +29,10 @@ var tips_allowed := true
 var paid := false
 
 var view := HANDOFF_CAMERA.new()
-var box_model: Node3D
+var terrain: RefCounted
+var spilled: Array[Dictionary] = []
 var queue: Array[Node3D] = []
-var flying_box: Node3D
+var flying_box: CARGO
 var elapsed := 0.0
 var flight_from := Vector3.ZERO
 var reaching := false
@@ -40,21 +42,18 @@ var caught := false
 
 func setup(vehicle: CharacterBody3D, _person: CharacterBody3D, camera: Camera3D, ground: RefCounted) -> void:
 	car = vehicle
-	box_model = _make_box()
-	add_child(box_model)
-	box_model.hide()
+	terrain = ground
 	add_child(view)
 	view.setup(camera, vehicle, ground)
 
 
-func play_order(receiver: Node3D, entrance: Node3D, arrival_radius := ARRIVAL_RADIUS) -> void:
+func play_order(receiver: Node3D, entrance: Node3D, arrival_radius := ARRIVAL_RADIUS, boxes := 1) -> void:
 	_clear_presentation()
 	queue.clear()
 	target = receiver
 	door = entrance
 	reach = arrival_radius
-	flying_box = box_model.duplicate() as Node3D
-	add_child(flying_box)
+	flying_box = _package(boxes)
 	elapsed = 0.0
 	reaching = false
 	launched = false
@@ -170,8 +169,7 @@ func _present_box(delta: float) -> void:
 			if not is_instance_valid(next) or next.defeated:
 				continue
 			target = next
-			flying_box = box_model.duplicate()
-			add_child(flying_box)
+			flying_box = _package(1)
 			launched = false
 			caught = false
 			reaching = false
@@ -211,6 +209,8 @@ func _step_flight(time: float, delta: float) -> void:
 func _give_box() -> void:
 	flying_box.reparent(target.grip, false)
 	flying_box.transform = Transform3D.IDENTITY
+	if flying_box.count >= 4 and launched and randf() < .30:
+		_spill()
 	flying_box.show()
 	target.player.play(&"carry", 0.12)
 	caught = true
@@ -242,37 +242,41 @@ func _clear_presentation() -> void:
 	car.damage.trunk_open = 0.0
 
 
-func _make_box() -> Node3D:
-	var root := Node3D.new()
-	var kraft := StandardMaterial3D.new()
-	kraft.albedo_color = Color("#ceb384")
-	kraft.roughness = 0.98
-	var lid := StandardMaterial3D.new()
-	lid.albedo_color = Color("#e6cc9e")
-	lid.roughness = 0.94
-	_box_face(root,Vector3(0.39,0.056,0.40),Vector3.ZERO,kraft)
-	_box_face(root,Vector3(0.405,0.016,0.41),Vector3(0.0,0.031,-0.003),lid)
-	var band := StandardMaterial3D.new()
-	band.albedo_color = Color("#9d4032")
-	band.roughness = 0.92
-	_box_face(root,Vector3(0.26,0.004,0.063),Vector3(0.0,0.041,0.016),band)
-	var label := Label3D.new()
-	label.text = "ПТИЦА ПИЦЦА"
-	label.font_size = 24
-	label.pixel_size = 0.00135
-	label.modulate = Color("#f3d7a8")
-	label.outline_size = 0
-	label.position = Vector3(0.0,0.044,0.016)
-	label.rotation.x = -PI*0.5
-	root.add_child(label)
-	return root
+func _package(boxes: int) -> CARGO:
+	var cargo := CARGO.new()
+	cargo.setup(boxes)
+	add_child(cargo)
+	cargo.hide()
+	return cargo
 
 
-func _box_face(root: Node3D, size: Vector3, at: Vector3, paint: Material) -> void:
-	var instance := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mesh.material = paint
-	instance.mesh = mesh
-	instance.position = at
-	root.add_child(instance)
+func _spill() -> void:
+	var count := mini(3,flying_box.count-2)
+	var top := flying_box.to_global(Vector3.UP*(flying_box.count-1)*CARGO.HEIGHT)
+	flying_box.resize(flying_box.count-count)
+	for i in count:
+		var loose := _package(1)
+		loose.global_position = top+Vector3.UP*i*.08
+		loose.show()
+		var impulse := Vector3(randf_range(-1.5,1.5),randf_range(.4,1.4),randf_range(-1.8,1.8))
+		spilled.append({"box":loose,"velocity":impulse,"ttl":14.0})
+
+
+func _physics_process(delta: float) -> void:
+	for i in range(spilled.size()-1,-1,-1):
+		var part := spilled[i]
+		part.ttl -= delta
+		var piece: Node3D = part.box
+		if part.ttl <= 0:
+			piece.queue_free()
+			spilled.remove_at(i)
+		elif not part.velocity.is_zero_approx():
+			part.velocity.y -= 9.8*delta
+			piece.position += part.velocity*delta
+			var floor_y: float = terrain.at(piece.position.x,piece.position.z,piece.position.y)+.05
+			if piece.position.y <= floor_y:
+				piece.position.y = floor_y
+				piece.rotation = Vector3.ZERO
+				part.velocity = Vector3.ZERO
+			else:
+				piece.rotate_x(4.0*delta)

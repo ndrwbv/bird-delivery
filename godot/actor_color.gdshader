@@ -10,12 +10,16 @@ uniform bool flat_city = false;
 uniform bool change_shirt = false;
 uniform vec3 original_shirt;
 uniform vec3 new_shirt;
+uniform bool change_trousers = false;
+uniform vec3 original_trousers;
+uniform vec3 new_trousers;
 varying vec3 paint;
 varying vec3 actor_world;
 
 void vertex() {
 	paint = COLOR.rgb;
 	if (change_shirt && distance(paint,original_shirt) < 0.012) paint = new_shirt;
+	if (change_trousers && distance(paint,original_trousers) < 0.009) paint = new_trousers;
 	actor_world = (MODEL_MATRIX*vec4(VERTEX,1.0)).xyz;
 }
 

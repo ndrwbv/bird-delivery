@@ -192,7 +192,8 @@ func _pursuit(s: Dictionary, dt: float, observer: Vector2, distance: float) -> v
 		s.speech = randf_range(1.6,2.6)
 		cast.say(v,SHOUT.pick_random(),RED)
 	s.aim -= dt
-	if distance>=40:
+	s.detour = maxf(0,float(s.get("detour",0))-dt)
+	if distance>=40 or s.detour>0:
 		if s.aim<=0:
 			s.aim = 2.5
 			var target: RefCounted = host.traffic.roads.nearest(observer)
@@ -237,6 +238,7 @@ func _pursuit(s: Dictionary, dt: float, observer: Vector2, distance: float) -> v
 			v.cruise = s.cruise
 		else:
 			s.aim = 2.5
+			s.detour = 2.5
 			var edge: RefCounted = host.traffic.roads.nearest(observer)
 			v.resume_flow(edge)
 		v.pace = 0

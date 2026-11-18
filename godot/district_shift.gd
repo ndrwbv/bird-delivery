@@ -1,5 +1,6 @@
 extends RefCounted
 
+const DONATIONS := preload("res://district_donations.gd")
 const RESPECT := preload("res://district_respect.gd")
 const DEPOT_RADIUS := 7.0
 const FINAL_WINDOW := 75.0
@@ -23,11 +24,15 @@ var money := 0
 var pace := "normal"
 var lunch_tips := false
 var meal_taken := false
+var rim_issued := false
+var client_zone := "normal"
 var people := 1
 var fee := 0
 var tips := 0
 var pay := 0
 var penalties := 0
+var client_fine := 0
+var knocked := 0
 var hits := 0
 var hits_at_start := 0
 var issued_deadline := 0.0
@@ -95,18 +100,26 @@ func clock_text() -> String:
 func quote(order: Dictionary) -> int:
 	var xp := int(profile.data.xp)
 	var courier_level := 1 + int(xp >= 3) + int(xp >= 8) + int(xp >= 15) + int(xp >= 25)
-	var factor := 1.0 + .03 * courier_level
+	var factor := 1.0+.03*courier_level
+	if order.get("zone","normal") == "gang":
+		factor *= 1.4
 	if order.get("kind","solo") == "urgent":
 		factor *= 2.5
+	if order.get("edge",false):
+		factor *= 1.4
 	var base := roundi((640 + 1.12 * float(order.meters)) * factor / 10.0) * 10
-	var extras := maxi(0, int(order.get("people",1)) - 1)
-	base += extras * roundi(640 * factor / 10) * 10
-	return roundi(base * (1.0 + .05*tier) * (1.1 if pace == "tight" else 1.0) / 10.0) * 10
+	var people_here := maxi(1,int(order.get("people",1)))
+	var boxes := maxi(people_here,int(order.get("boxes",people_here)))
+	var portions := float(people_here-1)+.5*float(boxes-people_here)
+	base += roundi(portions*roundi(640*factor/10))*10
+	var fee_before_event := roundi(base * (1.0 + .05*tier) * (1.1 if pace == "tight" else 1.0) / 10.0) * 10
+	return fee_before_event + int(order.get("pz",{}).get("add",0))
 
 
 func next_stop(order: Dictionary) -> void:
 	fee = quote(order)
 	people = int(order.get("people",1))
+	client_zone = str(order.get("zone","normal"))
 	settled = false
 	hits_at_start = hits
 	latest_payment = 0
@@ -134,22 +147,32 @@ func accept(order: Dictionary, manifest: RefCounted = null) -> void:
 	latest_payment = 0
 
 
-func settle(tips_allowed: bool, failed: bool, story: bool) -> void:
+func settle(tips_allowed: bool, failed: bool, story: bool, rich_neighbor := Callable()) -> void:
 	if settled:
 		return
 	settled = true
 	if failed:
 		missed += 1
+		client_fine += fee
 		fine(fee)
 	else:
 		var late := deadline <= 0
 		var base := roundi(fee * .45) if late else fee
-		var chance := .25 + (.25 if pace == "generous" else (-.05 if pace == "tight" else 0.0))
+		var clean := clampf(float(profile.data.get("trash_donated",0))/DONATIONS.TRASH_GOAL,0.0,1.0)
+		var regional_tip: float = {"gang":-.05,"rich":.35,"poor":-.10}.get(client_zone,0.0)
+		var chance := .25 + .1*clean + regional_tip + (.25 if pace == "generous" else (-.05 if pace == "tight" else 0.0))
 		var multiplier: float = RESPECT.TIPS[RESPECT.rank(profile.data)] * (1.5 if pace == "generous" else 1.0)
 		if lunch_tips:
 			chance += .2
 			multiplier *= 1.3
-		var tip := roundi(fee * randf_range(.1, .4) * multiplier / 10.0) * 10 if tips_allowed and not late and not story and randf() < chance else 0
+		var tip := 0
+		if tips_allowed and not late and not story:
+			var rich := client_zone=="rich"
+			var ordinary := randf() < chance
+			var rich_bonus := not ordinary and not rich and rich_neighbor.is_valid() and int(rich_neighbor.call())>0
+			if ordinary or rich_bonus:
+				var amount := randf_range(.3,1.0) if rich or rich_bonus else randf_range(.1,.4)
+				tip = roundi(fee * amount * multiplier / 10.0) * 10
 		delivered += people
 		pay += base
 		tips += tip
@@ -196,9 +219,11 @@ func finish(full: bool) -> Dictionary:
 	if delivered >= 3:
 		profile.data.counted = int(profile.data.get("counted",0)) + 1
 	profile.data.deliveries = int(profile.data.get("deliveries",0)) + delivered
+	profile.data.knocked = int(profile.data.get("knocked",0)) + knocked
 	var receipt := {"shift_number": number, "delivered": delivered, "missed": missed, "pay": pay,
 		"tips": tips, "bonus": bonus, "penalties": penalties, "earned": money + bonus, "balance": profile.data.wallet,
-		"hits": hits, "stars": stars, "reason": "Время смены вышло" if full else "Смена окончена", "minutes": floori(elapsed / 60)}
+		"hits": hits, "knocked":knocked, "stars": stars,
+		"reason": "Время смены вышло" if full else "Смена окончена", "minutes": floori(elapsed / 60)}
 	var best: Dictionary = profile.data.get("best", {})
 	if int(receipt.earned) > int(best.get("earned", 0)):
 		profile.data.best = {"earned": receipt.earned, "delivered": delivered}

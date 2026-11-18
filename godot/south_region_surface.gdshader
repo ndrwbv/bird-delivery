@@ -34,7 +34,7 @@ void fragment() {
 	vec2 p = ground.xz;
 	vec3 color = pigment;
 	float detail = 1.0 - smoothstep(26.0, 85.0, length(VERTEX));
-	float fine = grain(floor(p * 32.0)) - 0.5;
+	float fine = detail > 0.0 ? grain(floor(p * 32.0)) - 0.5 : 0.0;
 	float rough = 0.96;
 	if (style.x < 0.5) {
 		float moss = noise_at(p * 0.085) * 0.54 + noise_at(p * 0.8) * 0.46;

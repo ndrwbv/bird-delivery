@@ -6,6 +6,7 @@ var warmup: Dictionary
 var story: Dictionary
 var home: Vector2
 var routes: RefCounted
+var danger: Callable
 
 
 func setup(region: Dictionary, core: Dictionary, graph: RefCounted) -> void:
@@ -72,6 +73,31 @@ func next_order(first: bool, story_due: bool, recent: Array, level: int, number:
 	return _routed(warmup)
 
 
+func opening_order(recent: Array, limit: float) -> Dictionary:
+	var pool := candidates.duplicate()
+	pool.shuffle()
+	for candidate: Dictionary in pool:
+		if recent.has(candidate.name) or home.distance_squared_to(_v(candidate.stop)) > limit*limit:
+			continue
+		var order := _routed(candidate)
+		if not order.is_empty() and order.meters <= limit:
+			return order
+	return _routed(warmup)
+
+
+func rim_order(recent: Array, maximum: float) -> Dictionary:
+	var pool := candidates.duplicate()
+	pool.shuffle()
+	for candidate: Dictionary in pool:
+		if recent.has(candidate.name) or home.distance_squared_to(_v(candidate.stop)) < 1050.0*1050.0:
+			continue
+		var order := _routed(candidate)
+		if not order.is_empty() and order.meters >= 1900.0 and order.meters <= maximum:
+			order.edge = true
+			return order
+	return {}
+
+
 func _routed(template: Dictionary) -> Dictionary:
 	if template.get("route_revision",-1) != routes.revision:
 		var endpoint := _v(template.get("approach", template.stop))
@@ -84,7 +110,10 @@ func _routed(template: Dictionary) -> Dictionary:
 			back.push_front(template.stop)
 		template.merge({"route_revision": routes.revision, "route": there, "from_home": there, "back_home": back,
 			"meters": length_of(there), "back_meters": length_of(back)}, true)
-	return template.duplicate(false)
+	var order := template.duplicate(false)
+	if danger.is_valid() and danger.call(_v(order.stop)):
+		order.zone = "gang"
+	return order
 
 
 static func length_of(path: Array) -> float:

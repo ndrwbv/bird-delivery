@@ -33,6 +33,7 @@ var queue_dirty := false
 
 func setup(board: CanvasLayer, owner: RefCounted, memory_only := false, other_modal := Callable()) -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	add_to_group("game_platform")
 	honors = board
 	profile = owner
 	temporary = memory_only

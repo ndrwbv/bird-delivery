@@ -70,7 +70,7 @@ func _start(observer: Vector2) -> void:
 	var same: int = [0,0,1,2].pick_random()
 	groups.append({"p":p,"fight":fight,"brand":same,"seen":false,"victim":victim,"head":head,"n":people,
 		"nv":2 if people==5 else 1,"life":randf_range(15,40),"over":false,"bye":8.0,
-		"talk":randf_range(0.5,2),"people":[],"added":0,"terminal":-1.0})
+		"talk":randf_range(0.5,2),"people":[],"added":0})
 
 
 func _add(g: Dictionary) -> void:
@@ -120,7 +120,6 @@ func _finish(g: Dictionary, how: String) -> void:
 				person.knockdown = 30.0
 			else:
 				person.model.position.y = -0.52
-			g.terminal = host.elapsed+8
 		elif local_help and how in ["ko","honk"]:
 			cast.say(person,["спасибо, брат!","ты лучший!","с нас пицца!"].pick_random(),Color("#a4e6b2"))
 			person._emote(3)

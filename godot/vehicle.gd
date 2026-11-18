@@ -2,6 +2,8 @@ extends CharacterBody3D
 
 signal shift_started(pace: String)
 signal drowned
+signal wrecked
+signal roof_landed
 
 # The first district uses the stock Семёрка tuning (econ.js, handling 3).
 const DAMAGE := preload("res://car_damage.gd")
@@ -48,6 +50,10 @@ var steer_visual := 0.0
 var shield_aura := MeshInstance3D.new()
 var region_edge: RefCounted
 var terrain: RefCounted
+var roofs: RefCounted
+var ramps: Node3D
+var ramp_state := {}
+var ramp_safe := 0.0
 var controls_locked := false
 var hit_handler: Callable
 var person_handler: Callable
@@ -55,7 +61,12 @@ var pad_nitro_available: Callable
 var person_kick := 0.0
 var rear_slip := 0.0
 var nitro := 0.50
-var hearts := 7.0
+var hearts := 7.0:
+	set(value):
+		var lost_last := hearts > 0.0 and value <= 0.0
+		hearts = value
+		if lost_last:
+			wrecked.emit()
 var shield_time := 0.0
 var knock_cooldown := 0.0
 var headlamps := false
@@ -144,6 +155,9 @@ func park(at: Vector2, yaw: float) -> void:
 	equipment.reset_drive(false)
 	sinking = -1.0
 	surface.ice_load = 0.0
+	airborne = false
+	ramp_state.clear()
+	ramp_safe = 0.0
 	position = Vector3(at.x, terrain.at(at.x, at.y) + 0.04, at.y)
 	rotation = Vector3(0.0, yaw, 0.0)
 	speed = 0.0
@@ -194,6 +208,7 @@ func _physics_process(delta: float) -> void:
 	starter.step(delta,active_shift and not controls_locked)
 	shield_time = maxf(0.0,shield_time-delta)
 	knock_cooldown = maxf(0.0,knock_cooldown-delta)
+	ramp_safe = maxf(0.0,ramp_safe-delta)
 	var forward := -basis.z
 	var right := basis.x
 	var longitudinal := forward.dot(velocity)
@@ -289,6 +304,7 @@ func _physics_process(delta: float) -> void:
 		velocity = velocity.rotated(Vector3.UP,yaw*0.6)
 	_drive_motion(delta)
 	speed = -basis.z.dot(velocity)
+	_ramp_step()
 	var actual := (position-previous)/delta
 	brake_load = lerpf(brake_load,clampf((speed-old_speed)/delta,-18.0,12.0),1.0-exp(-7.0*delta))
 	skid = absf(actual.dot(basis.x))+(2.8*rear_slip if absf(speed) > 2.5 else 0.0)
@@ -301,6 +317,15 @@ func _physics_process(delta: float) -> void:
 	shield_aura.visible = shield_time > 0.0 and (shield_time > 2.0 or floori(shield_time*6.0)%2 == 0)
 	damage.bounce_parts(position,rotation.y,delta)
 	lamps.update_lamps(headlamps,brake and old_speed > 0.2,speed < -0.35)
+
+
+func pizza_cooling() -> float:
+	var cooling := .6*clampf(1.0-hearts/hearts_max,0.0,1.0)
+	var trunk := damage.stage[2]
+	cooling += .5 if trunk >= 3 else (.2 if trunk == 2 else 0.0)
+	if damage.stage[8] == 3:
+		cooling += .25
+	return snappedf(minf(1.0,cooling),.01)
 
 
 func _step_steering(current: float, target: float, delta: float) -> float:
@@ -341,6 +366,8 @@ func _drive_motion(delta: float) -> void:
 	var start := position
 	var approach_velocity := velocity
 	var motion := velocity*delta
+	if ramps:
+		ramps.prepare_motion(self,motion,airborne or ramp_safe > 0.0)
 	for attempt in 5:
 		if motion.length_squared() < 0.00000001:
 			break
@@ -367,11 +394,34 @@ func _drive_motion(delta: float) -> void:
 		person_handler.call(start,position,approach_velocity)
 
 
+func _ramp_step() -> void:
+	if not ramps or equipment.phase != equipment.Phase.GROUND:
+		ramp_state.clear()
+		return
+	var current: Dictionary = ramps.info(Vector2(position.x,position.z))
+	if not airborne and speed > 6.0 and not ramp_state.is_empty() and float(ramp_state.lift)>float(ramp_state.height)*.7 and float(current.get("lift",0.0))<.2:
+		var axis: Vector2 = ramp_state.axis
+		if axis.dot(Vector2(velocity.x,velocity.z)) > 3.0:
+			var boost := minf(1.25,tuned_speed*1.3/maxf(1.0,speed))
+			velocity *= boost
+			speed *= boost
+			suspension_velocity = speed * float(ramp_state.height)/float(ramp_state.length)*1.15
+			airborne = true
+			ramp_safe = 1.5
+	ramp_state = current
+
+
 func _update_wheels(delta: float, rolling: float) -> void:
 	var support: Array[float] = []
+	var was_airborne := airborne
+	var roof_level: bool = roofs and terrain == roofs.ground and (airborne or position.y-surface.land_y > 1.4)
 	for i in wheels.size():
 		var sample := position + basis * wheel_rest[i]
-		sample.y = terrain.wheel_height(sample.x, sample.z, position.y)+surface.winter.support[i]
+		sample.y = terrain.wheel_height(sample.x,sample.z,position.y)+surface.winter.support[i]
+		if roof_level:
+			sample.y = roofs.support(sample.x,sample.z,position.y,sample.y)
+		if ramps:
+			sample.y += ramps.lift(Vector2(sample.x,sample.z))
 		if surface.ice_height > -INF:
 			sample.y = maxf(sample.y,surface.ice_height)
 		elif surface.wade > 0.0:
@@ -382,11 +432,22 @@ func _update_wheels(delta: float, rolling: float) -> void:
 	var pitch := atan2((support[0]+support[1]-support[2]-support[3])*0.5, WHEELBASE)
 	var roll := atan2((support[1]+support[3]-support[0]-support[2])*0.5, TRACK)
 	if delta > 0.0 and not equipment.height_step(delta,average):
-		suspension_velocity += ((average+0.035-position.y)*142.0 - suspension_velocity*19.0)*delta
-		position.y = clampf(position.y + suspension_velocity*delta, average-0.10, average+0.23)
+		if position.y-average > .9 or airborne:
+			suspension_velocity -= 22.0*delta
+			position.y += suspension_velocity*delta
+			airborne = position.y-average > .045
+			if not airborne:
+				ramp_safe = 1.5
+				position.y = average+.035
+				suspension_velocity = 0.0
+		else:
+			suspension_velocity += ((average+.035-position.y)*142.0-suspension_velocity*19.0)*delta
+			position.y = clampf(position.y+suspension_velocity*delta,average-.10,average+.23)
 		var blend := 1.0-exp(-8.0*delta)
 		visual.rotation.x = lerpf(visual.rotation.x, clampf(pitch,-0.17,0.17)+clampf(brake_load*0.0038,-0.055,0.045), blend)
 		visual.rotation.z = lerpf(visual.rotation.z, clampf(roll,-0.105,0.105)+clampf(-yaw_rate*absf(rolling)*0.0024,-0.052,0.052), blend)
+	if was_airborne and not airborne and roof_level and roofs.support(position.x,position.z,position.y,-INF) > -INF:
+		roof_landed.emit()
 	wheel_roll = fposmod(wheel_roll-rolling/WHEEL_RADIUS*delta, TAU)
 	for i in wheels.size():
 		var wheel_yaw := -steer_visual if i < 2 else 0.0
@@ -414,6 +475,8 @@ func collect_road_bonus(type: int) -> void:
 
 
 func collision_damage(impact: float, other_car: bool, contact: Vector3, normal: Vector3) -> void:
+	if airborne or ramp_safe > 0.0:
+		return
 	if shield_time > 0.0:
 		return
 	damage.impact(contact,normal,impact)

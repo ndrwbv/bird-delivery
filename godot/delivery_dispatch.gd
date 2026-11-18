@@ -1,12 +1,14 @@
 extends Node3D
 
 const FLIGHT_TIME := 1.0
+const CARGO := preload("res://pizza_cargo.gd")
 
 var car: CharacterBody3D
 var door := Node3D.new()
 var door_leaf: Node3D
-var bag: Node3D
+var bag := CARGO.new()
 var elapsed := FLIGHT_TIME
+var kitchen_wait := 0.0
 var origin: Vector3
 
 
@@ -18,7 +20,7 @@ func setup(vehicle: CharacterBody3D, ground: RefCounted, data: Dictionary) -> vo
 	add_child(door)
 	_make_pizzeria_door()
 	origin = door.to_global(Vector3(0.0, 1.7, 0.3))
-	bag = _make_box()
+	bag.setup(1)
 	add_child(bag)
 	bag.hide()
 
@@ -27,16 +29,25 @@ func active() -> bool:
 	return elapsed < FLIGHT_TIME
 
 
-func begin() -> void:
+func begin(delay := 0.0, boxes := 1) -> void:
+	bag.resize(boxes)
 	elapsed = 0.0
+	kitchen_wait = maxf(0.0,delay)
 	bag.position = origin
-	bag.show()
+	bag.visible = kitchen_wait <= 0.0
 
 
 func step(delta: float) -> bool:
 	if not active():
 		return false
-	elapsed = minf(FLIGHT_TIME, elapsed + delta)
+	if kitchen_wait > 0:
+		var waiting := minf(kitchen_wait,delta)
+		delta -= waiting
+		kitchen_wait -= waiting
+		if kitchen_wait > 0:
+			return false
+		bag.show()
+	elapsed = minf(FLIGHT_TIME,elapsed+delta)
 	var t := elapsed / FLIGHT_TIME
 	var trunk := car.to_global(Vector3(0.0, 0.98, 1.86))
 	bag.position = origin.lerp(trunk, t) + Vector3.UP * (4.0 * t * (1.0 - t) * 2.3)
@@ -49,17 +60,16 @@ func step(delta: float) -> bool:
 
 
 func finish() -> void:
+	kitchen_wait = 0.0
 	elapsed = FLIGHT_TIME
 	bag.hide()
 	car.damage.trunk_open = 0.0
 
 
-func _make_box() -> Node3D:
-	var box := Node3D.new()
-	_panel(box, Vector3(.48,.085,.48), Vector3.ZERO, _paint("#bc8958"))
-	_panel(box, Vector3(.49,.025,.49), Vector3.UP*.05, _paint("#eed19a"))
-	_panel(box, Vector3(.15,.006,.48), Vector3.UP*.065, _paint("#b44528"))
-	return box
+func story_box() -> Node3D:
+	var package := CARGO.new()
+	package.setup(1)
+	return package
 
 
 func _make_pizzeria_door() -> void:

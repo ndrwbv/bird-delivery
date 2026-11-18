@@ -2,6 +2,7 @@ extends Node3D
 
 const VEHICLE := preload("res://south_rival_car.gd")
 const BURGER := Color("#ffd000")
+# game.js FOE_SPEC uses a blue sedan. In South this is the same VAZ-2107; the restaurant mopeds have a separate population.
 const SUSHI := Color("#1a8cff")
 var host: Node3D
 var cast: RefCounted

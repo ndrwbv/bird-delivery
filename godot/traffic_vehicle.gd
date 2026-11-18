@@ -173,6 +173,16 @@ func _make_lamps() -> void:
 func struck(strength: float, shot: Vector3) -> void:
 	if strength < 2.7:
 		return
+	_impact_motion(strength,shot)
+	player_impact.emit(self,strength)
+
+
+func displace(strength: float, shot: Vector3) -> void:
+	if strength >= 2.7:
+		_impact_motion(strength,shot)
+
+
+func _impact_motion(strength: float, shot: Vector3) -> void:
 	going = false
 	coast += shot.normalized()*clampf(strength*0.26,1.0,9.0)
 	visual.rotation.z = clampf(shot.normalized().dot(basis.x)*strength*0.004,-0.12,0.12)
@@ -180,7 +190,6 @@ func struck(strength: float, shot: Vector3) -> void:
 	if lamps:
 		lamps.material_override = lamp_on
 	set_physics_process(true)
-	player_impact.emit(self,strength)
 
 
 func _physics_process(delta: float) -> void:

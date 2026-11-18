@@ -14,6 +14,7 @@ var mask_texture := ImageTexture.create_from_image(mask_image)
 var impact_ground: Node3D
 var debris_paint: Material
 var batches: Dictionary = {}
+var table_shapes := {}
 var props: Dictionary = {}
 var shapes: Dictionary = {}
 var down: Dictionary = {}
@@ -49,7 +50,12 @@ func setup(floor: Node3D, paint: Material, street_scales: Dictionary) -> void:
 				shapes[key] = shape
 			var pose := Transform3D(Basis(Vector3.UP,-float(row[7])),Vector3(row[1],row[2],row[3]))
 			PhysicsServer3D.body_add_shape(body,shapes[key],pose)
-			ids.append(int(row[0]))
+			var id := int(row[0])
+			if props.has(id) and props[id].kind=="table":
+				if not table_shapes.has(id):
+					table_shapes[id] = []
+				table_shapes[id].append([body,ids.size()])
+			ids.append(id)
 		batches[body] = ids
 		PhysicsServer3D.body_set_space(body,get_world_3d().space)
 	set_process(false)
@@ -79,6 +85,22 @@ func impact(contact: KinematicCollision3D, approach: float, motion: Vector3) -> 
 	if item.post or item.heavy:
 		return 0.62
 	return 0.91 if item.kind in ["fence","bigfence","bench","table"] else 0.98
+
+
+func smash_tables(at: Vector2, radius: float) -> void:
+	for id: int in table_shapes:
+		var item: Dictionary = props[id]
+		var p := Vector2(item.at[0],item.at[2])
+		if down.has(id) or p.distance_squared_to(at)>radius*radius:
+			continue
+		for ref: Array in table_shapes[id]:
+			PhysicsServer3D.body_set_shape_disabled(ref[0],ref[1],true)
+		down[id] = true
+		mask_image.set_pixel(id,0,Color.WHITE)
+		prop_lost.emit(id)
+		mask_dirty = true
+	if mask_dirty:
+		set_process(true)
 
 
 func _process(_delta: float) -> void:

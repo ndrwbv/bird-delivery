@@ -222,6 +222,6 @@ func _input(event: InputEvent) -> void:
 	elif not results and is_instance_valid(board_tabs) and board_tabs.visible and event is InputEventJoypadButton and event.pressed and event.button_index in [JOY_BUTTON_LEFT_SHOULDER,JOY_BUTTON_RIGHT_SHOULDER]:
 		get_viewport().set_input_as_handled()
 		_tab("friends" if current_tab=="world" else "world")
-	elif results and event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_X:
+	elif results and ((event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_X) or (event is InputEventKey and event.pressed and not event.echo and (event.physical_keycode==KEY_X or event.keycode==KEY_X))):
 		get_viewport().set_input_as_handled()
 		_choose(conditions_requested)

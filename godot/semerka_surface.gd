@@ -13,6 +13,7 @@ var ice := false
 var wade := 0.0
 var sand := 0.0
 var water_depth := 0.0
+var land_y := 0.0
 var wading_beach := false
 var ice_height := -INF
 var ice_load := 0.0
@@ -53,6 +54,7 @@ func setup(region: Dictionary) -> void:
 
 func step(at: Vector3, terrain: RefCounted, delta: float) -> void:
 	var p := Vector2(at.x,at.z)
+	land_y = terrain.land_height(p.x,p.y)
 	wading_beach = false
 	sand = _sand(p)
 	wade = 0.0
@@ -64,19 +66,16 @@ func step(at: Vector3, terrain: RefCounted, delta: float) -> void:
 		var near := Geometry2D.get_closest_point_to_segment(p,Vector2(ends.x,ends.y),Vector2(ends.z,ends.w))
 		if p.distance_squared_to(near) >= float(entry[1]):
 			continue
-		var land: float = terrain.land_height(p.x,p.y)
 		# The release excludes the road crossing and a bridge deck from wading.
-		if terrain.material_at(p.x,p.y) != 0 and at.y-land < 0.6:
-			ice = frozen and absf(at.y-land-0.058) < 0.4
+		if terrain.material_at(p.x,p.y) != 0 and at.y-land_y < 0.6:
+			ice = frozen and absf(at.y-land_y-.058) < 0.4
 			wade = 0.0 if frozen else 0.45
 		break
-	if is_finite(_sea):
-		var ground: float = terrain.land_height(p.x,p.y)
-		if ground < _sea-0.02 and terrain.at(p.x,p.y,at.y)-ground < 0.6:
-			water_depth = _sea-ground
-			if frozen:
-				ice_height = _sea
-				ice = absf(at.y-_sea) < 0.4
+	if land_y < _sea-.02 and float(terrain.at(p.x,p.y,at.y))-land_y < .6:
+		water_depth = _sea-land_y
+		if frozen:
+			ice_height = _sea
+			ice = absf(at.y-_sea)<.4
 	_grip_timer -= delta
 	if _grip_timer <= 0.0:
 		_grip_timer = 0.2

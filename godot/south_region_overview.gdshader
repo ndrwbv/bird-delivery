@@ -24,11 +24,11 @@ void vertex() {
 }
 
 void fragment() {
-	if (quick_cut(vec3(world_xz.x, altitude, world_xz.y))) discard;
 	if (all(greaterThanEqual(world_xz,core.xy)) && all(lessThanEqual(world_xz,core.zw))) discard;
 	vec2 key = floor((world_xz-area.xy)/tile_size);
 	vec2 ready_uv = (key+0.5)/vec2(textureSize(complete_tiles,0));
 	if (texture(complete_tiles,ready_uv).r > 0.5) discard;
+	if (quick_cut(vec3(world_xz.x, altitude, world_xz.y))) discard;
 	vec2 uv = (world_xz-area.xy)/area.zw;
 	float pavement = smoothstep(0.15,0.84,texture(roads,uv).r);
 	vec3 color = mix(vec3(0.082,0.146,0.043),vec3(0.109,0.113,0.111),pavement);

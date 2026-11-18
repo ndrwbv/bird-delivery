@@ -71,4 +71,16 @@ const weights=runInNewContext(block('const KIND =','/* реплики')+'\nKIND;
 const props=runInNewContext(block('function mangal','/* ── люди')+'\n({shashlik:mangal(),domino:dominoTable()});',{
  propMesh(fn){const out=[];fn((w,h,d,color,x,y,z,rx=0,ry=0,rz=0)=>out.push([w,h,d,color,x,y,z,rx,ry,rz]));return out;}
 });
-await writeFile(new URL('summer_yards.json',assets),JSON.stringify({spots,weights,props,lines:lex,en:Object.fromEntries(Object.values(lex).flat().filter(s=>en[s]).map(s=>[s,en[s]]))})+'\n');
+const life=await readFile(new URL('../../src/game/life.js',import.meta.url),'utf8');
+let seed=81233;
+const math=Object.create(Math);
+math.random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+A.CITY.buildings=r.buildings.map(b=>({k:b.kind,lv:Math.max(1,Math.round((b.height-1.1)/3.15)),p:b.outline.map(([x,z])=>[x+ox,z+oz])}));
+A.ARCHES=physics.arches.map(g=>({mx:g.entry[0]+ox,mz:g.entry[1]+oz,t:g.length,ux:g.side[0],uz:g.side[1],ix:g.axis[0],iz:g.axis[1],top:g.top-r.water_y}));
+const walls=runInNewContext(life.slice(life.indexOf('function buildWalls'),life.indexOf('const CELL ='))+'\nbuildWalls();WALLS;',{
+ A,Math:math,WALLS:[],chance:p=>math.random()<p,rand:(a,b)=>a+(b-a)*math.random()
+}).map(w=>({at:[round(w.x-ox),round(w.z-oz)],n:[round(w.nx),round(w.nz)],w:round(w.w),h:round(w.h),y:round(w.y0+r.water_y),kind:w.k}));
+const hk=await readFile(new URL('../../src/game/hookah.js',import.meta.url),'utf8');
+const pool=spots.filter(s=>s.kind==='bench').map(s=>({x:s.at[0]+ox,z:s.at[1]+oz,id:s.id}));
+const fixed=runInNewContext(hk.slice(hk.indexOf('const SPAWN_R'),hk.indexOf('/* ── кальян')) .replaceAll('export ','')+'\ninit({BENCHES:pool});SPOTS.map(s=>({id:s.b.id,n:s.n}));',{pool,setTimeout(){}});
+await writeFile(new URL('summer_yards.json',assets),JSON.stringify({spots,weights,props,hookah:fixed,walls,lines:lex,en:Object.fromEntries(Object.values(lex).flat().filter(s=>en[s]).map(s=>[s,en[s]]))})+'\n');

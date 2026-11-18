@@ -14,7 +14,6 @@ func setup() -> void:
 	stretch = true
 	focus_mode = Control.FOCUS_ALL
 	add_child(view)
-	view.size = Vector2i(390,272)
 	view.own_world_3d = true
 	view.gui_disable_input = true
 	var studio := WorldEnvironment.new()

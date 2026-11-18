@@ -316,6 +316,7 @@ func _try_order(hour: float) -> void:
 func person_hit(actor: Node3D, kmh: float) -> void:
 	if actor==mafia:
 		if kmh>=20.0:
+			get_tree().call_group(&"local_achievements",&"add","mafia")
 			host.money_changed.emit(2500,tr("уложил мафиози"))
 			host.cast.retire(mafia,true)
 			mafia = null

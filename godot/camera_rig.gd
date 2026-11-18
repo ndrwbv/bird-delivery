@@ -10,6 +10,9 @@ var filtered_eye := INF
 var temporary := false
 var eye_time := 0.0
 var eye_pitch := 0.0
+var impact_time := .45
+var impact_strength := 0.0
+var impact_direction := Vector3.ZERO
 
 @onready var car: CharacterBody3D = $"../Car"
 
@@ -93,9 +96,38 @@ func _cab(delta: float, pose: Transform3D, pace: float) -> void:
 	var pitch := eye_pitch+.02+glance.angles.y-pow(sin(minf(absf(yaw),PI*.5)),2.0)*.10
 	ahead = Vector3(ahead.x,0,ahead.z).normalized()*cos(pitch)+Vector3.UP*sin(pitch)
 	look_at(eye+ahead)
-	fov = lerpf(66.0,72.0,pace)
+	_drive_fov(lerpf(66.0,72.0,pace),delta)
+	_impact_motion(delta)
 	near = .045
 
+
+func kick(speed: float, direction: Vector3) -> void:
+	if person:
+		return
+	var strength := pow(clampf((speed-6.0)/20.0,0.0,1.0),.8)
+	var u := impact_time/.055
+	var current_strength := impact_strength*u*exp(1.0-u) if impact_time<.45 else 0.0
+	if strength<=current_strength:
+		return
+	impact_time = 0.0
+	impact_direction = Vector3(direction.x,0,direction.z).normalized()
+	impact_strength = strength
+
+func _impact_motion(delta: float) -> void:
+	if impact_time>=.45:
+		return
+	impact_time += delta
+	if impact_time>=.45:
+		return
+	var t := impact_time/.055
+	var k := impact_strength*t*exp(1.0-t)
+	var distance := .09 if mode=="cab" else (.45 if mode=="near" else .70)
+	position += impact_direction*distance*k
+	rotate_object_local(Vector3.RIGHT,-k*(.014 if mode=="cab" else .03))
+
+func _drive_fov(base: float, delta: float) -> void:
+	var target := minf(86.0,base+(16.0 if car.boost_active else 0.0))
+	fov = lerpf(fov,target,1.0-exp(-3.5*delta))
 
 func set_parked_view(at: Vector3, target: Vector3) -> void:
 	parked_position = at
@@ -103,6 +135,7 @@ func set_parked_view(at: Vector3, target: Vector3) -> void:
 
 
 func reset_view() -> void:
+	impact_time = .45
 	person = null
 	dispatch_view = false
 	exchange_target = null
@@ -240,7 +273,11 @@ func _process(delta: float) -> void:
 	aim = aim.lerp(look,1.0-exp(-9.0*delta))
 	look_at(aim)
 	var lens := lerpf(61.0,50.0,close_up) if on_foot else (lerpf(68.0,75.0,pace) if mode=="near" else 64.0)
-	fov = lerpf(fov,lens,1.0-exp(-6.0*delta))
+	if on_foot:
+		fov = lerpf(fov,lens,1.0-exp(-6.0*delta))
+	else:
+		_drive_fov(lens,delta)
+		_impact_motion(delta)
 
 
 func _arm(from: Vector3, to: Vector3) -> float:

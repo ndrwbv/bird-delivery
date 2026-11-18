@@ -6,6 +6,7 @@ const FLIGHT := preload("res://south_park_flight.gd")
 const COURIER := preload("res://assets/courier.glb")
 const BAR_HEIGHT := 2.3
 const DIP_HEIGHT := 1.25
+var wave:=preload("res://south_park_flyers.gd").new()
 var terrain: RefCounted
 var car: CharacterBody3D
 var sky: Node
@@ -39,6 +40,8 @@ func setup(_region:Dictionary, ground:RefCounted, vehicle:CharacterBody3D, traff
 	people=recipients
 	paint=material
 	create_actor=traffic.people.create_person
+	add_child(wave)
+	wave.setup(self,_region,traffic.roads)
 	iron_paint.vertex_color_use_as_albedo=true
 	var data:Dictionary=JSON.parse_string(FileAccess.get_file_as_string("res://assets/summer_park.json"))
 	for entry:Dictionary in data.gym:
@@ -56,11 +59,13 @@ func begin(shift_number:int,seed_value:int,_adult:bool) -> void:
 	last_heal=-1
 	rng.seed=("%d/parks/%d"%[seed_value,shift_number]).hash()
 	active=true
+	wave.begin(rng.randi())
 	scan=0.0
 
 func step(delta:float,_hour:float) -> void:
 	if not active: return
 	var pos:=Vector2(car.position.x,car.position.z)
+	wave.step(delta,_hour,pos)
 	scan-=delta
 	if scan<=0:
 		scan=1
@@ -290,6 +295,7 @@ func _fallen(actor:Node) -> bool:
 	return actor.stunned>0 or actor.knockdown>0 or actor.ragdoll!=null or actor.recovery>0 or actor.defeated
 
 func clear() -> void:
+	wave.clear()
 	_end_set(false)
 	for s:Dictionary in populated.duplicate(): _stop_gym(s)
 	for s:Dictionary in flying.duplicate(): _stop_flight(s,false)

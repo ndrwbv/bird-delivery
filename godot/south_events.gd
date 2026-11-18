@@ -60,8 +60,14 @@ var road_cells := {}
 var _decoration_materials := {}
 var clock_write := 60.0
 var dialogue: Dictionary
+var special_orders := preload("res://south_pizzeria_events.gd").new()
+var club := preload("res://south_evening_club.gd").new()
+var worksites := preload("res://south_worksites.gd").new()
 var street_works := preload("res://south_roadworks.gd").new()
 var cast := preload("res://south_event_people.gd").new()
+var protest_streets := preload("res://south_protest_streets.gd").new()
+var riot := preload("res://south_riot.gd").new()
+var raid := preload("res://south_depot_raid.gd").new()
 var brand_crews := preload("res://south_brand_crews.gd").new()
 var rivals := preload("res://south_rival_deliveries.gd").new()
 var drivers := preload("res://south_angry_drivers.gd").new()
@@ -91,17 +97,29 @@ func setup(player: CharacterBody3D, terrain: RefCounted, population: Node3D, map
 	robbery.cast = cast
 	brand_crews.host = self
 	brand_crews.cast = cast
+	riot.host = self
+	riot.cast = cast
 	drivers.host = self
 	drivers.cast = cast
 	traffic.vehicle_struck.connect(drivers.struck)
 	var shared: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/south-event-sites.json"))
 	dialogue = shared
+	add_child(worksites)
+	worksites.setup(self)
 	add_child(street_works)
 	street_works.setup(self)
+	add_child(protest_streets)
+	protest_streets.setup(self)
+	add_child(raid)
+	raid.setup(self)
 	add_child(rivals)
 	rivals.setup(self)
 	add_child(garage_zone)
 	garage_zone.setup(self)
+	add_child(special_orders)
+	special_orders.setup(self)
+	add_child(club)
+	club.setup(self)
 	add_child(winter_view)
 	winter_view.setup(car,ground)
 	add_child(holes)
@@ -200,6 +218,8 @@ func begin_shift(shift_number: int, seconds: float, free_drive := false, quick_r
 	duration = seconds
 	ride = free_drive
 	quick = quick_run
+	raid.begin()
+	special_orders.begin()
 	session_deliveries = career_n
 	session_shifts = career_shifts
 	running = true
@@ -219,6 +239,8 @@ func begin_shift(shift_number: int, seconds: float, free_drive := false, quick_r
 	peaked = false
 	order_index = 0
 	_update_topic()
+	riot.begin()
+	protest_streets.begin()
 	story = false
 	safe_stop = Vector2.INF
 	budget = 3 if seconds < 300.0 else (4 if seconds < 420.0 else 5)
@@ -252,12 +274,22 @@ func person_hit(actor: Node3D, impact_kmh: float) -> void:
 	drivers.hit(actor,impact_kmh)
 	rivals.hit(actor,impact_kmh)
 	brand_crews.hit(actor,impact_kmh)
+	raid.hit(actor,impact_kmh)
+	riot.hit(actor,impact_kmh)
+	if impact_kmh>=20.0:
+		for scene in scenes:
+			if scene.kind=="march" and scene.actors.has(actor) and not actor.has_meta("march_fallen"):
+				actor.set_meta("march_fallen",true)
+				if not ride and not quick:
+					respect_earned.emit("marcher")
+				break
 	robbery.hit(actor,impact_kmh)
 
 
 func honk() -> void:
 	robbery.honk()
 	brand_crews.honk()
+	raid.honk()
 
 
 func reward(amount: int, why: String, respect_key := "") -> void:
@@ -371,12 +403,18 @@ func _end(index: int) -> void:
 
 
 func finish() -> void:
+	special_orders.clear()
+	club.reset()
+	worksites.reset()
 	garage_zone.clear()
 	thief.clear()
 	robbery.clear()
 	drivers.clear()
 	rivals.clear()
 	brand_crews.clear()
+	raid.clear()
+	riot.clear()
+	protest_streets.clear()
 	cast.clear()
 	street_works.clear()
 	for scene in scenes:
@@ -391,6 +429,9 @@ func step(delta: float, live: bool, hour: float) -> void:
 	if not running or not live:
 		return
 	elapsed += delta
+	special_orders.step(delta,hour)
+	club.step(delta,cast.at(car),hour)
+	worksites.step(delta,cast.at(car))
 	holes.step(delta)
 	garage_zone.step(delta,hour)
 	street_works.step(delta)
@@ -399,6 +440,9 @@ func step(delta: float, live: bool, hour: float) -> void:
 		drivers.step(delta,cast.at(car))
 		robbery.step(delta,cast.at(car))
 		var calm := not ride and (story or not bool(profile.data.get("gennady_paid",false)))
+		raid.step(delta,cast.at(car))
+		riot.step(delta,cast.at(car))
+		protest_streets.step(delta,cast.at(car))
 		rivals.step(delta,cast.at(car),calm)
 		brand_crews.step(delta,cast.at(car),calm)
 		thief.step(delta,cast.at(car),calm)
@@ -443,7 +487,7 @@ func _update_topic() -> void:
 		return
 	var choices: Array[int] = []
 	for i in dialogue.topics.size():
-		if not protest_history.has(i):
+		if not protest_history.has(i) and (garage_zone.adults or not bool(dialogue.topics[i].get("adult",false))):
 			choices.append(i)
 	var selected: int = choices.pick_random()
 	protest_topic = dialogue.topics[selected]

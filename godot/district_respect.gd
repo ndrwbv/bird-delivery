@@ -2,7 +2,7 @@ extends RefCounted
 
 const GAIN := {
 	"rivalCourier":3,"rivalCar":5,"rivalShop":10,"rivalMascot":2,"rivalFighter":2,
-	"helpCrew":6,"honkCrew":3,"defend":8,"thief":3,"helpedCivil":4,"burger":1,
+	"helpCrew":6,"honkCrew":3,"defend":8,"defendAlone":4,"thief":3,"helpedCivil":4,"burger":1,
 	"ownCourier":-5,"ownCrew":-4,"passCrew":-3,"noDefend":-6,"marcher":-1,"chat":1,
 }
 const CAP := {"burger":10,"chat":4}

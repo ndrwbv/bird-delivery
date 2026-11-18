@@ -95,13 +95,18 @@ var person_name: Label
 var initials: Label
 var portrait := TextureRect.new()
 var address_value: Label
+var former_address: RichTextLabel
 var items_value: Label
 var fee_value: Label
+var special_value: Label
 var accept_btn: Button
 var sheet := PanelContainer.new()
 var receipt_head: Label
 var reason_label: Label
 var wallet_value: Label
+var score_note: Label
+var leaders: Node
+var receipt_key := 0
 var rows := VBoxContainer.new()
 var bottom := HBoxContainer.new()
 var receipt_buttons: Array[Button] = []
@@ -161,8 +166,19 @@ func show_invoice(paper: Dictionary) -> void:
 	var apartment := int(paper.get("flat", 0))
 	if apartment > 0 and not address_value.text.contains(tr("кв.")):
 		address_value.text += ", %s %d" % [tr("кв."), apartment]
+	former_address.clear()
+	former_address.visible = paper.has("was_address")
+	address_value.position.y = 292.0 if former_address.visible else 268.0
+	address_value.size.y = 40.0 if former_address.visible else 64.0
+	if former_address.visible:
+		former_address.push_strikethrough()
+		former_address.add_text(str(paper.was_address))
+		former_address.pop()
 	items_value.text = str(paper.items)
 	fee_value.text = _money(int(paper.fee))
+	special_value.text = str(paper.get("special",""))
+	special_value.visible = not special_value.text.is_empty()
+	fee_value.size.y = 25.0 if special_value.visible else 52.0
 	preview.set_path(paper.get("route", []), paper.get("stop", []))
 	gas_armed = not Input.is_action_pressed(&"accelerate")
 	pad = bool(paper.get("pad", pad))
@@ -196,6 +212,15 @@ func refresh_balance(amount: int) -> void:
 		receipt_buttons[0].grab_focus.call_deferred()
 
 
+func bind_leaders(source: Node) -> void:
+	leaders = source
+	leaders.receipt_updated.connect(_score_update)
+
+func _score_update(key: int, line: String) -> void:
+	if page==Page.RECEIPT and key==receipt_key:
+		score_note.text = line
+		score_note.visible = not line.is_empty()
+
 func show_receipt(receipt: Dictionary) -> void:
 	dismiss()
 	page = Page.RECEIPT
@@ -203,6 +228,9 @@ func show_receipt(receipt: Dictionary) -> void:
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	receipt_head.text = tr("ЧЕК СМЕНЫ · ЮГ") + "     № %04d" % int(receipt.shift_number)
 	reason_label.text = str(receipt.get("reason", ""))
+	var mood_line: String = {"bad":"Сегодня вышло плохо. Завтра соберись, Женя.","ok":"Смена закончилась. Отдохни перед следующей.","great":"Молодец, Женя. Сегодня клиенты довольны."}.get(receipt.get("mood",""),"")
+	if not mood_line.is_empty():
+		reason_label.text += "\n" + tr(mood_line)
 	reason_label.visible = not reason_label.text.is_empty()
 	refresh_balance(int(receipt.balance))
 	for old in rows.get_children():
@@ -213,6 +241,8 @@ func show_receipt(receipt: Dictionary) -> void:
 		_receipt_row(tr("Чаевые"), "+" + _money(int(receipt.tips)), GREEN)
 	if receipt.has("hits"):
 		_receipt_row(tr("Удары"), str(int(receipt.hits)), INK)
+	if int(receipt.get("knocked",0)) > 0:
+		_receipt_row(tr("Сбито прохожих"), str(int(receipt.knocked)), INK)
 	if int(receipt.get("missed", 0)) > 0:
 		_receipt_row(tr("Сорвано заказов"), str(int(receipt.missed)), RED)
 	if int(receipt.get("penalties", 0)) > 0:
@@ -228,6 +258,11 @@ func show_receipt(receipt: Dictionary) -> void:
 	if receipt.has("rating"):
 		_receipt_row(tr("Рейтинг"), str(receipt.rating), INK)
 	var earned := int(receipt.earned)
+	receipt_key = 0
+	score_note.hide()
+	if leaders and int(leaders.last_receipt.score)==earned and int(leaders.last_receipt.key)>0:
+		receipt_key = leaders.last_receipt.key
+		_score_update(receipt_key,leaders.last_receipt.line)
 	_receipt_row(tr("За смену"), _money(earned), GREEN if earned >= 0 else RED, 23)
 	sheet.show()
 	show()
@@ -349,8 +384,19 @@ func _build_phone(region: Dictionary) -> void:
 	preview.size = Vector2(268, 100)
 	preview.setup(region)
 	address_value = _invoice_row(screen, 267, 65, tr("адрес"), INK)
+	former_address = RichTextLabel.new()
+	former_address.position = Vector2(97,272)
+	former_address.size = Vector2(188,22)
+	former_address.scroll_active = false
+	former_address.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	former_address.add_theme_font_size_override("normal_font_size",12)
+	former_address.add_theme_color_override("default_color",MUTED)
+	screen.add_child(former_address)
 	items_value = _invoice_row(screen, 333, 50, tr("заказ"), INK)
 	fee_value = _invoice_row(screen, 384, 53, tr("оплата"), GREEN)
+	special_value = _text_at(screen,Rect2(15,411,270,28),12,MUTED)
+	special_value.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	special_value.hide()
 	accept_btn = _button(screen, "", Color("#ecdbc1"), INK)
 	accept_btn.position = Vector2(2, 442)
 	accept_btn.size = Vector2(296, 65)
@@ -394,6 +440,9 @@ func _build_receipt() -> void:
 	column.add_child(HSeparator.new())
 	rows.add_theme_constant_override("separation", 6)
 	column.add_child(rows)
+	score_note = _label(column,13,MUTED)
+	score_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	score_note.hide()
 	column.add_child(HSeparator.new())
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	bottom.add_theme_constant_override("separation", 12)

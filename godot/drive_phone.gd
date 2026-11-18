@@ -55,6 +55,7 @@ var last_health := ""
 var last_balance := -1
 var home_head: Label
 var textures := {}
+var meal: Control
 
 func build() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -71,6 +72,10 @@ func build() -> void:
 		pages[id] = bg
 		if id in ["shift","rank","home"]:
 			_texture(bg,Rect2(0,0,290,497),"leather")
+	meal = preload("res://phone_meal.gd").new()
+	_at(screen,meal,Rect2(2,21,290,497))
+	pages["meal"] = meal
+	meal.setup(self)
 	var status := _panel(screen,Rect2(2,2,290,20),Color("#34383b"),Color.TRANSPARENT)
 	health = _label(status,Rect2(6,0,85,20),11,Color("#ffb8a7"))
 	time = _label(status,Rect2(91,0,108,20),12,Color.WHITE)
@@ -227,7 +232,7 @@ func _layout(animate: bool) -> void:
 	var pos := center-PHONE*.5
 	var angle := 0.0 if expanded else deg_to_rad(2)
 	if animate:
-		layout_tween = create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		layout_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 		layout_tween.tween_property(body,"position",pos,.53)
 		layout_tween.tween_property(body,"scale",Vector2.ONE*zoom,.53)
 		layout_tween.tween_property(body,"rotation",angle,.53)
@@ -249,14 +254,15 @@ func _notification(what: int) -> void:
 func _show_page() -> void:
 	for id: String in pages:
 		pages[id].visible = id == page
-	header.text = tr({"shift":"Птица Пицца","chat":"Сообщения","home":"Домой","rank":"Рейтинг смены","paid":"Птица Пицца"}[page])
-	shift_btn.visible = page not in ["paid","home"]
+	header.text = tr({"shift":"Птица Пицца","chat":"Сообщения","home":"Домой","rank":"Рейтинг смены","paid":"Птица Пицца","meal":"Личные"}[page])
+	header.get_parent().visible = page!="meal"
+	shift_btn.visible = page not in ["paid","home","meal"]
 	chat_btn.visible = shift_btn.visible
-	home_btn.visible = page != "paid"
+	home_btn.visible = page not in ["paid","meal"]
 	dock_target.visible = not expanded
 
 func open_page(next: String) -> void:
-	if popup or intro or (block_input.is_valid() and block_input.call()):
+	if popup or intro or meal.active() or (block_input.is_valid() and block_input.call()):
 		return
 	_switch(next,true)
 
@@ -275,10 +281,11 @@ func _home() -> void:
 		open_page("home")
 
 func dock() -> void:
-	if not popup and not intro:
+	if not popup and not intro and not meal.active():
 		_switch("shift",false)
 
 func begin_shift() -> void:
+	meal.cancel()
 	earned = 0
 	popup = false
 	intro = false

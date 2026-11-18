@@ -16,6 +16,7 @@ var dirty := false
 var writable := true
 var pending_save := 0.0
 var shift_late := 0
+var shift_knocked := 0
 var shift_closed := false
 var board := BOARD.new()
 var snapshot := {}
@@ -103,9 +104,41 @@ func bind_vehicle(vehicle: CharacterBody3D) -> void:
 	var stall := add.bind("pothole")
 	if not vehicle.engine.pothole_stalled.is_connected(stall):
 		vehicle.engine.pothole_stalled.connect(stall)
+	var wreck := over.bind("boom")
+	if not vehicle.wrecked.is_connected(wreck):
+		vehicle.wrecked.connect(wreck)
+	var landed := add.bind("roof")
+	if not vehicle.roof_landed.is_connected(landed):
+		vehicle.roof_landed.connect(landed)
+
+func bind_furniture(furniture: Node) -> void:
+	var lost := _prop_lost.bind(furniture)
+	if not furniture.prop_lost.is_connected(lost):
+		furniture.prop_lost.connect(lost)
+
+func _prop_lost(id: int, furniture: Node) -> void:
+	match furniture.props.get(id,{}).get("kind",""):
+		"lamp": add("lamps")
+		"stop": add("stops")
+
+func person_down(person: Node) -> void:
+	if person.has_meta(&"knockdown_recorded"):
+		return
+	person.set_meta(&"knockdown_recorded",true)
+	shift_knocked += 1
+	add("peds")
+
+static func boss_mood(delivered: int, full: bool, kind: String, slow: float, client_fine: int) -> String:
+	var short_shift := is_equal_approx(slow,.65)
+	if kind in ["pulled","dead"] or delivered < (2 if short_shift else 3):
+		return "bad"
+	if full and client_fine == 0 and delivered >= (3 if short_shift else 5):
+		return "great"
+	return "ok"
 
 func begin_shift() -> void:
 	shift_late = 0
+	shift_knocked = 0
 	shift_closed = false
 
 func deliver(order: Dictionary) -> void:

@@ -3,6 +3,7 @@ extends Node3D
 const BANK := preload("res://wildlife_meshes.gd")
 const SKIN := preload("res://wildlife_actor.gdshader")
 var bank := BANK.new()
+var moose:=preload("res://south_moose_behavior.gd").new()
 var ground: RefCounted
 var car: CharacterBody3D
 var traffic: Node
@@ -20,6 +21,7 @@ func setup(region: Dictionary, terrain: RefCounted, vehicle: CharacterBody3D, ro
 	car = vehicle
 	traffic = roads
 	director = events
+	moose.setup(self)
 	for parcel: Dictionary in region.greens:
 		if parcel.kind!="green":
 			continue
@@ -57,6 +59,7 @@ func begin(number: int, seed_value: int, _adult: bool) -> void:
 	rng.seed=("%d/fauna/%d"%[seed_value,number]).hash()
 	timers=PackedFloat32Array([.4,1.7,.8,rng.randf_range(45,90),rng.randf_range(30,60)])
 	active=true
+	moose.begin(_adult)
 
 func step(delta: float, _hour: float) -> void:
 	bank.upload_one()
@@ -64,6 +67,7 @@ func step(delta: float, _hour: float) -> void:
 		return
 	day_time+=delta
 	var observer := Vector2(car.position.x,car.position.z)
+	moose.scan(delta,observer)
 	for i in timers.size():
 		timers[i]-=delta
 	if timers[0]<=0:
@@ -81,7 +85,7 @@ func step(delta: float, _hour: float) -> void:
 		timers[4]=1.0
 		for a in animals:
 			var d:=observer.distance_to(a.at)
-			if a.big and d>=9 and d<=30 and a.mode in ["graze","walk"] and rng.randf()<.3 and director.start_event("moose",12.0):
+			if a.id=="moose" and a.partner==0 and d>=9 and d<=30 and a.mode in ["graze","walk"] and rng.randf()<.3 and director.start_event("moose",12.0):
 				a.mode="aim"
 				a.wait=1.3
 				timers[4]=rng.randf_range(90,180)
@@ -183,6 +187,7 @@ func _add(id: String, at: Vector2) -> Dictionary:
 	var a:={"id":id,"at":at,"node":m,"mat":mat,"big":big,"cat":id.begins_with("cat"),"roof":false,"site":{},
 		"floor":m.position.y,"mode":"graze","wait":rng.randf_range(3,8),"heading":m.rotation.y,"speed":0.0,
 		"target":at,"opposite":at,"cooldown":0.0,"scared":false,"height":0.0}
+	if a.big:moose.prepare(a)
 	animals.append(a)
 	return a
 
@@ -192,17 +197,15 @@ func _tick(a: Dictionary, delta: float, observer: Vector2) -> void:
 	var distance:=toward.length()
 	a.wait-=delta
 	a.cooldown=maxf(0,a.cooldown-delta)
-	if a.cat:
+	var special:float=moose.motion(a,delta,observer) if a.big else -1.0
+	if special>=0:
+		pass
+	elif a.cat:
 		_cat(a,toward,distance)
 	elif not a.big and distance<14 and a.mode!="flee" and a.cooldown<=0:
 		a.mode="flee"
 		a.heading=atan2(-toward.x,-toward.y)+rng.randf_range(-.6,.6)
 		a.wait=rng.randf_range(1.8,2.6)
-	elif a.mode=="aim":
-		a.heading=atan2(toward.x,toward.y)
-		if a.wait<=0:
-			a.mode="charge"
-			a.wait=3.5
 	elif a.mode in ["cross","stand"]:
 		if a.mode=="stand" and a.wait<=0:
 			a.target=a.opposite
@@ -222,13 +225,15 @@ func _tick(a: Dictionary, delta: float, observer: Vector2) -> void:
 		"cross": velocity=1.3
 		"charge": velocity=9.0
 		"stagger": velocity=2.2
+	if special>=0:velocity=special
 	if a.big and distance<2.3 and a.cooldown<=0:
-		if a.mode=="charge":
+		if a.id=="moose" and (a.mode=="charge" or absf(car.speed)>3):
+			get_tree().call_group(&"local_achievements",&"add","moose")
+		if a.mode=="charge" and a.chase==car.get_instance_id():
 			var shove:=toward.normalized()*9.0
 			car.velocity+=Vector3(shove.x,0,shove.y)
 			car.collision_damage(9.0,false,a.node.global_position,Vector3(shove.x,0,shove.y).normalized())
-			a.mode="graze"
-			a.wait=10
+			moose.reset_charge(a)
 			a.cooldown=5
 		elif absf(car.speed)>3:
 			car.collision_damage(minf(16.0,3.0+.12*absf(car.speed)),false,a.node.global_position,Vector3(toward.x,0,toward.y).normalized())
@@ -241,14 +246,15 @@ func _tick(a: Dictionary, delta: float, observer: Vector2) -> void:
 		a.node.hide()
 		return
 	a.node.show()
-	var next:=at+Vector2(sin(a.heading),cos(a.heading))*velocity*delta
+	var next:=Vector2(a.at)+Vector2(sin(a.heading),cos(a.heading))*velocity*delta
+	if a.big:next=moose.solid(a,next,delta)
 	if a.cat and a.roof and not Geometry2D.is_point_in_polygon(next,a.site.polygon):
 		a.heading+=PI
 		next=at
 	a.at=next
 	if not a.roof and next.distance_squared_to(at)>.000001:
 		a.floor=ground.at(next.x,next.y)+.02
-	a.node.position=Vector3(next.x,a.floor,next.y)
+	a.node.position=Vector3(next.x,a.floor+(float(a.height) if a.big else 0.0),next.y)
 	a.node.rotation.y=lerp_angle(a.node.rotation.y,a.heading,1-exp(-7*delta))
 	if not is_equal_approx(a.speed,velocity):
 		a.speed=velocity
@@ -296,8 +302,8 @@ func traffic_speed(at: Vector2, direction: Vector2, _speed: float) -> float:
 		if not a.big: continue
 		var delta:Vector2=a.at-at
 		var along:=delta.dot(direction)
-		if along>0 and along<30 and absf(delta.cross(direction))<1.4:
-			value=minf(value,clampf((along-3.0)/14.0,0,1))
+		if along>0 and along<30 and absf(delta.cross(direction))<2.3:
+			value=minf(value,clampf((along-2.49-.9-3.0)/14.0,0,1))
 	return value
 
 func honk() -> void:
@@ -307,10 +313,8 @@ func honk() -> void:
 		if offset.length_squared()>400: continue
 		if a.cat:
 			a.scared=true
-		elif a.big and a.mode in ["stand","cross","graze"]:
-			a.heading=atan2(offset.x,offset.y)
-			a.mode="stagger"
-			a.wait=2.0
+		elif a.big:
+			moose.shoo(a)
 
 func clear() -> void:
 	active=false

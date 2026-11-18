@@ -1,6 +1,7 @@
 extends RefCounted
 
 const PIZZAS := ["пепперони","маргарита","четыре сыра","мясная","гавайская","птичий микс","ветчина и сыр","диабло","карбонара"]
+const STACK_COUNTS := [2,2,2,3,3,3,4,4,5,6,8]
 const LIMITS := [2,20,35,55,80,110]
 const SIZE_WEIGHTS := [28,18,9,6,3,2]
 const TIME_FACTOR := [.9,.85,.8,.76,.72,.70]
@@ -26,10 +27,10 @@ func prepare(first: Dictionary, shift: RefCounted, book: RefCounted) -> void:
 	total_fee = 0
 	all_on_time = true
 	time_factor = 1
-	kind = "solo"
+	kind = "edge" if first.get("edge",false) else "solo"
 	var life := int(shift.profile.data.xp) + 1
 	var skill := float(shift.profile.data.skill)
-	var safe: bool = shift.number == 1 or shift.orders == 0 or first.get("story",false) or first.get("beach",false) or shift.duration-shift.elapsed < 75.0
+	var safe: bool = shift.number == 1 or shift.orders == 0 or first.get("story",false) or first.get("beach",false) or first.get("edge",false) or shift.duration-shift.elapsed < 75.0
 	if not safe:
 		var hour: float = shift.hour()
 		var from_hour := 16 if shift.pace == "generous" else (10 if shift.pace == "tight" else 11)
@@ -42,16 +43,16 @@ func prepare(first: Dictionary, shift: RefCounted, book: RefCounted) -> void:
 		_make_stops(first, shift, book, life, skill)
 	if kind == "multi" and remaining.is_empty():
 		kind = "solo"
-	pizzas = (randi_range(2,4) if kind == "group" else stops)
-	var pizza: String = PIZZAS.pick_random()
-	first.items = "пеперони" if first.get("story",false) else pizza
-	first.people = pizzas if kind == "group" else 1
-	first.kind = kind
-	total_meters = float(first.meters)
-	total_fee = shift.quote(first)
-	for order: Dictionary in remaining:
-		order.items = PIZZAS.pick_random()
-		order.kind = "multi"
+	pizzas = 0
+	total_meters = 0
+	for order: Dictionary in [first]+remaining:
+		order.items = "пеперони" if order.get("story",false) else PIZZAS.pick_random()
+		order.kind = kind
+		order.people = randi_range(2,4) if kind == "group" else 1
+		order.boxes = order.people
+		if order.people == 1 and shift.orders >= 2 and not order.get("story",false) and not order.get("beach",false) and randf() < .14:
+			order.boxes = int(STACK_COUNTS.pick_random())
+		pizzas += int(order.boxes)
 		total_meters += float(order.meters)
 		total_fee += shift.quote(order)
 	streak = streak + 1 if previous == kind else 1

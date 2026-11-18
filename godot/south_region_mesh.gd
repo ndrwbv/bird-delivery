@@ -126,6 +126,7 @@ func prepare(key: Vector2i) -> void:
 	var greens: Array = greens_by_tile.get(key, [])
 	for part in _outer_parts(area):
 		_land(mesh, part, roads, greens)
+	mesh.index()
 	surface_arrays = mesh.commit_to_arrays()
 
 
@@ -136,6 +137,7 @@ func make_house_block(key: Vector2i) -> Dictionary:
 	var walls := PackedVector3Array()
 	for house: Dictionary in house_blocks[key]:
 		_house(mesh,walls,house)
+	mesh.index()
 	return {"surface":mesh.commit_to_arrays(), "walls":walls}
 
 

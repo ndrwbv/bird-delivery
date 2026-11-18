@@ -135,18 +135,13 @@ func height_step(delta: float, support: float) -> bool:
 			y = lerpf(y,maxf(target_y,support+2.5),minf(1,6*delta))
 			if age>=HOLD: phase=Phase.DESCEND; age=0
 		Phase.DESCEND:
-			# A ray also sees solid roofs above the sampled road surface.
-			var roof := _ray(car.position+Vector3.UP*.12,Vector3(car.position.x,support+.2,car.position.z))
-			if not roof.is_empty() and roof.position.y>support+.35:
-				y = maxf(y,float(roof.position.y)+.25)
-			elif car.surface.water_depth <= .15 or car.surface.frozen:
-				y -= maxf(1.2,(y-support)*1.6)*delta
-				if y<=support+.02:
-					y=support+.035
-					phase=Phase.GROUND
-					car.airborne=false
-					cooldown=RECHARGE
-					_update_ui()
+			y -= maxf(1.2,(y-support)*1.6)*delta
+			if y <= support+.035:
+				y = support+.035
+				phase = Phase.GROUND
+				car.airborne = false
+				cooldown = RECHARGE
+				_update_ui()
 	car.position.y = maxf(y,support)
 	car.suspension_velocity = 0
 	return true

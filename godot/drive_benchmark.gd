@@ -64,8 +64,21 @@ func _physics_process(delta: float) -> void:
 	if game.choices.visible:
 		print("CHOICE at ",car.position," · hearts ",car.hearts," · sinking ",car.sinking)
 		game.choices._pick(0)
+	if game.hud.meal_active():
+		var meal: Control = game.hud.phone.meal
+		meal._complete_text()
+		meal.elapsed = .12
+		meal.pick(0)
+		if meal.selected >= 0:
+			meal.finish()
 	if get_tree().paused:
 		return
+	if headless and not ready_reported and absf(car.speed) > .01:
+		ready_reported = true
+		print("PLAYABLE %.3f seconds · headless (simulation)" % (Time.get_ticks_msec()*.001))
+		if startup_only:
+			_finish()
+			return
 	elapsed += delta
 	if elapsed >= next_report:
 		next_report += 20.0

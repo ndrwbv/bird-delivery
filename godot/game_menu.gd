@@ -39,6 +39,7 @@ var bar_context := Label.new()
 var hint := Label.new()
 var mode_ids := PackedStringArray()
 var quick := {"mode":"normal", "weather":"auto", "len":"medium"}
+var quick_mode_field: OptionButton
 var selected_locale := ""
 var completed_shifts := 0
 var summary := {}
@@ -426,6 +427,16 @@ func _pause_page() -> void:
 					continue
 				var value: Variant = invoice[field[0]]
 				order.add_child(_label(field[1],14,FAINT))
+				if field[0]=="address" and invoice.has("was_address"):
+					var former := RichTextLabel.new()
+					former.fit_content = true
+					former.scroll_active = false
+					former.mouse_filter = Control.MOUSE_FILTER_IGNORE
+					former.add_theme_color_override("default_color",FAINT)
+					former.push_strikethrough()
+					former.add_text(str(invoice.was_address))
+					former.pop()
+					order.add_child(former)
 				var content := _cash(value) if field[0] == "fee" else _display_value(value)
 				order.add_child(_wrapped(content,18))
 			if bool(invoice.get("can_cancel",false)) and cancel_order_requested.has_connections():
@@ -485,11 +496,14 @@ func _quick_field(card: Container, title: String, key: String, ids: PackedString
 	var labels := PackedStringArray()
 	for id: String in ids:
 		labels.append(names[id])
-	_option(card,title,labels,ids.find(quick[key]),func(i: int):
+	var field := _option(card,title,labels,ids.find(quick[key]),func(i: int):
 		quick[key] = ids[i]
 		if key == "mode":
 			_show_page("quick")
+			focus_default = quick_mode_field
 	)
+	if key == "mode":
+		quick_mode_field = field
 
 func _launch_quick() -> void:
 	_save("menu","quick",quick)
@@ -698,6 +712,9 @@ func _input(event: InputEvent) -> void:
 	if pad != pad_active and (pad or event is InputEventKey or event is InputEventMouseButton):
 		pad_active = pad
 		_update_hint()
+	if current_page == "quick" and _quick_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventJoypadMotion:
 		_handle_stick(event)
 		return
@@ -710,6 +727,38 @@ func _input(event: InputEvent) -> void:
 	if current_page == "settings" and event is InputEventJoypadButton and event.pressed and event.button_index in [JOY_BUTTON_LEFT_SHOULDER,JOY_BUTTON_RIGHT_SHOULDER]:
 		get_viewport().set_input_as_handled()
 		_settings(posmod(tab_index + (-1 if event.button_index == JOY_BUTTON_LEFT_SHOULDER else 1),TABS.size()))
+
+func _quick_input(event: InputEvent) -> bool:
+	var field := get_viewport().gui_get_focus_owner() as OptionButton
+	if not field or field.get_popup().visible:
+		return false
+	var step := 0
+	if event is InputEventKey and event.pressed:
+		var code: Key = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
+		if code in [KEY_LEFT,KEY_A,KEY_Q]:
+			step = -1
+		elif code in [KEY_RIGHT,KEY_D,KEY_E]:
+			step = 1
+		elif not event.echo and event.is_action_pressed(&"ui_accept"):
+			_launch_quick()
+			return true
+	elif event is InputEventJoypadButton and event.pressed:
+		if event.button_index in [JOY_BUTTON_DPAD_LEFT,JOY_BUTTON_LEFT_SHOULDER]:
+			step = -1
+		elif event.button_index in [JOY_BUTTON_DPAD_RIGHT,JOY_BUTTON_RIGHT_SHOULDER]:
+			step = 1
+		elif event.button_index == JOY_BUTTON_A:
+			_launch_quick()
+			return true
+	if step == 0:
+		return false
+	_flip_quick_field(field,step)
+	return true
+
+func _flip_quick_field(field: OptionButton, direction: int) -> void:
+	var index := posmod(field.selected+direction,field.item_count)
+	field.select(index)
+	field.item_selected.emit(index)
 
 func _handle_stick(event: InputEventJoypadMotion) -> void:
 	if event.axis not in [JOY_AXIS_LEFT_X,JOY_AXIS_LEFT_Y]:
@@ -730,7 +779,9 @@ func _handle_stick(event: InputEventJoypadMotion) -> void:
 	var focus := get_viewport().gui_get_focus_owner()
 	if not is_instance_valid(focus):
 		return
-	if focus is Slider and horizontal:
+	if current_page == "quick" and horizontal and focus is OptionButton:
+		_flip_quick_field(focus,next)
+	elif focus is Slider and horizontal:
 		focus.value += focus.step * next
 	else:
 		var side := (SIDE_LEFT if next < 0 else SIDE_RIGHT) if horizontal else (SIDE_TOP if next < 0 else SIDE_BOTTOM)
@@ -826,7 +877,7 @@ func _field(parent: Container, caption: String, value: String) -> void:
 	row.add_child(label)
 	row.add_child(_label(value,17,INK))
 
-func _option(parent: Container, title: String, labels: PackedStringArray, idx: int, change: Callable) -> void:
+func _option(parent: Container, title: String, labels: PackedStringArray, idx: int, change: Callable) -> OptionButton:
 	var row := HBoxContainer.new()
 	parent.add_child(row)
 	var label := _label(title,17,INK)
@@ -839,6 +890,7 @@ func _option(parent: Container, title: String, labels: PackedStringArray, idx: i
 	choice.select(maxi(0,idx))
 	row.add_child(choice)
 	choice.item_selected.connect(change)
+	return choice
 
 func _button(parent: Container, title: String, cb: Callable, emphasis := false) -> Button:
 	var button := Button.new()

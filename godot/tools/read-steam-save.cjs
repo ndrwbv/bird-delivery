@@ -87,9 +87,9 @@ function south(region,used,damage) {
   for(const item of array(damage.scars)){
     const x=+item.x-ox, z=+item.z-oz;
     if(!Number.isFinite(x+z) || !inside(x,z,region.boundary)) continue;
-    const outline=array(item.contour);
-    const radii=outline.filter(p=>Array.isArray(p)&&p.length>=3).map(p=>Math.hypot(+p[0]-item.x,+p[2]-item.z)).filter(Number.isFinite);
-    scars.push([x,z,radii.length?num(radii.reduce((a,b)=>a+b)/radii.length,1.8,9):4]);
+    const points=array(item.outer).length>=3?item.outer:array(item.contour);
+    const outline=points.slice(0,128).filter(p=>Array.isArray(p)&&p.length>=3&&Number.isFinite(+p[0]+ +p[2])&&Math.hypot(+p[0]-item.x,+p[2]-item.z)<50).map(p=>[+p[0]-ox,+p[2]-oz]);
+    if(outline.length>=3) scars.push({kind:item.kind==="hell-fissure"?"fissure":"crater",center:[x,z],outer:outline});
   }
   return {recent:recent.slice(-24),history:{version:1,houses,scars}};
 }
@@ -127,12 +127,14 @@ async function convert(source) {
   for(const [k,v] of Object.entries(object(ach.got))) if(/^[A-Z0-9_]+$/.test(k)&&Number.isFinite(+v)&&+v>0) got[k]=+v;
   for(const k of Object.keys(object(ach.seen))) if(object(ach.seen)[k]) seen[k]=true;
   const career={version:1,save_id:mark.saveId,resets:int(mark.resets),source_profile:int(mark.sourceProfile),import_digest:fp,
-    wallet:int(get('msk-wallet'))*cashMultiplier,shifts,stars:int(get('stars')),xp:int(get('msk-xp')),skill:num(skill.u,0,10),skill_shift:int(skill.shift),
+    wallet:int(get('msk-wallet'))*cashMultiplier,respect:int(get('respect')),depot_turret:int(get('turret'))>0,shifts,stars:int(get('stars')),xp:int(get('msk-xp')),skill:num(skill.u,0,10),skill_shift:int(skill.shift),
     gennady_paid:int(object(story.gennady).ch)>0,deliveries:int(get('delivered')),counted:Math.min(shifts,sourceCounts),knocked:int(get('knocked')),
     best:{earned:int(get('msk-best')),delivered:0},recent,engine,
     seed:int(cycle.seed)||parseInt(crypto.createHash('sha256').update(mark.saveId).digest('hex').slice(0,7),16),
     crew_earned:int(crew.me)*cashMultiplier,crew_count:int(crew.n),crew_totals:crewTotals,
     semerka:{armor:num(tune.armor,0,3)|0,engine:num(tune.engine,0,3)|0,wings:!!tune.wings,gun:!!tune.gun,paint:validPaint?hex:'#ebe6d8'}};
+  if(get('don-trash')!=null) career.trash_donated=Math.min(480000,int(get('don-trash'))*cashMultiplier);
+  if(get('don-gang')!=null) career.gang_donated=Math.min(640000,int(get('don-gang'))*cashMultiplier);
   const oldBoard=array(get('lb-local'));
   if(oldBoard.length){
     career.imported_scores=oldBoard.slice(0,50).map(item=>{

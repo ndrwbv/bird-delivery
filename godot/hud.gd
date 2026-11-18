@@ -24,6 +24,9 @@ var balance := 0
 var last_meters := -1
 var free_roam := false
 var homebound := false
+var consumed_physics_frame: int:
+	get:
+		return int(phone.meal.consumed_frame) if is_instance_valid(phone) and is_instance_valid(phone.meal) else -2
 var last_hint := ""
 var using_pad := false
 var on_foot := false
@@ -97,6 +100,22 @@ func bind_drive(vehicle: CharacterBody3D, clock_hud: CanvasLayer, modal: Callabl
 	phone.block_input = modal
 	clock_hud.bind_phone(phone,car,modal)
 
+func open_meal(apply: Callable, next: Callable) -> bool:
+	if not apply.is_valid():
+		return false
+	var apply_and_refresh := func(index: int):
+		apply.call(index)
+		if car:
+			phone.resources(phone.last_clock,phone.last_left,phone.last_left>=0,ceili(car.hearts),ceili(car.hearts_max))
+	return phone.meal.open(apply_and_refresh,next)
+
+func meal_active() -> bool:
+	return is_instance_valid(phone) and is_instance_valid(phone.meal) and phone.meal.active()
+
+func cancel_meal() -> void:
+	if meal_active():
+		phone.meal.cancel()
+
 func begin_shift() -> void:
 	phone.begin_shift()
 
@@ -136,6 +155,7 @@ func show_payment(_earned: int, total: int) -> void:
 	phone.set_account(total)
 
 func free_drive(_delivered: int, _earned: int) -> void:
+	cancel_meal()
 	card.hide()
 	phone.end_pay()
 	phone.end_intro()
@@ -170,13 +190,8 @@ func update_drive(at: Vector2, forward: Vector2, _kmh: float, meters: float, hin
 		range_label.text = measure
 		phone.distance.text = measure
 	if car:
-		var cold: float = .6 * (1.0-car.hearts/car.hearts_max)
-		if car.damage.stage.size()>8:
-			var engine_stage := int(car.damage.stage[2])
-			cold += .5 if engine_stage>=3 else (.2 if engine_stage==2 else 0.0)
-			if car.damage.stage[8]>=3:
-				cold += .25
-		bars.set_values(car.nitro,-1 if homebound or free_roam else (2 if cold>=.6 else (1 if cold>=.25 else 0)))
+		var cold: float = car.pizza_cooling()
+		bars.set_values(car.nitro,-1 if homebound or free_roam else (2 if cold>=.25 else (1 if cold>0.0 else 0)))
 	if pad != using_pad or running != on_foot or hint != last_hint:
 		using_pad = pad
 		on_foot = running

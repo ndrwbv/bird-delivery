@@ -4,7 +4,7 @@ const PIXELS := 512
 const SPAN := 420.0
 const CELL := 16.0
 var base: RefCounted
-var scars: Array[Dictionary] = []
+var scars: Array[RefCounted] = []
 var houses: Array[Dictionary] = []
 var cells := {}
 var materials: Array[ShaderMaterial] = []
@@ -47,8 +47,7 @@ func stop() -> void:
 	origin = Vector2.INF
 	dirty = true
 
-func add_crater(p: Vector2, radius: float) -> void:
-	var scar := {"p":p,"r":radius,"y":base.at(p.x,p.y),"depth":radius*.52}
+func add_scar(scar: RefCounted) -> void:
 	scars.append(scar)
 	if scars.size() > 48:
 		scars.pop_front()
@@ -59,11 +58,13 @@ func add_crater(p: Vector2, radius: float) -> void:
 		_index(scar)
 	dirty = true
 
-func _index(scar: Dictionary) -> void:
+func _index(scar: RefCounted) -> void:
+	if not scar.repaired and scar.kind!="crater":
+		return
 	var p: Vector2 = scar.p
-	var r := Vector2.ONE * float(scar.r)
-	var lo := Vector2i(((p-r)/CELL).floor())
-	var hi := Vector2i(((p+r)/CELL).floor())
+	var span := Vector2.ONE * float(scar.radius)
+	var lo := Vector2i(((p-span)/CELL).floor())
+	var hi := Vector2i(((p+span)/CELL).floor())
 	for y in range(lo.y,hi.y+1):
 		for x in range(lo.x,hi.x+1):
 			var key := Vector2i(x,y)
@@ -71,24 +72,24 @@ func _index(scar: Dictionary) -> void:
 				cells[key] = []
 			cells[key].append(scar)
 
-func deformation(p: Vector2) -> float:
-	if repairing:
-		return 0.0
-	var depth := 0.0
-	for scar: Dictionary in cells.get(Vector2i((p/CELL).floor()),[]):
-		var d := p.distance_to(scar.p) / float(scar.r)
-		if d < 1.0:
-			depth = maxf(depth,float(scar.depth)*(1.0-smoothstep(0.18,1.0,d)))
-	return depth
+func _support(x: float,z: float,original: float) -> float:
+	var point := Vector2(x,z)
+	for scar: RefCounted in cells.get(Vector2i((point/CELL).floor()),[]):
+		if point.distance_squared_to(scar.p)>scar.radius*scar.radius:
+			continue
+		var surface: float = scar.support(point)
+		if is_finite(surface):
+			return surface
+	return original
 
 func at(x: float,z: float,previous := INF) -> float:
-	return float(base.at(x,z,previous))-deformation(Vector2(x,z))
+	return _support(x,z,float(base.at(x,z,previous)))
 
 func wheel_height(x: float,z: float,previous := INF) -> float:
-	return float(base.wheel_height(x,z,previous))-deformation(Vector2(x,z))
+	return _support(x,z,float(base.wheel_height(x,z,previous)))
 
 func land_height(x: float,z: float) -> float:
-	return float(base.land_height(x,z))-deformation(Vector2(x,z))
+	return _support(x,z,float(base.land_height(x,z)))
 
 func material_at(x: float,z: float) -> int:
 	return base.material_at(x,z)
@@ -111,8 +112,8 @@ func update_at(p: Vector2) -> void:
 			_raster_house(house)
 	if not repairing:
 		for scar in scars:
-			if box.grow(scar.r).has_point(scar.p):
-				_raster_crater(scar)
+			if box.grow(scar.radius).has_point(scar.p):
+				_raster_polygon(scar.border,Color(0,clampf((float(scar.center_y)+67.2)/190.0,.004,1),0),scar.p,scar.open_scale)
 	texture.update(atlas)
 	var active := not houses.is_empty() or (not repairing and not scars.is_empty())
 	for material in materials:
@@ -121,22 +122,19 @@ func update_at(p: Vector2) -> void:
 			material.set_shader_parameter(&"quick_cut_enabled",active)
 	cuts = active
 
-func _raster_crater(scar: Dictionary) -> void:
-	var center: Vector2 = (scar.p-origin)*(PIXELS/SPAN)
-	var radius: float = scar.r*(PIXELS/SPAN)
-	var tint := Color(0,clampf((float(scar.y)+67.2)/190.0,.004,1),0)
-	for y in range(maxi(0,floori(center.y-radius)),mini(PIXELS,ceili(center.y+radius))):
-		var dy := y+.5-center.y
-		var dx := sqrt(maxf(0,radius*radius-dy*dy))
-		_line(y,center.x-dx,center.x+dx,tint)
-
 func _raster_house(house: Dictionary) -> void:
+	_raster_polygon(house.outline,Color(clampf((float(house.cut)+65.0)/190.0,.004,1),0,0))
+
+func _raster_polygon(outline: PackedVector2Array, tint: Color, pivot := Vector2.ZERO, k := 1.0) -> void:
 	var points := PackedVector2Array()
-	for p: Vector2 in house.outline:
-		points.append((p-origin)*PIXELS/SPAN)
-	var area: Rect2 = house.bounds
-	var tint := Color(clampf((float(house.cut)+65.0)/190.0,.004,1),0,0)
-	for y in range(maxi(0,floori((area.position.y-origin.y)*PIXELS/SPAN)),mini(PIXELS,ceili((area.end.y-origin.y)*PIXELS/SPAN))):
+	var lo := PIXELS
+	var hi := 0
+	for p in outline:
+		var at := ((pivot+(p-pivot)*k)-origin)*(PIXELS/SPAN)
+		points.append(at)
+		lo = mini(lo,floori(at.y))
+		hi = maxi(hi,ceili(at.y))
+	for y in range(maxi(0,lo),mini(PIXELS,hi)):
 		var xs := PackedFloat32Array()
 		var py := y+.5
 		for i in points.size():

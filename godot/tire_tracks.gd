@@ -34,12 +34,15 @@ func break_tracks() -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	if absf(car.speed) < 0.8 or car.controls_locked:
+	if absf(car.speed) < .8 or car.controls_locked or car.airborne:
 		break_tracks()
 		return
 	for i in 2:
 		var p: Vector3 = car.wheel_at[i+2]
-		p.y = terrain.at(p.x,p.z)
+		p.y = terrain.at(p.x,p.z,car.position.y)
+		if absf(p.y-car.wheel_at[i+2].y) > 1.0:
+			active[i] = false
+			continue
 		var loose: bool = terrain.material_at(p.x,p.z) != 0
 		var drawing: bool = loose or car.skid > 1.5
 		if drawing and active[i]:

@@ -3,6 +3,8 @@ extends Node
 # BEST_SHIFT in steam.js and board.js. A valid local career never depends on Steam.
 signal rows_ready(tab: String, rows: Array, remote: bool)
 signal score_stored(rank: int, changed: bool)
+signal receipt_updated(receipt_key: int, line: String)
+var last_receipt := {"key":0,"score":0,"line":""}
 const SAVE := "user://shift_records.cfg"
 var platform: Node
 var cfg := ConfigFile.new()
@@ -83,6 +85,7 @@ func available() -> bool:
 	return is_processing() and platform.available() and not uncertain
 
 func record(value: int, delivered: int, level: int) -> void:
+	last_receipt = {"key":0,"score":0,"line":""}
 	if value<=0 or memory_only or not writable or platform.profile.in_memory:
 		return
 	var owner := str(platform.profile.data.save_id)
@@ -93,15 +96,15 @@ func record(value: int, delivered: int, level: int) -> void:
 	var pending: Dictionary = cfg.get_value("pending",owner,{})
 	if value>int(pending.get("score",0)):
 		cfg.set_value("pending",owner,entry)
-	_save()
+	if _save():
+		last_receipt = {"key":entry.ts,"score":value,"line":tr("смена записана на этом компьютере")}
 	retry = 0.0
 
-func _save() -> void:
+func _save() -> bool:
 	if memory_only or not writable:
-		return
+		return false
 	var path := ProjectSettings.globalize_path(SAVE)
-	if cfg.save(path+".tmp")==OK:
-		DirAccess.rename_absolute(path+".tmp",path)
+	return cfg.save(path+".tmp")==OK and DirAccess.rename_absolute(path+".tmp",path)==OK
 
 func local_top() -> Array:
 	var result := []
@@ -230,5 +233,10 @@ func _uploaded(ok: int, this_handle: int, result: Dictionary) -> void:
 	if int(pending.get("score",0))<=int(sending.score):
 		cfg.erase_section_key("pending",owner)
 		_save()
-	score_stored.emit(int(result.get("global_rank_new",0)),bool(result.get("score_changed",false)))
+	var rank := int(result.get("global_rank_new",0))
+	var changed := bool(result.get("score_changed",false))
+	score_stored.emit(rank,changed)
+	if rank>0 and int(last_receipt.key)==int(sending.ts):
+		last_receipt.line = tr("лучшая смена! ты #{n} в мире" if changed else "смена в таблице рекордов · ты #{n} в мире").format({"n":rank})
+		receipt_updated.emit(last_receipt.key,last_receipt.line)
 	sending = {}

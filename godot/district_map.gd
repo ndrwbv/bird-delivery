@@ -85,6 +85,8 @@ var _destination := Vector2.ZERO
 var _has_destination := false
 var _player := Vector2.ZERO
 var _has_player := false
+var _incident := Vector2.INF
+var _incident_label := ""
 
 
 func setup(region: Dictionary, core: Dictionary, full: bool) -> void:
@@ -146,8 +148,9 @@ func _set_region(region: Dictionary) -> void:
 		_landmarks.append({"label": str(gate.name), "point": _point(gate.at), "color": Color("#786c60")})
 	if region.get("beach", []).size() == 2:
 		_landmarks.append({"label": "Пляж", "point": _point(region.beach), "color": Color("#43829a")})
-	if region.get("garage", []).size() == 2:
-		_landmarks.append({"label": "Мастерская", "point": _point(region.garage), "color": POI_COLOR})
+	var workshop: Array = region.get("workshop",region.get("garage",[]))
+	if workshop.size() == 2:
+		_landmarks.append({"label":tr("Мастерская"),"point":_point(workshop),"color":POI_COLOR})
 
 
 func _set_core(core: Dictionary) -> void:
@@ -251,6 +254,15 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), OUTSIDE if is_instance_valid(_streets) and _streets.boundary_fill else PAPER)
 
 
+func set_incident(at: Vector2, label: String) -> void:
+	if _incident == at and _incident_label == label:
+		return
+	_incident = at
+	_incident_label = label
+	if is_instance_valid(_markers):
+		_markers.queue_redraw()
+
+
 func draw_markers(layer: Node2D) -> void:
 	var view := Rect2(Vector2.ZERO, size)
 	if _route.size() > 1:
@@ -272,6 +284,12 @@ func draw_markers(layer: Node2D) -> void:
 		var dest := _destination * _scale
 		layer.draw_circle(dest, 6.0, Color("#fff5dd"), true, -1.0, true)
 		layer.draw_circle(dest, 4.3, ROUTE_COLOR, true, -1.0, true)
+	if _incident.is_finite():
+		var pin := _incident*_scale
+		layer.draw_circle(pin,8.0,Color("#fdf3db"),true,-1.0,true)
+		layer.draw_circle(pin,6.2,Color("#bd4032"),true,-1.0,true)
+		if _full and view.has_point(pin+layer.position):
+			_draw_label(layer,pin,_incident_label)
 	if _has_player:
 		var car := _player * _scale
 		layer.draw_circle(car, 5.8, INK, true, -1.0, true)

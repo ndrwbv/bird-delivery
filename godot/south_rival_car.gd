@@ -33,6 +33,15 @@ func player_collided(force: float, at: Vector3, normal: Vector3) -> bool:
 	return true
 
 
+func displace(force: float, shot: Vector3) -> void:
+	if hp<=0 or force<2.7:
+		return
+	super.displace(force,shot)
+	ram = 0
+	cut = 0
+	displaced.emit(self)
+
+
 func struck(force: float, shot: Vector3) -> void:
 	if hp<=0 or grazed or force<=5:
 		grazed = false

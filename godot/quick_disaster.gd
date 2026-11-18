@@ -43,6 +43,9 @@ var random := RandomNumberGenerator.new()
 var meteors: Array[Dictionary] = []
 var fires: Array[Dictionary] = []
 var scars: Array[Dictionary] = []
+var opening_scars: Array[Dictionary] = []
+var atlas_step := 0.0
+var repair_jobs: Array[Dictionary] = []
 var damage_houses: Array[Dictionary] = []
 var pulses: Array[Dictionary] = []
 var struck_traffic := {}
@@ -115,7 +118,7 @@ func _prepare() -> void:
 	fire.shader = FIRE_SHADER
 	flame.material = fire
 	for spec: Array in [["rock",Color("#48262b")],["trail",Color("#ff993d")],["warning",Color("#ffba40")],
-			["coal",Color("#4c3735")],["soil",Color("#56372e")],["steel",Color("#667a7b")],
+			["brick",Color("#9e5941")],["coal",Color("#4c3735")],["soil",Color("#56372e")],["steel",Color("#667a7b")],
 			["wood",Color("#c68c46")],["patch",Color("#403e39")],["concrete",Color("#787066")],["barrier",Color("#dc6c35")]]:
 		var paint := StandardMaterial3D.new()
 		paint.albedo_color = spec[1]
@@ -184,18 +187,35 @@ func history() -> Dictionary:
 	for item in damage_houses:
 		saved_houses.append(item.house.id)
 	for site in scars:
-		saved_scars.append([site.p.x,site.p.y,site.r])
+		saved_scars.append(site.shape.history())
 	return {"version":1,"houses":saved_houses,"scars":saved_scars}
 
 func _load_history(prior: Dictionary) -> void:
-	if prior.get("version") == 1 and prior.get("houses") is Array and prior.get("scars") is Array:
+	if prior.get("version")==1 and prior.get("houses") is Array and prior.get("scars") is Array:
 		for id in prior.houses.slice(-MAX_HOUSES):
-			if houses_by_id.has(int(id)) and int(id) != PROTECT_DEPOT:
-				_hurt_house(houses_by_id[int(id)],true)
+			if houses_by_id.has(int(id)) and int(id)!=PROTECT_DEPOT:
+				var house: Dictionary = houses_by_id[int(id)]
+				repair_jobs.append({"house":house,"d":depot.distance_squared_to(house.p)})
 		for item in prior.scars.slice(-MAX_SCARS):
 			if item is Array and item.size()==3:
-				_crater(Vector2(float(item[0]),float(item[1])),clampf(float(item[2]),1.8,9),true)
-	if not damage_houses.is_empty() or not scars.is_empty():
+				var p := Vector2(float(item[0]),float(item[1]))
+				if p.is_finite():
+					repair_jobs.append({"p":p,"r":clampf(float(item[2]),1.8,9),"d":depot.distance_squared_to(p)})
+			elif item is Dictionary and item.get("center") is Array and item.center.size()==2 and item.get("outer") is Array:
+				var center := Vector2(float(item.center[0]),float(item.center[1]))
+				var outline := PackedVector2Array()
+				for pt in item.outer.slice(0,128):
+					if pt is Array and pt.size()==2:
+						var at := Vector2(float(pt[0]),float(pt[1]))
+						if at.is_finite() and at.distance_squared_to(center)<=2500:
+							outline.append(at)
+				if center.is_finite() and outline.size()>=3 and not Geometry2D.triangulate_polygon(outline).is_empty():
+					repair_jobs.append({"p":center,"outer":outline,"kind":str(item.get("kind","crater")),"d":depot.distance_squared_to(center)})
+	if not repair_jobs.is_empty():
+		# Pop the nearest first. Loading 48 detailed repairs in one physics tick
+		# delays the first drive frame even when none of them are in view.
+		repair_jobs.sort_custom(func(a: Dictionary,b: Dictionary): return a.d>b.d)
+		_restore_repairs()
 		return
 	for i in 3:
 		var target := _house_target()
@@ -204,6 +224,24 @@ func _load_history(prior: Dictionary) -> void:
 	for d: float in [28.0,66.0,117.0]:
 		var road := _nearest_road(_ahead(d,0))
 		_crater(road.p,6.5 if d==66 else 2.6,true)
+
+func _restore_repairs() -> void:
+	var until := Time.get_ticks_usec()+1250
+	for i in 2:
+		if repair_jobs.is_empty():
+			return
+		var task: Dictionary = repair_jobs.pop_back()
+		if task.has("house"):
+			_hurt_house(task.house,true)
+		elif task.has("outer"):
+			var shape := preload("res://quick_scar.gd").new()
+			shape.repair(task.p,task.outer,terrain,task.kind)
+			_install_scar(shape)
+		else:
+			_crater(task.p,task.r,true)
+		if Time.get_ticks_usec()>=until:
+			return
+
 
 func stop() -> void:
 	if not active:
@@ -237,6 +275,9 @@ func stop() -> void:
 	meteors.clear()
 	fires.clear()
 	scars.clear()
+	repair_jobs.clear()
+	opening_scars.clear()
+	atlas_step = 0.0
 	damage_houses.clear()
 	pulses.clear()
 	rubble.clear()
@@ -248,6 +289,9 @@ func stop() -> void:
 func _physics_process(delta: float) -> void:
 	if not active:
 		return
+	if aftermath and not repair_jobs.is_empty():
+		_restore_repairs()
+	_expand_scars(delta)
 	cut.update_at(_xz(car.global_position))
 	if aftermath:
 		return
@@ -342,9 +386,16 @@ func _impact(m: Dictionary) -> void:
 	var radius: float = float(m.r)*4.6+8.0 if m.r>0.0 else (36.0 if not m.house.is_empty() else 8.0+m.size*5.0)
 	if m.r>0.0:
 		_crater(p,m.r,false)
+		var offset := random.randf()*TAU
+		for i in 4:
+			var angle := offset+i*PI*.5+random.randf_range(-.28,.28)
+			var center := p+Vector2.from_angle(angle)*(float(m.r)+random.randf_range(3.1,5.0))
+			_fissure(center,angle,random.randf_range(8,12),random.randf_range(.48,.83),random.randf_range(.8,1.5))
 		figures.emerge(p,m.r,clock,random)
 	elif not m.house.is_empty():
 		_hurt_house(m.house,false)
+	elif p.distance_squared_to(_xz(car.position))<18225 and not _near_scar(p,10):
+		_fissure(p,random.randf()*TAU,random.randf_range(7,13),.52,.95)
 	rubble.burst(m.end,m.house,m.r,random)
 	figures.blast(p,radius)
 	var d := _xz(car.position).distance_to(p)
@@ -377,41 +428,62 @@ func _impact(m: Dictionary) -> void:
 	else:
 		var house: Dictionary = m.house
 		_fire(p,1.8,float(house.cut))
-	if m.r>0 or not m.house.is_empty():
-		history_changed.emit()
+	history_changed.emit()
 
 func _crater(p: Vector2, radius: float, repaired: bool) -> void:
-	cut.add_crater(p,radius)
+	var shape := preload("res://quick_scar.gd").new()
+	var road := _nearest_road(p)
+	if repaired:
+		var outline := PackedVector2Array()
+		for i in 23:
+			outline.append(p+Vector2.from_angle(TAU*i/23)*radius)
+		shape.repair(p,outline,terrain,"crater")
+	else:
+		var approach := (Vector2(road.p)-p).normalized() if not road.is_empty() else Vector2.RIGHT
+		shape.crater(p,radius,approach,random,terrain)
+	_install_scar(shape)
+
+func _fissure(p: Vector2, angle: float, length: float, width: float, depth: float) -> void:
+	if not _safe(p,length*.52):
+		return
+	var shape := preload("res://quick_scar.gd").new()
+	shape.fissure(p,angle,length,width,depth,random,terrain)
+	_install_scar(shape)
+
+func _install_scar(shape: RefCounted) -> void:
+	cut.add_scar(shape)
 	var group := Node3D.new()
 	damage_nodes.add_child(group)
-	var painter := SurfaceTool.new()
-	painter.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var rings: Array[PackedVector3Array] = []
-	for fraction: float in [0.0,.25,.56,.80,1.0,1.12]:
-		var points := PackedVector3Array()
-		for i in 28:
-			var angle := TAU*i/28.0
-			var v := p+Vector2(cos(angle),sin(angle))*radius*fraction
-			var y: float = cut.at(v.x,v.y)+.045
-			if not repaired and fraction>.79:
-				y += .20*(1.0-absf(fraction-1.0)*5.0)
-			points.append(Vector3(v.x,y,v.y))
-		rings.append(points)
-	for band in range(1,rings.size()):
-		for i in 28:
-			var j := (i+1)%28
-			for v: Vector3 in [rings[band-1][i],rings[band][j],rings[band][i],rings[band-1][i],rings[band-1][j],rings[band][j]]:
-				painter.add_vertex(v)
-	painter.generate_normals()
-	_mesh(group,painter.commit(),"patch" if repaired else "soil",Vector3.ZERO,Vector3.ONE)
-	if repaired:
-		for side in [-1,1]:
-			var where := p+Vector2(radius*1.1*side,0)
-			_mesh(group,box,"barrier",Vector3(where.x,terrain.at(where.x,where.y)+.37,where.y),Vector3(.32,.75,.32))
-	scars.append({"p":p,"r":radius,"node":group})
+	_mesh(group,shape.mesh(),"patch" if shape.repaired else "soil",Vector3.ZERO,Vector3.ONE)
+	var item := {"p":shape.p,"r":shape.radius,"shape":shape,"node":group,"open":1.0 if shape.repaired else .015}
+	scars.append(item)
+	if not shape.repaired:
+		opening_scars.append(item)
+		_pose_scar(item)
 	if scars.size()>MAX_SCARS:
 		var retired: Dictionary = scars.pop_front()
 		retired.node.queue_free()
+
+func _pose_scar(item: Dictionary) -> void:
+	var k := smoothstep(0.,1.,float(item.open))
+	var center := Vector3(item.p.x,item.shape.center_y,item.p.y)
+	item.shape.open_scale = k
+	item.node.position = center*(1.-k)
+	item.node.scale = Vector3.ONE*k
+
+func _expand_scars(delta: float) -> void:
+	if opening_scars.is_empty():
+		return
+	for i in range(opening_scars.size()-1,-1,-1):
+		var item := opening_scars[i]
+		item.open = minf(1.,item.open+delta/.65)
+		_pose_scar(item)
+		if item.open>=1:
+			opening_scars.remove_at(i)
+	atlas_step -= delta
+	if atlas_step<=0 or opening_scars.is_empty():
+		cut.dirty = true
+		atlas_step = 1./12.
 
 func _hurt_house(house: Dictionary, repaired: bool) -> void:
 	for previous in damage_houses:
@@ -456,6 +528,8 @@ func _hurt_house(house: Dictionary, repaired: bool) -> void:
 			var ground_y: float = terrain.at(where.x,where.y)
 			var orientation := Basis.from_euler(Vector3(random.randf_range(-.5,.5),edge_yaw,random.randf_range(-.4,.4)))
 			chunks.append(Transform3D(orientation.scaled_local(Vector3(2.8,.7,1.45)),Vector3(where.x,ground_y+.3,where.y)))
+	if repaired:
+		preload("res://quick_rebuilding.gd").new().build(self,group,house)
 	_batch(group,members,"wood")
 	_batch(group,chunks,"coal")
 	damage_houses.append({"house":house,"node":group})

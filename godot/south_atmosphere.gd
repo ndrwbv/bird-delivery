@@ -90,6 +90,14 @@ func start_quick(weather_id := "auto", seed_value := 1) -> void:
 	_begin(CALENDAR.summer_weather(weather_id,CALENDAR.random01(seed_value,5003)),false,seed_value)
 
 
+func start_free_drive() -> void:
+	_external_clock = false
+
+
+func clock_position() -> float:
+	return _clock
+
+
 func set_clock(env_time: float) -> void:
 	_external_clock = true
 	_clock = fposmod(env_time,1.0)

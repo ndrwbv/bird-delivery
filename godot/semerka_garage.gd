@@ -9,6 +9,8 @@ const FACTORY := "#ebe6d8"
 const PALETTE := {"#ebe6d8":"заводской","#d8262e":"красный","#f0522a":"оранжевый","#f2c21b":"жёлтый",
 	"#3f9a4e":"зелёный","#46b4e0":"голубой","#2d4fa6":"синий","#7a3fb0":"фиолетовый",
 	"#f27aa8":"розовый","#ecebe6":"белый","#1b1c21":"чёрный"}
+const DONATIONS := preload("res://district_donations.gd")
+const DEPOT_TREE_PRICE := 120000
 const TITLES := {"armor":"добавить брони","engine":"улучшить мотор","wings":"крылья","gun":"гранатомёт"}
 const GAMES := ["slot","roulette","tennis"]
 const GAME_NAMES := {"slot":"однорукий бандит","roulette":"красное или чёрное","tennis":"теннис: кто выиграет матч"}
@@ -27,6 +29,7 @@ var actions: VBoxContainer
 var preview: PREVIEW
 var paint_open := false
 var showroom: VBoxContainer
+var donation_page: Control
 var preset_focus: Control
 var active_pad := 0
 var shift_id := 0
@@ -89,6 +92,7 @@ func open(owner: RefCounted) -> void:
 	layout.add_child(actions)
 	notice=_label("",16,Color("#a24532"))
 	showroom.add_child(notice)
+	_button(showroom,"Помочь городу",_open_donations)
 	_button(showroom,"назад",_close)
 	_garage_controls()
 	set_process(true)
@@ -133,7 +137,52 @@ func _garage_controls(focus_key := "") -> void:
 			if not b.disabled and (not preset_focus or focus_key==key): preset_focus=b
 		var paint_button:=_button(actions,tr("покрасить")+"    "+_money(1500),_toggle_paint)
 		if not preset_focus or focus_key=="paint": preset_focus=paint_button
-	if preset_focus: preset_focus.grab_focus.call_deferred()
+		var owned := bool(profile.data.get("depot_turret",false))
+		var respect := int(profile.data.get("respect",0))
+		var detail := tr("стоит у точки") if owned else (_money(DEPOT_TREE_PRICE) if respect>=130 else tr("нужно 130 респекта"))
+		var tree := _button(actions,tr("ёлка-турель")+"   ·   "+detail,_buy_depot_tree)
+		tree.disabled = owned or respect<130 or int(profile.data.wallet)<DEPOT_TREE_PRICE
+	if preset_focus: preset_focus.grab_focus()
+
+func _open_donations() -> void:
+	if section != "garage":
+		return
+	section = "donate"
+	(showroom.get_parent() as Control).hide()
+	var page := _page("Городские проекты",590)
+	donation_page = page.get_parent()
+	var projects := DONATIONS.new()
+	page.add_child(projects)
+	projects.setup(profile)
+	var back := _button(page,"назад",_close)
+	back.grab_focus()
+
+
+func _close_donations() -> void:
+	section = "garage"
+	donation_page.queue_free()
+	donation_page = null
+	(showroom.get_parent() as Control).show()
+	_garage_controls()
+
+
+func _buy_depot_tree() -> void:
+	if section!="garage" or not profile or profile.data.get("depot_turret",false) or int(profile.data.get("respect",0))<130 or int(profile.data.wallet)<DEPOT_TREE_PRICE:
+		return
+	var previous: int = profile.data.wallet
+	var had_key: bool = profile.data.has("depot_turret")
+	profile.data.wallet = previous-DEPOT_TREE_PRICE
+	profile.data.depot_turret = true
+	if not profile.save():
+		profile.data.wallet = previous
+		if had_key:
+			profile.data.depot_turret = false
+		else:
+			profile.data.erase("depot_turret")
+		notice.text = tr("Не удалось сохранить покупку")
+		return
+	notice.text = tr("стоит у точки")
+	_garage_controls()
 
 func _price(key: String, equipped: Dictionary) -> int:
 	match key:
@@ -216,7 +265,7 @@ func _bet_page() -> void:
 		right.add_child(_label(title,22,Color("#466b3b") if bool(result.win) else Color("#a24532")))
 		var choice: String = result.get("name","")
 		if not choice.is_empty(): right.add_child(_label(choice,18,INK))
-		_button(right,"пора на работу",_start_next).grab_focus.call_deferred()
+		_button(right,"пора на работу",_start_next).grab_focus()
 		if int(profile.data.wallet)>=50: _button(right,"крутить ещё",_again)
 	else:
 		right.add_child(_label(tr("выигрыш ×{k}").format({"k":2}),18,MUTE))
@@ -240,7 +289,7 @@ func _bet_page() -> void:
 			amount.text=tr("ставка")+"    "+_money(stake)
 		)
 		_button(right,"ва-банк",func(): slider.value=slider.max_value)
-		_button(right,tr("депнуть")+"  ×2",_spin).grab_focus.call_deferred()
+		_button(right,tr("депнуть")+"  ×2",_spin).grab_focus()
 	right.add_child(notice)
 	_button(sheet,"назад",_close)
 
@@ -307,6 +356,9 @@ func _enter(owner: RefCounted, screen: String) -> void:
 
 func _close() -> void:
 	if not active() or spinning: return
+	if section == "donate":
+		_close_donations()
+		return
 	if section=="garage" and paint_open:
 		_toggle_paint()
 		return

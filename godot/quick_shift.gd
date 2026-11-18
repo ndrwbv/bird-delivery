@@ -9,7 +9,7 @@ func begin(career: RefCounted) -> void:
 	duration = (day_end - T0) * 480.0 * slow
 	sun_rate = (.01/1.5 + .55 + .15/1.5 + (day_end-.77)/2.0) / duration
 
-func settle(tips_allowed: bool, failed: bool, _story: bool) -> void:
+func settle(tips_allowed: bool, failed: bool, _story: bool, _rich_neighbor := Callable()) -> void:
 	var career_xp := int(profile.data.xp)
 	super.settle(tips_allowed,failed,false)
 	profile.data.xp = career_xp

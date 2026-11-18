@@ -106,6 +106,13 @@ func repair() -> void:
 	repairs += 1
 
 
+func service_at_lunch() -> void:
+	condition = ceiling
+	dead = false
+	restarting = false
+	pending = -1.0
+
+
 func pothole(severity := 1.0) -> void:
 	if not dead and randf() < stall_chance()*0.25*severity:
 		_stall()

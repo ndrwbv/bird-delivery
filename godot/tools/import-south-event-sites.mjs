@@ -20,7 +20,9 @@ function releasedValue(name, source, open, close) {
 }
 const releasedArray = name => releasedValue(name, source, '[', ']');
 const data = {benches, bands: releasedArray('BANDS'), gig: releasedArray('GIG_L'),
-  meet: releasedArray('MEET_L'), march_adult: releasedArray('MARCH_ADULT'), topics: releasedArray('PROBLEMS')};
+  meet: releasedArray('MEET_L'), announce: releasedArray('ANNOUNCE'), riot: releasedArray('RIOT_L'),
+  riot_adult: releasedArray('RIOT_ADULT'), graffiti: releasedArray('GRAFF'), flyers: releasedArray('OWN'),
+  flyers_adult: releasedArray('OWN_ADULT'), march_adult: releasedArray('MARCH_ADULT'), topics: releasedArray('PROBLEMS')};
 const crews = await readFile(new URL('../../src/game/crews.js', import.meta.url), 'utf8');
 data.crews = {
   chat: releasedValue('CHAT', crews, '{', '}'), cry: releasedValue('CRY', crews, '{', '}'),
@@ -28,7 +30,7 @@ data.crews = {
 };
 // Register released English strings used by the native street encounters.
 for (const module of ['south_garage_zone', 'south_bribe_ring', 'south_street_robbery', 'south_pizza_thief',
-  'south_angry_drivers', 'south_rival_deliveries', 'south_brand_crews', 'south_roadworks']) {
+  'south_angry_drivers', 'south_rival_deliveries', 'south_brand_crews', 'south_roadworks', 'south_depot_raid']) {
   const native = await readFile(new URL('../' + module + '.gd', import.meta.url), 'utf8');
   for (const [, line] of native.matchAll(/"([^"\n]*[А-Яа-яЁё][^"\n]*)"/gu)) phrase(line);
 }
