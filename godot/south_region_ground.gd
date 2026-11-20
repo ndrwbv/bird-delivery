@@ -4,6 +4,7 @@ const ROAD_CELL := 48.0
 const SEAM_METERS := 24.0
 const PAVEMENT := 0
 const GRASS := 1
+const CURB_WIDTH := 0.19
 const SHORE_PATH := "res://assets/south-beach-height.json"
 const SHORE_BLEND := 12.0
 const RELIEF_PATH := "res://assets/south-outer-relief.bin"
@@ -28,7 +29,7 @@ var road_cells := {}
 var road_sections: Array[Dictionary] = []
 
 
-func setup(data: Dictionary, bounds: Array, detail_ground: RefCounted, use_relief := true) -> void:
+func setup(data: Dictionary, bounds: Array, detail_ground: RefCounted, use_relief := true, use_yards := true) -> void:
 	detail = detail_ground
 	core = Rect2(Vector2(bounds[0], bounds[1]), Vector2(bounds[2]-bounds[0], bounds[3]-bounds[1]))
 	var spec: Dictionary = data.terrain
@@ -48,18 +49,42 @@ func setup(data: Dictionary, bounds: Array, detail_ground: RefCounted, use_relie
 	for road: Dictionary in data.roads:
 		var half := float(road.width)*0.5
 		for segment in sections(road.points,half,half+sidewalk_width(road),road):
-			var area: Rect2 = segment.bounds
-			if core.encloses(area):
-				continue
-			road_sections.append(segment)
-			var first := Vector2i((area.position / ROAD_CELL).floor())
-			var last := Vector2i((area.end / ROAD_CELL).floor())
-			for z in range(first.y, last.y+1):
-				for x in range(first.x, last.x+1):
-					var key := Vector2i(x,z)
-					if not road_cells.has(key):
-						road_cells[key] = []
-					road_cells[key].append(segment)
+			_add_paving(segment)
+	for lot: Dictionary in data.parking_lots:
+		var outline := outline_of(lot.outline)
+		if outline.size() < 3:
+			continue
+		_add_paving({"bounds":bounds_of(outline),"walk":outline,"road":outline,"curbs":[],
+			"at":Vector2(lot.at[0],lot.at[1]),"axis":Vector2.RIGHT,"along":0.0,"rank":7,
+			"half":0.0,"length":1.0,"deck":Vector2(INF,INF),"lot":true})
+		for segment in sections([lot.entry,lot.at],2.2,2.2):
+			_add_paving(segment)
+	if not use_yards or not FileAccess.file_exists("res://assets/south-yards.json"):
+		return
+	var yards: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/south-yards.json"))
+	for yard: Dictionary in yards.values():
+		var departure := Vector2(yard.driveway[0],yard.driveway[1])
+		var arrival := Vector2(yard.stop[0],yard.stop[1])
+		if arrival.distance_to(departure) < 5.0:
+			continue
+		for segment in sections([yard.driveway,yard.stop],1.65,1.65):
+			_add_paving(segment)
+
+
+func _add_paving(segment: Dictionary) -> void:
+	var area: Rect2 = segment.bounds
+	if core.encloses(area):
+		return
+	segment.id = road_sections.size()
+	road_sections.append(segment)
+	var first := Vector2i((area.position / ROAD_CELL).floor())
+	var last := Vector2i((area.end / ROAD_CELL).floor())
+	for z in range(first.y,last.y+1):
+		for x in range(first.x,last.x+1):
+			var key := Vector2i(x,z)
+			if not road_cells.has(key):
+				road_cells[key] = []
+			road_cells[key].append(segment)
 
 
 func _load_shore() -> void:
@@ -75,7 +100,7 @@ func _load_shore() -> void:
 
 
 static func sidewalk_width(road: Dictionary) -> float:
-	return 2.75 if int(road["class"]) <= 5 else 1.0
+	return 2.75 if int(road["class"]) <= 5 else 1.30
 
 
 static func outline_of(raw: Array) -> PackedVector2Array:
@@ -125,7 +150,16 @@ static func sections(raw: Array, half: float, sidewalk: float, road := {}) -> Ar
 		var paving := PackedVector2Array([a+n*sidewalk,b+m*sidewalk,b-m*sidewalk,a-n*sidewalk])
 		var limits := bounds_of(paving)
 		var asphalt := PackedVector2Array([a+n*half,b+m*half,b-m*half,a-n*half])
-		result.append({"bounds":limits,"walk":paving,"road":asphalt,
+		var curbs := []
+		if sidewalk > half:
+			for side: float in [-1.0,1.0]:
+				var inner := PackedVector2Array([a+n*half*side,b+m*half*side])
+				var outer := PackedVector2Array([a+n*sidewalk*side,b+m*sidewalk*side])
+				var lip := PackedVector2Array([a+n*(half+CURB_WIDTH)*side,b+m*(half+CURB_WIDTH)*side])
+				curbs.append({"inner":inner,"outer":outer,
+					"slab":PackedVector2Array([lip[0],lip[1],outer[1],outer[0]]),
+					"cap":PackedVector2Array([inner[0],inner[1],lip[1],lip[0]])})
+		result.append({"bounds":limits,"walk":paving,"road":asphalt,"curbs":curbs,
 				"at":a,"axis":(b-a).normalized(),"along":along,"rank":rank,"half":half,"length":a.distance_to(b),
 				"deck":Vector2(deck[i-1],deck[i]) if deck.size() == points.size() else Vector2(INF,INF)})
 		along += a.distance_to(b)
@@ -182,31 +216,41 @@ func land_height(x: float, z: float) -> float:
 func _surface(x: float, z: float, previous_height: float) -> Vector2:
 	var p := Vector2(x,z)
 	var land := land_height(x,z)
-	var top := land
-	var material := GRASS
+	var road_top := -INF
+	var walk_top := -INF
 	var key := Vector2i((p/ROAD_CELL).floor())
 	for segment: Dictionary in road_cells.get(key, []):
 		var area: Rect2 = segment.bounds
 		if not area.has_point(p) or not Geometry2D.is_point_in_polygon(p,segment.walk):
 			continue
 		var roadway := Geometry2D.is_point_in_polygon(p,segment.road)
-		var base := land
-		var deck: Vector2 = segment.deck
-		if is_finite(deck.x):
-			var axis: Vector2 = segment.axis
-			var start: Vector2 = segment.at
-			var station := clampf((p-start).dot(axis)/float(segment.length),0.0,1.0)
-			base = maxf(land,lerpf(deck.x,deck.y,station))
-			if base-land >= 1.8 and is_finite(previous_height) and absf(previous_height-base) >= 2.5:
-				continue
+		var base := paving_height(segment,p,land)
+		if base-land >= 1.8 and is_finite(previous_height) and absf(previous_height-base) >= 2.5:
+			continue
 		var lift := road_lift(roadway,int(segment.rank)) * seam_lift(p)
-		top = maxf(top,base+lift)
-		material = PAVEMENT
-	return Vector2(top,material)
+		if roadway:
+			road_top = maxf(road_top,base+lift)
+		else:
+			walk_top = maxf(walk_top,base+lift)
+	if is_finite(road_top) and road_top+0.28 >= walk_top:
+		return Vector2(road_top,PAVEMENT)
+	if is_finite(walk_top):
+		return Vector2(walk_top,PAVEMENT)
+	return Vector2(land,GRASS)
+
+
+static func paving_height(segment: Dictionary, p: Vector2, land: float) -> float:
+	var deck: Vector2 = segment.deck
+	if not is_finite(deck.x):
+		return land
+	var axis: Vector2 = segment.axis
+	var start: Vector2 = segment.at
+	var station := clampf((p-start).dot(axis)/float(segment.length),0.0,1.0)
+	return maxf(land,lerpf(deck.x,deck.y,station))
 
 
 static func road_lift(roadway: bool, rank: int) -> float:
-	return (0.14 if roadway else 0.09) + (7-rank)*0.004
+	return (0.075 if roadway else 0.235) + (7-rank)*0.004
 
 
 func seam_lift(p: Vector2) -> float:

@@ -8,6 +8,7 @@ import { soilPattern, treeHabitat } from './landscape-pattern.mjs';
 import { groundGrid } from './ground-grid.mjs';
 import { Glb } from './glb.mjs';
 import { CrownMesh } from './crown-mesh.mjs';
+import { compactCrownRadius, canopyLobe } from './mature-canopy.mjs';
 import { crownClearance } from './planting-space.mjs';
 
 const assets = new URL('../assets/', import.meta.url);
@@ -321,21 +322,12 @@ for(const item of clumps.values()) {
   }
 }
 
-function compactCrownRadius(height,style,limit=Infinity) {
-  return Math.min(limit,Math.min(5.0,Math.max(0.76,height*0.30))*style.width);
-}
-
 function fillCanopy(tree,height,style,groups,young,compact=false,heading) {
   const radius=compact ? compactCrownRadius(height,style,tree.crownLimit) : Math.min(2.9,Math.max(0.76,height*0.26))*style.width;
   const center=new Vector3();
   const rotation=heading??random()*Math.PI*2;
   for (let i=0;i<groups;i++) {
-    const theta=rotation+i*2.39996;
-    const top=i===0;
-    const skirt=top ? 0.14 : 0.43+random()*0.59;
-    const level=top ? 0.86 : 0.49+random()*0.25;
-    const width=radius*(top ? 0.81 : 0.49+random()*0.27);
-    const tall=Math.max(0.55,height*(top ? 0.16 : 0.11+random()*0.047));
+    const {theta,top,skirt,level,width,tall}=canopyLobe(radius,height,rotation,i,random);
     center.set(tree.x+Math.cos(theta)*radius*skirt,tree.y+height*level,tree.z+Math.sin(theta)*radius*skirt);
     const coreWidth=compact ? 0.67 : 0.74;
     addCore(center,[width*coreWidth,tall*0.81,width*(coreWidth-0.05)],theta,style,level,compact&&!top ? 0 : 1);

@@ -5,24 +5,32 @@ const CROWN := preload("res://crown_core.gdshader")
 const GRASS := preload("res://grass.gdshader")
 const LEAF := preload("res://leaf_cards.gdshader")
 const LEAF_ATLAS := preload("res://assets/leaf-sprigs.png")
+const CANOPY_ATLAS := preload("res://assets/shrub-leaves.png")
 const PLANTING := preload("res://south_planting_catalog.gd")
 const TILE := PLANTING.TILE
-const SHOW_RANGE := 365.0
-const KEEP_RANGE := 430.0
-const TREE_VIEW := 350.0
-const COVER_VIEW := 118.0
+const FAR_LOAD := 638.0
+const FAR_KEEP := 708.0
+const NEAR_LOAD := 212.0
+const NEAR_KEEP := 255.0
+const TREE_VIEW := 179.0
+const COVER_VIEW := 119.0
 
 var focus: Node3D
 var planting := PLANTING.new()
-var active := {}
-var pending: Array[Vector2i] = []
-var retire: Array[Vector2i] = []
+var distant := {}
+var nearby := {}
+var pending_far: Array[Vector2i] = []
+var pending_near: Array[Vector2i] = []
+var retire_far: Array[Vector2i] = []
+var retire_near: Array[Vector2i] = []
 var meshes: Array[Mesh] = []
 var sprigs: Array[Mesh] = []
 var paint := ShaderMaterial.new()
 var meadow_paint := ShaderMaterial.new()
 var leaf_paint := ShaderMaterial.new()
+var far_meshes: Array[Mesh] = []
 var shrub: Mesh
+var shrub_leaves: Mesh
 var meadow: Mesh
 var stones := SphereMesh.new()
 var trunk := CylinderMesh.new()
@@ -50,14 +58,18 @@ func setup(observer: Node3D) -> void:
 		return
 	for i in 6:
 		meshes.append((sample.get_node("Crown"+str(i)) as MeshInstance3D).mesh)
-		if i < 5:
-			sprigs.append((sample.get_node("Sprigs"+str(i)) as MeshInstance3D).mesh)
+		sprigs.append((sample.get_node("Sprigs"+str(i)) as MeshInstance3D).mesh)
 	shrub = (sample.get_node("Shrub") as MeshInstance3D).mesh
+	shrub_leaves = (sample.get_node("ShrubLeaves") as MeshInstance3D).mesh
+	far_meshes.assign([(sample.get_node("FarDeciduous") as MeshInstance3D).mesh,
+		(sample.get_node("FarSpruce") as MeshInstance3D).mesh])
 	sample.free()
 	paint.shader = CROWN
 	meadow_paint.shader = GRASS
 	leaf_paint.shader = LEAF
 	leaf_paint.set_shader_parameter(&"leaf_atlas",LEAF_ATLAS)
+	leaf_paint.set_shader_parameter(&"canopy_atlas",CANOPY_ATLAS)
+	leaf_paint.set_shader_parameter(&"leaf_mode",4)
 	meadow = _meadow_mesh()
 	var stone_paint := StandardMaterial3D.new()
 	stone_paint.albedo_color = Color("#777260")
@@ -82,54 +94,92 @@ func setup(observer: Node3D) -> void:
 
 func _process(_delta: float) -> void:
 	var pose := focus.global_position
+	var camera := get_viewport().get_camera_3d()
+	if camera and camera.global_position.distance_squared_to(pose) > 72.0*72.0:
+		pose = camera.global_position
 	var point := Vector2(pose.x,pose.z)
 	var current := Vector2i((point/24.0).floor())
 	if current != last:
 		last = current
 		_refresh(point)
-	if not pending.is_empty():
-		var id := pending.pop_back() as Vector2i
-		active[id] = _attach(id)
-	if not retire.is_empty():
-		var id := retire.pop_back() as Vector2i
-		active[id].queue_free()
-		active.erase(id)
+	if not pending_near.is_empty():
+		var id: Vector2i = pending_near.pop_back()
+		nearby[id] = _attach(id,true)
+		_set_far_start(id,TREE_VIEW-9.0)
+	for _i in mini(2,pending_far.size()):
+		var id: Vector2i = pending_far.pop_back()
+		distant[id] = _attach(id,false)
+		if nearby.has(id):
+			_set_far_start(id,TREE_VIEW-9.0)
+	if not retire_near.is_empty():
+		var id: Vector2i = retire_near.pop_back()
+		nearby[id].queue_free()
+		nearby.erase(id)
+		_set_far_start(id,0.0)
+	if not retire_far.is_empty():
+		var id: Vector2i = retire_far.pop_back()
+		distant[id].queue_free()
+		distant.erase(id)
 
 
 func _refresh(point: Vector2) -> void:
-	pending.clear()
-	retire.clear()
+	pending_far.clear()
+	pending_near.clear()
+	retire_far.clear()
+	retire_near.clear()
 	var center := PLANTING.tile_at(point)
-	var distance := ceili(SHOW_RANGE/TILE)
-	for z in range(center.y-distance,center.y+distance+1):
-		for x in range(center.x-distance,center.x+distance+1):
+	var reach := ceili(FAR_LOAD/TILE)
+	for z in range(center.y-reach,center.y+reach+1):
+		for x in range(center.x-reach,center.x+reach+1):
 			var id := Vector2i(x,z)
-			if planting.tiles.has(id) and not active.has(id) and _tile_center(id).distance_squared_to(point) < SHOW_RANGE*SHOW_RANGE:
-				pending.append(id)
-	for id: Vector2i in active:
-		if _tile_center(id).distance_squared_to(point) > KEEP_RANGE*KEEP_RANGE:
-			retire.append(id)
-	pending.sort_custom(func(a: Vector2i,b: Vector2i): return _tile_center(a).distance_squared_to(point) > _tile_center(b).distance_squared_to(point))
+			if not planting.tiles.has(id):
+				continue
+			var distance := _tile_center(id).distance_squared_to(point)
+			if distance <= FAR_LOAD*FAR_LOAD and not distant.has(id):
+				pending_far.append(id)
+			if distance <= NEAR_LOAD*NEAR_LOAD and not nearby.has(id):
+				pending_near.append(id)
+	for id: Vector2i in distant:
+		if _tile_center(id).distance_squared_to(point) > FAR_KEEP*FAR_KEEP:
+			retire_far.append(id)
+	for id: Vector2i in nearby:
+		if _tile_center(id).distance_squared_to(point) > NEAR_KEEP*NEAR_KEEP:
+			retire_near.append(id)
+	var nearer := func(a: Vector2i,b: Vector2i): return _tile_center(a).distance_squared_to(point) > _tile_center(b).distance_squared_to(point)
+	pending_far.sort_custom(nearer)
+	pending_near.sort_custom(nearer)
 
 
-func _attach(id: Vector2i) -> Node3D:
+func _attach(id: Vector2i, detail: bool) -> Node3D:
 	var center := _tile_center(id)
-	var node := StaticBody3D.new()
+	var node: Node3D = StaticBody3D.new() if detail else Node3D.new()
 	node.position = Vector3(center.x,0,center.y)
-	node.collision_layer = 1
-	node.collision_mask = 0
+	if detail:
+		var body := node as StaticBody3D
+		body.collision_layer = 1
+		body.collision_mask = 0
 	var boughs := [[],[],[],[],[],[]]
 	var trunks := [[],[]]
 	var low := [[],[],[]]
+	var far := [[],[]]
+	var floor_y := INF
+	var peak_y := -INF
 	var bytes := planting.bytes
 	var rows: Vector2i = planting.tiles[id]
 	for row in range(rows.x,rows.y,PLANTING.PLANT_BYTES):
 		var at := Vector3(bytes.decode_u16(row)*0.01-TILE*0.5,bytes.decode_s16(row+2)*0.01,
 			bytes.decode_u16(row+4)*0.01-TILE*0.5)
+		floor_y = minf(floor_y,at.y)
+		peak_y = maxf(peak_y,at.y)
 		var size := bytes[row+6]*0.01
 		var kind := int(bytes[row+7])
 		var rotation := Basis(Vector3.UP,bytes[row+8]*TAU/256.0)
-		var pose := Transform3D(rotation.scaled(Vector3.ONE*size),at)
+		var lateral := 0.92+0.18*float(bytes[row+8]%19)/18.0
+		var pose := Transform3D(rotation.scaled(Vector3(size*lateral,size,size/lateral)),at)
+		if not detail:
+			if kind < PLANTING.SHRUB:
+				far[int(kind == 5)].append(pose)
+			continue
 		if kind >= PLANTING.SHRUB:
 			if kind == PLANTING.STONE:
 				pose.origin.y += .08
@@ -143,20 +193,34 @@ func _attach(id: Vector2i) -> Node3D:
 		solid.shape = roots
 		solid.position = at + Vector3.UP*1.65
 		node.add_child(solid)
-	_batch(node,branched,trunks[0],null,TREE_VIEW)
-	_batch(node,trunk,trunks[1],null,TREE_VIEW)
-	for i in meshes.size():
-		_batch(node,meshes[i],boughs[i],paint,TREE_VIEW)
-	for i in sprigs.size():
-		_batch(node,sprigs[i],boughs[i],leaf_paint,COVER_VIEW)
-	_batch(node,shrub,low[0],paint,COVER_VIEW)
-	_batch(node,meadow,low[1],meadow_paint,COVER_VIEW)
-	_batch(node,stones,low[2],null,COVER_VIEW)
+	# Identical bounds keep the distance switch aligned for all species in this tile.
+	var bounds := AABB(Vector3(-TILE*.5-13.0,floor_y-0.25,-TILE*.5-13.0),
+		Vector3(TILE+26.0,peak_y-floor_y+22.0,TILE+26.0))
+	if detail:
+		_batch(node,branched,trunks[0],null,TREE_VIEW,bounds,true)
+		_batch(node,trunk,trunks[1],null,TREE_VIEW,bounds,true)
+		for i in meshes.size():
+			_batch(node,meshes[i],boughs[i],paint,TREE_VIEW,bounds,true)
+			_batch(node,sprigs[i],boughs[i],leaf_paint,COVER_VIEW,bounds,false)
+		_batch(node,shrub,low[0],paint,COVER_VIEW,bounds,false)
+		_batch(node,shrub_leaves,low[0],leaf_paint,COVER_VIEW,bounds,false)
+		_batch(node,meadow,low[1],meadow_paint,COVER_VIEW,bounds,false)
+		_batch(node,stones,low[2],null,COVER_VIEW,bounds,false)
+	else:
+		for i in far_meshes.size():
+			_batch(node,far_meshes[i],far[i],paint,0.0,bounds,false)
 	add_child(node)
 	return node
 
 
-func _batch(parent: Node3D, mesh: Mesh, poses: Array, material: Material, distance: float) -> void:
+func _set_far_start(id: Vector2i, distance: float) -> void:
+	if distant.has(id):
+		for layer: MultiMeshInstance3D in distant[id].get_children():
+			layer.visibility_range_begin = distance
+
+
+func _batch(parent: Node3D, mesh: Mesh, poses: Array, material: Material, distance: float, bounds: AABB,
+		shadows: bool) -> void:
 	if poses.is_empty():
 		return
 	var instances := MultiMesh.new()
@@ -165,12 +229,12 @@ func _batch(parent: Node3D, mesh: Mesh, poses: Array, material: Material, distan
 	instances.instance_count = poses.size()
 	for i in poses.size():
 		instances.set_instance_transform(i,poses[i])
+	instances.custom_aabb = bounds
 	var layer := MultiMeshInstance3D.new()
 	layer.multimesh = instances
 	layer.material_override = material
 	layer.visibility_range_end = distance
-	layer.visibility_range_end_margin = 24.0
-	if distance == COVER_VIEW:
+	if not shadows:
 		layer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(layer)
 
@@ -180,7 +244,7 @@ func _meadow_mesh() -> ArrayMesh:
 	random.seed = 283
 	var mesh := SurfaceTool.new()
 	mesh.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for i in 72:
+	for i in 48:
 		var angle := random.randf()*TAU
 		var spread := random.randf()*1.48
 		var at := Vector3(cos(angle)*spread,-.10,sin(angle)*spread)

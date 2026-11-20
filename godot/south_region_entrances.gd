@@ -23,30 +23,29 @@ static func add_to(mesh: SurfaceTool, ground: GROUND, doors: Array, layer: int) 
 		var canopy_width := 2.9 if grand else 2.1
 		var canopy_depth := 1.42 if grand else 0.86
 		var step_depth := 1.27 if grand else 0.93
-		_box(mesh,frame,Vector3(0,.04,step_depth*.5),Vector3(canopy_width,.28,step_depth),stone*.78,layer)
-		_box(mesh,frame,Vector3(0,.17,step_depth*.36),Vector3(canopy_width*.88,.19,step_depth*.72),stone,layer)
-		_box(mesh,frame,Vector3(0,1.10,.018),Vector3(1.23,2.10,.036),metal,layer)
+		box(mesh,frame,Vector3(0,.04,step_depth*.5),Vector3(canopy_width,.28,step_depth),stone*.78,layer)
+		box(mesh,frame,Vector3(0,.17,step_depth*.36),Vector3(canopy_width*.88,.19,step_depth*.72),stone,layer)
+		box(mesh,frame,Vector3(0,1.10,.018),Vector3(1.23,2.10,.036),metal,layer)
 		for side: float in [-1.0,1.0]:
-			_box(mesh,frame,Vector3(side*.67,1.26,.12),Vector3(.13,2.20,.26),trim,layer)
-			_box(mesh,frame,Vector3(side*.81,2.48,.21),Vector3(.10,.25,.40),trim,layer)
-		_box(mesh,frame,Vector3(0,2.33,.13),Vector3(1.49,.16,.24),trim,layer)
-		_box(mesh,frame,Vector3(0,2.63,canopy_depth*.44),Vector3(canopy_width,.17,canopy_depth),stone,layer)
-		_box(mesh,frame,Vector3(.36,1.19,.037),Vector3(.24,.06,.019),stone,layer)
-		_box(mesh,frame,Vector3(-.74,1.33,.27),Vector3(.09,.19,.041),metal*.61,layer)
-		_box(mesh,frame,Vector3(.59,2.46,.16),Vector3(.34,.16,.037),stone*.79,layer)
+			box(mesh,frame,Vector3(side*.67,1.26,.12),Vector3(.13,2.20,.26),trim,layer)
+			box(mesh,frame,Vector3(side*.81,2.48,.21),Vector3(.10,.25,.40),trim,layer)
+		box(mesh,frame,Vector3(0,2.33,.13),Vector3(1.49,.16,.24),trim,layer)
+		box(mesh,frame,Vector3(0,2.63,canopy_depth*.44),Vector3(canopy_width,.17,canopy_depth),stone,layer)
+		box(mesh,frame,Vector3(.36,1.19,.037),Vector3(.24,.06,.019),stone,layer)
+		box(mesh,frame,Vector3(-.74,1.33,.27),Vector3(.09,.19,.041),metal*.61,layer)
+		box(mesh,frame,Vector3(.59,2.46,.16),Vector3(.34,.16,.037),stone*.79,layer)
 
 
-static func _box(mesh: SurfaceTool, frame: Transform3D, at: Vector3, size: Vector3, color: Color, layer: int) -> void:
+static func box(mesh: SurfaceTool, frame: Transform3D, at: Vector3, size: Vector3, color: Color, layer: int) -> void:
 	var h := size*0.5
 	var corners := PackedVector3Array([
 		at+Vector3(-h.x,-h.y,h.z),at+Vector3(h.x,-h.y,h.z),
 		at+Vector3(h.x,h.y,h.z),at+Vector3(-h.x,h.y,h.z),
 		at+Vector3(-h.x,-h.y,-h.z),at+Vector3(h.x,-h.y,-h.z),
 		at+Vector3(h.x,h.y,-h.z),at+Vector3(-h.x,h.y,-h.z)])
-	# South's district material is two-sided. The buried rear and bottom
-	# need no triangles for the door trim or landing.
-	for i: int in [0,1,2,0,2,3, 0,3,7,0,7,4, 1,5,6,1,6,2, 3,2,6,3,6,7]:
-		mesh.set_uv(Vector2.ZERO)
+	# The rear touches the facade. The exposed underside also serves balcony slabs.
+	for i: int in [0,1,2,0,2,3, 0,3,7,0,7,4, 1,5,6,1,6,2, 3,2,6,3,6,7, 0,4,5,0,5,1]:
+		mesh.set_uv(Vector2(corners[i].x,corners[i].y))
 		mesh.set_uv2(Vector2(layer,0.0))
 		mesh.set_color(color)
 		mesh.add_vertex(frame*corners[i])

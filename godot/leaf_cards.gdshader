@@ -22,17 +22,22 @@ float facet_pick(vec3 p) {
 }
 
 void vertex() {
-	paint = leaf_mode == 0 ? COLOR.rgb : INSTANCE_CUSTOM.rgb;
+	paint = (leaf_mode == 0 || leaf_mode == 4) ? COLOR.rgb : INSTANCE_CUSTOM.rgb;
 	atlas_uv = UV*vec2(0.80,1.0);
 	dense_leaf = 0.0;
-	if(leaf_mode != 0) {
+	if (leaf_mode == 4) {
+		vec2 local = vec2(UV.x*4.0,UV.y);
+		dense_leaf = step(0.9,COLOR.a);
+		atlas_uv = dense_leaf > 0.5 ? vec2(0.44,0.02)+local*vec2(0.22,0.57)
+			: vec2(0.80+local.x*0.20,local.y);
+	} else if (leaf_mode != 0) {
 		float frame = floor(INSTANCE_CUSTOM.a*16.0);
 		dense_leaf = step(4.0,frame)*(1.0-step(8.0,frame));
 		atlas_uv = dense_leaf > 0.5 ? vec2(0.44,0.02)+UV*vec2(0.22,0.57)
 			: vec2((UV.x*0.988+0.006+min(frame,4.0))*0.20,UV.y);
 	}
 	world = (MODEL_MATRIX*vec4(VERTEX,1.0)).xyz;
-	if(leaf_mode < 2) {
+	if (leaf_mode < 2 || leaf_mode == 4) {
 		float phase = dot(world.xz,vec2(0.82,0.57));
 		VERTEX.xz += vec2(0.045,0.022)*sin(TIME*1.75+phase);
 	}

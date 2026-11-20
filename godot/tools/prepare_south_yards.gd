@@ -14,7 +14,7 @@ func _initialize() -> void:
 	graph.setup(region,core)
 	var detail := preload("res://terrain_height.gd").new()
 	detail.setup(_json("south-ground"),FileAccess.get_file_as_bytes("res://assets/south-ground.bin"))
-	ground.setup(region,core.bounds,detail)
+	ground.setup(region,core.bounds,detail,true,false)
 	water_y = region.water_y
 	for obstacle: Dictionary in _json("south-obstacles"):
 		_add_obstacle(_v(obstacle.at),obstacle.w,obstacle.d,obstacle.angle)
