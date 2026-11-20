@@ -3,6 +3,7 @@ extends SceneTree
 
 const GROUND := preload("res://south_region_ground.gd")
 const PLANTING := preload("res://south_planting_catalog.gd")
+const YARD_LAYOUT := preload("res://tools/south-yard-layout.gd")
 const CELL := 32.0
 const SEARCH := 16.0
 const TREE_CELL := 8.0
@@ -20,6 +21,10 @@ var boundary: PackedVector2Array
 var obstacles := {}
 var greens := {}
 var occupied := {}
+var open_yards := {}
+var yard_layout := {}
+var summer_park: Dictionary
+var dry_count := 0
 var stands := {}
 var tree_count := 0
 var cover_count := 0
@@ -38,6 +43,11 @@ func _initialize() -> void:
 	_noise(contours,319,0.032)
 	_noise(banks,822,0.091)
 	_noise(habitat,740,0.022)
+	summer_park = _read("summer_park")
+	yard_layout = YARD_LAYOUT.create(region,center,ground,summer_park)
+	for yard: Dictionary in yard_layout.lots:
+		var outline := GROUND.outline_of(yard.outline)
+		_bin(open_yards,GROUND.bounds_of(outline),{"poly":outline,"kind":yard.kind})
 	_protect_sites()
 	_bake_relief()
 	for path: Dictionary in region.roads:
@@ -55,8 +65,16 @@ func _initialize() -> void:
 	if not PLANTING.save(stands):
 		quit(1)
 		return
-	print("Godot South scenery: ",tree_count," trees, ",cover_count," understory groups, ",
+	var yard_file := FileAccess.open(YARD_LAYOUT.PATH,FileAccess.WRITE)
+	if yard_file == null:
+		quit(1)
+		return
+	yard_file.store_string(JSON.stringify(yard_layout)+"\n")
+	yard_file.close()
+	print("Godot South scenery: ",tree_count," trees (",dry_count," dry), ",cover_count," understory groups, ",
 		relief.size()," relief samples")
+	print("Courtyards: ",yard_layout.lots.size()," meadows and vacant lots, ",yard_layout.pitches.size(),
+		" football fields and ",yard_layout.gym.size()," workout courts")
 	quit()
 
 
@@ -100,12 +118,15 @@ func _protect_sites() -> void:
 	_lane(_v(shop.driveway),_v(shop.at),10.0)
 	var tennis := _v(_read("summer_tennis").at)
 	_lane(tennis,tennis,25.0)
-	var park: Dictionary = _read("summer_park")
+	var park := summer_park
 	for key in ["gym","kites"]:
 		for feature: Dictionary in park.get(key,[]):
 			var at := _v(feature.at)
 			_lane(at,at,7.0)
-	for pitch: Dictionary in park.pitches:
+	for facility: Dictionary in yard_layout.gym:
+		var at := _v(facility.at)
+		_lane(at,at,5.3)
+	for pitch: Dictionary in park.pitches+yard_layout.pitches:
 		var at := _v(pitch.at)
 		var lengthwise := _v(pitch.axis)*float(pitch.length)*0.5
 		var across := _v(pitch.axis).orthogonal()*float(pitch.width)*0.5
@@ -223,8 +244,7 @@ func _plant_open_land() -> void:
 			var evergreen := 0.34 if woods else lerpf(0.10,0.28,smoothstep(-0.2,0.55,density))
 			var p := center+Vector2(random.randf_range(-1.05,1.05),random.randf_range(-1.05,1.05))
 			_plant(p,evergreen,TREE_GAP+0.7*(1.0-density),1.17)
-			# Complete every usable cell that was missed by rows or the scattered pass.
-			# No random rejection remains on open land after this step.
+			# Complete the gaps between rows except in deliberately open yards.
 			_plant(center,evergreen,6.9,1.13)
 			_understory(center,p,density)
 
@@ -239,6 +259,12 @@ func _understory(center: Vector2, scatter: Vector2, density: float) -> void:
 	if height < float(region.water_y)+0.90:
 		return
 	var pick := random.randf()
+	var clearing := _open_at(scatter)
+	if clearing == "vacant" and pick > .44:
+		return
+	if not clearing.is_empty():
+		_record(scatter,height,random.randf_range(.29,.76),PLANTING.GRASS if pick > .12 else PLANTING.STONE)
+		return
 	if pick < 0.40 and edge > 1.16 and _tree_room(scatter,1.45):
 		_record(scatter,height,minf(edge*.59,random.randf_range(0.79,1.64)),PLANTING.SHRUB)
 	elif pick < 0.43 and density < 0.05 and edge > 1.3:
@@ -251,13 +277,32 @@ func _understory(center: Vector2, scatter: Vector2, density: float) -> void:
 
 
 func _plant(p: Vector2, conifer_chance: float, gap: float, size: float) -> bool:
-	if not _inside(p) or not _tree_room(p,gap) or _clearance(p) < 0.96:
+	if not _inside(p) or not _tree_room(p,gap):
+		return false
+	var room := _clearance(p)
+	if room < .96:
 		return false
 	var y := ground.land_height(p.x,p.y)
 	if y < float(region.water_y)+1.15:
 		return false
-	var kind := 5 if random.randf() < conifer_chance else random.randi_range(0,4)
-	_record(p,y,clampf(size*random.randf_range(0.94,1.56),0.87,2.05),kind)
+	var clearing := _open_at(p)
+	if not clearing.is_empty():
+		return false
+	var habitat_value := habitat.get_noise_2dv(p)
+	var dry_chance := .045+.105*(1.0-smoothstep(-.60,.17,habitat_value))
+	var kind := PLANTING.DRY if random.randf() < dry_chance else (
+		PLANTING.SPRUCE if random.randf() < conifer_chance else random.randi_range(0,4))
+	var height := clampf(size*random.randf_range(1.18,1.98),1.18,2.55)
+	var width := minf(height*random.randf_range(.69,1.16),.75+room*.24)
+	var age := random.randf()
+	var bark := random.randf_range(.13,.22)
+	if age > .26:
+		bark = random.randf_range(.24,.39)
+	if age > .77:
+		bark = random.randf_range(.40,.58)
+	if kind == PLANTING.DRY:
+		dry_count += 1
+	_record(p,y,height,kind,bark,width)
 	var key := _tree_cell(p)
 	if not occupied.has(key):
 		occupied[key] = []
@@ -271,6 +316,13 @@ func _inside(p: Vector2) -> bool:
 
 func _green_at(p: Vector2) -> String:
 	for patch: Dictionary in greens.get(_cell(p),[]):
+		if Geometry2D.is_point_in_polygon(p,patch.poly):
+			return patch.kind
+	return ""
+
+
+func _open_at(p: Vector2) -> String:
+	for patch: Dictionary in open_yards.get(_cell(p),[]):
 		if Geometry2D.is_point_in_polygon(p,patch.poly):
 			return patch.kind
 	return ""
@@ -334,12 +386,12 @@ func _bin(index: Dictionary, area: Rect2, entry: Dictionary) -> void:
 			index[key].append(entry)
 
 
-func _record(p: Vector2,y: float,scale: float,kind: int) -> void:
+func _record(p: Vector2,y: float,scale: float,kind: int,bark := 0.0,width := 0.0) -> void:
 	var key := PLANTING.tile_at(p)
 	if not stands.has(key):
 		stands[key] = []
-	stands[key].append([p.x,y,p.y,scale,kind,random.randf()*TAU])
-	if kind < PLANTING.SHRUB:
+	stands[key].append([p.x,y,p.y,scale,kind,random.randf()*TAU,bark,tree_count+cover_count,width])
+	if PLANTING.is_tree(kind):
 		tree_count += 1
 	else:
 		cover_count += 1

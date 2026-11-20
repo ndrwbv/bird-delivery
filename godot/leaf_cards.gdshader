@@ -3,6 +3,7 @@ render_mode cull_disabled, diffuse_lambert, specular_disabled;
 
 #include "res://material_grade.gdshaderinc"
 #include "res://season_tint.gdshaderinc"
+#include "res://vegetation_distance.gdshaderinc"
 
 uniform sampler2D leaf_atlas : filter_linear_mipmap, repeat_disable;
 uniform sampler2D canopy_atlas : source_color, filter_linear_mipmap, repeat_disable;
@@ -44,6 +45,7 @@ void vertex() {
 }
 
 void fragment() {
+	if (vegetation_hidden(VERTEX,FRAGCOORD.xy)) discard;
 	if (leaf_mode == 1 || leaf_mode == 2) {
 		vec3 offset = view_origin-world;
 		float distance_sq = dot(offset,offset);

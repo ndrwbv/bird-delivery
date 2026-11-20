@@ -5,8 +5,9 @@ const GEOMETRY := preload("res://south_region_mesh.gd")
 const OVERVIEW := preload("res://south_region_overview.gd")
 const CHECKPOINT := preload("res://south_region_checkpoint.gd")
 const REGION_PAINT := preload("res://south_region_surface.gdshader")
-const VIEW_RADIUS := 640.0
-const RETAIN_RADIUS := 820.0
+const VIEW_RADIUS := 388.0
+const RETAIN_RADIUS := 494.0
+const BUILDING_VIEW := 820.0
 
 var ground := GROUND.new()
 var builder := GEOMETRY.new()
@@ -22,6 +23,8 @@ var building_key: Vector2i
 
 
 func setup(data: Dictionary, core_bounds: Array, detail: RefCounted, car: Node3D) -> void:
+	var yards: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/south-yard-spaces.json"))
+	data.yard_spaces = yards if yards is Dictionary else {}
 	ground.setup(data, core_bounds, detail)
 	builder.setup(data,ground)
 	observer = car
@@ -36,7 +39,7 @@ func setup(data: Dictionary, core_bounds: Array, detail: RefCounted, car: Node3D
 		var block := builder.make_house_block(key)
 		var node := Node3D.new()
 		node.name = "Buildings_%d_%d" % [key.x,key.y]
-		_attach_surface(node,block.surface,RETAIN_RADIUS)
+		_attach_surface(node,block.surface,BUILDING_VIEW)
 		var shape := ConcavePolygonShape3D.new()
 		shape.backface_collision = true
 		shape.set_faces(block.walls)

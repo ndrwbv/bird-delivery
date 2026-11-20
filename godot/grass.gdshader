@@ -4,6 +4,7 @@ render_mode cull_disabled, diffuse_lambert, specular_disabled, world_vertex_coor
 #include "res://material_grade.gdshaderinc"
 #include "res://season_tint.gdshaderinc"
 #include "res://street_light.gdshaderinc"
+#include "res://vegetation_distance.gdshaderinc"
 
 varying vec3 paint;
 varying vec3 ground;
@@ -17,6 +18,7 @@ void vertex() {
 }
 
 void fragment() {
+	if (vegetation_hidden(VERTEX,FRAGCOORD.xy)) discard;
 	NORMAL = normalize(VIEW_MATRIX[1].xyz*0.7 + face_normal(VERTEX,VIEW)*0.30);
 	ALBEDO = display_color(seasonal_grass(paint));
 	EMISSION = display_color(street_bounce(ground,paint,0.74));

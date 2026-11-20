@@ -44,7 +44,8 @@ func setup(_region:Dictionary, ground:RefCounted, vehicle:CharacterBody3D, traff
 	wave.setup(self,_region,traffic.roads)
 	iron_paint.vertex_color_use_as_albedo=true
 	var data:Dictionary=JSON.parse_string(FileAccess.get_file_as_string("res://assets/summer_park.json"))
-	for entry:Dictionary in data.gym:
+	var yards: Dictionary = _region.get("yard_spaces",{})
+	for entry:Dictionary in data.gym+yards.get("gym",[]):
 		var at:=Vector2(entry.at[0],entry.at[1])
 		var axis:=Vector2(entry.axis[0],entry.axis[1]).normalized()
 		gyms.append({"at":at,"axis":axis,"bar":at-axis*1.3,"dip":at+axis*1.5,"height":terrain.land_height(at.x,at.y),

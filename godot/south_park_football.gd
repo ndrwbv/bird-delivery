@@ -37,7 +37,8 @@ func setup(_region:Dictionary, ground:RefCounted, vehicle:CharacterBody3D, traff
 	frame_paint.albedo_color=Color("#f4f4ee")
 	post.size=Vector3.ONE
 	var data:Dictionary=JSON.parse_string(FileAccess.get_file_as_string("res://assets/summer_park.json"))
-	for spec:Dictionary in data.pitches:
+	var yards: Dictionary = _region.get("yard_spaces",{})
+	for spec:Dictionary in data.pitches+yards.get("pitches",[]):
 		var axis:=Vector2(spec.axis[0],spec.axis[1]).normalized()
 		pitches.append({"at":Vector2(spec.at[0],spec.at[1]),"axis":axis,"side":Vector2(-axis.y,axis.x),
 			"l":float(spec.length)*.5,"w":float(spec.width)*.5,"goal":minf(3.6,float(spec.width)*.3),
@@ -57,18 +58,35 @@ func step(delta:float,_hour:float) -> void:
 		scan=1
 		_scan(observer)
 	for m in matches:
+		if m.pitch.at.distance_squared_to(observer)>=139.0*139.0:
+			_set_suspended(m,true)
+			continue
+		_set_suspended(m,false)
 		if m.players.size()<6:
 			m.spawn-=delta
 			if m.spawn<=0:
 				_player(m,m.players.size())
 				m.spawn=.08
 		_ball(m,observer,delta)
-		_teams(m,m.pitch.at.distance_squared_to(observer)<130.0*130.0,delta)
+		_teams(m,delta)
+
+func _set_suspended(m:Dictionary,suspended:bool) -> void:
+	if m.get("suspended",false)==suspended: return
+	m.suspended=suspended
+	m.ball.visible=not suspended
+	for player:Dictionary in m.players:
+		var actor:Node3D=player.node
+		if is_instance_valid(actor) and not player.fell:
+			actor.visible=not suspended
+			if suspended:
+				actor.player.pause()
+			else:
+				actor.player.play()
 
 func _scan(observer:Vector2) -> void:
 	var day:bool=sky.night<.45 and sky.wet<.5
 	var closest:Dictionary={}
-	var best:=160.0*160.0
+	var best:=135.0*135.0
 	for pitch in pitches:
 		var d:=observer.distance_squared_to(pitch.at)
 		if not pitch.baked:
@@ -83,7 +101,19 @@ func _scan(observer:Vector2) -> void:
 		elif day and d<best:
 			closest=pitch
 			best=d
-	if not closest.is_empty() and matches.size()<2: _start(closest)
+	if closest.is_empty(): return
+	if matches.size()>=2:
+		# Prefer the yard the player is actually approaching.
+		var farthest:Dictionary={}
+		var farthest_distance:=sqrt(best)+21.0
+		for match_:Dictionary in matches:
+			var at:Vector2=match_.pitch.at
+			var distance:=at.distance_to(observer)
+			if distance>farthest_distance:
+				farthest_distance=distance
+				farthest=match_
+		if not farthest.is_empty(): _stop(farthest)
+	if matches.size()<2: _start(closest)
 
 func _world(s:Dictionary,a:float,b:float) -> Vector2:
 	return s.at+s.axis*a+s.side*b
@@ -94,9 +124,13 @@ func _point(s:Dictionary,a:float,b:float,h:float) -> Vector3:
 
 func _stripe(mesh:SurfaceTool,s:Dictionary,start:Vector2,end:Vector2) -> void:
 	var across:Vector2=(end-start).normalized().orthogonal()*.065
-	for p:Vector2 in [start-across,end+across,start+across,start-across,end-across,end+across]:
-		mesh.set_normal(Vector3.UP)
-		mesh.add_vertex(_point(s,p.x,p.y,.075))
+	var steps:=maxi(1,ceili(start.distance_to(end)/2.0))
+	for i in steps:
+		var a:=start.lerp(end,float(i)/steps)
+		var b:=start.lerp(end,float(i+1)/steps)
+		for p:Vector2 in [a-across,b+across,a+across,a-across,b-across,b+across]:
+			mesh.set_normal(Vector3.UP)
+			mesh.add_vertex(_point(s,p.x,p.y,.075))
 
 func _field(s:Dictionary) -> void:
 	var root:=Node3D.new()
@@ -216,7 +250,7 @@ func _ball(m:Dictionary,observer:Vector2,delta:float) -> void:
 	m.ball.position=Vector3(m.at.x,terrain.land_height(m.at.x,m.at.y)+m.height,m.at.y)
 	m.ball.rotation.x+=m.v.length()*delta*3
 
-func _teams(m:Dictionary,near:bool,delta:float) -> void:
+func _teams(m:Dictionary,delta:float) -> void:
 	var s:Dictionary=m.pitch
 	var closest:Array=[null,null]
 	var dists:=[INF,INF]
@@ -239,7 +273,7 @@ func _teams(m:Dictionary,near:bool,delta:float) -> void:
 	for p:Dictionary in m.players:
 		if not is_instance_valid(p.node) or p.fell: continue
 		var actor:Node3D=p.node
-		actor.visible=near
+		actor.show()
 		var chasing:bool=m.inside and closest[p.team]!=null and closest[p.team].node==actor
 		var target:Vector2=m.at if chasing else _world(s,p.home.x+shift_a,p.home.y+shift_b)
 		var rest:Vector2=target-p.at

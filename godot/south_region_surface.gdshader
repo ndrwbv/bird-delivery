@@ -50,6 +50,8 @@ void fragment() {
 		float sand = noise_at(p * 0.057 + vec2(13.0,19.0));
 		vec3 soil = mix(vec3(0.126,0.071,0.036),vec3(0.297,0.224,0.122),sand);
 		float bare = smoothstep(0.53,0.74,patches + (0.64-vigor)*0.18) * color.r*1.36;
+		if (color.g > 0.91) bare = clamp(max(bare,0.44+patches*0.51),0.0,1.0);
+		if (color.g < 0.25) greens *= 0.92 + 0.11*smoothstep(-0.32,0.32,sin((p.x+p.y*.34)*1.34));
 		float pebbles = smoothstep(0.92,0.99,grain(floor(p*12.0)));
 		color = mix(seasonal_grass(greens),soil,bare) * (1.0 + detail*(fine*0.21+pebbles*bare*0.25));
 	} else if (style.x < 1.5) {

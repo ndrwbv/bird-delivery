@@ -64,7 +64,8 @@ func configure(vehicle: CharacterBody3D, view: Camera3D, paint: ShaderMaterial, 
 	_region_paint = district.region_world.paint
 	season_materials.assign([paint,soil,_region_paint,district.region_world.overview.material_override,
 		district.leaves.near_paint,district.leaves.far_paint,district.leaves.far_only,district.leaves.verge_paint,
-		district.outer_trees.paint,district.outer_trees.meadow_paint,district.outer_trees.leaf_paint])
+		district.outer_trees.paint,district.outer_trees.infill_paint,district.outer_trees.shrub_paint,
+		district.outer_trees.meadow_paint,district.outer_trees.leaf_paint])
 	for name in ["Grass","Crowns","Understory"]:
 		var layer := district.get_node(name) as Node3D
 		if layer.get_child_count():

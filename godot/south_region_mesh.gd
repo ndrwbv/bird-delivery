@@ -50,11 +50,23 @@ func setup(data: Dictionary, sampler: GROUND) -> void:
 				owner = part
 		var block := Vector2i(((owner.get_center()-ground.origin)/(TILE*3.0)).floor())
 		_add_to(house_blocks,block,entry)
+	var yards: Dictionary = data.get("yard_spaces",{})
+	for yard: Dictionary in yards.get("lots",[]):
+		_index_green(GROUND.outline_of(yard.outline),yard.kind)
+	for pitch: Dictionary in yards.get("pitches",[]):
+		var at := Vector2(pitch.at[0],pitch.at[1])
+		var axis := Vector2(pitch.axis[0],pitch.axis[1])
+		var length := axis*float(pitch.length)*.54
+		var width := axis.orthogonal()*float(pitch.width)*.58
+		_index_green(PackedVector2Array([at-length-width,at+length-width,at+length+width,at-length+width]),"courtyard_pitch")
 	for green: Dictionary in data.get("greens", []):
-		var outline := GROUND.outline_of(green.outline)
-		if outline.size() >= 3:
-			var limits := GROUND.bounds_of(outline)
-			_bin(greens_by_tile, limits, {"outline":outline, "bounds":limits, "kind":str(green.kind)})
+		_index_green(GROUND.outline_of(green.outline),str(green.kind))
+
+
+func _index_green(outline: PackedVector2Array, kind: String) -> void:
+	if outline.size() >= 3:
+		var limits := GROUND.bounds_of(outline)
+		_bin(greens_by_tile,limits,{"outline":outline,"bounds":limits,"kind":kind})
 
 
 func tile_at(p: Vector2) -> Vector2i:
@@ -183,6 +195,12 @@ func _land(mesh: SurfaceTool, area: Rect2, paving: Array, paths: Array, greens: 
 					elif green.kind in ["pitch","play"]:
 						color.r = 0.0
 						color.b = 0.66
+					elif green.kind == "vacant":
+						color = Color(.94,1.0,.34)
+					elif green.kind == "meadow":
+						color = Color(.23,.73,.84)
+					elif green.kind == "courtyard_pitch":
+						color = Color(.09,.17,.85)
 					else:
 						color.b = 0.64
 					break
