@@ -1,9 +1,10 @@
 extends RefCounted
 
 const GROUND := preload("res://south_region_ground.gd")
+const ENTRANCES := preload("res://south_region_entrances.gd")
 const TILE := 96.0
 
-enum Surface { SOIL, SIDEWALK, ROAD, WALL, ROOF, WATER, RAIL, GARAGE, FACTORY }
+enum Surface { SOIL, SIDEWALK, ROAD, WALL, ROOF, WATER, RAIL, GARAGE, FACTORY, TRIM }
 
 var ground: GROUND
 var terrain_bounds: Rect2
@@ -35,6 +36,7 @@ func setup(data: Dictionary, sampler: GROUND) -> void:
 		if ground.core.encloses(bounds):
 			continue
 		var entry := {"outline":outline, "bounds":bounds, "height":float(house.height), "kind":str(house.kind),
+				"doors":house.get("doors",[]), "seed":fposmod(float(house.id)*0.6180339887,1.0),
 				"color":Color.from_string(str(house.color), Color("aaa28f")).srgb_to_linear()}
 		var outside := _outer_parts(bounds)
 		if outside.is_empty():
@@ -142,39 +144,48 @@ func make_house_block(key: Vector2i) -> Dictionary:
 
 
 func _land(mesh: SurfaceTool, area: Rect2, roads: Array, greens: Array) -> void:
-	var spacing := ground.step
+	var spacing := ground.step if ground.relief.is_empty() else GROUND.RELIEF_STEP
 	if area.intersects(ground.core.grow(GROUND.SEAM_METERS)):
 		spacing = minf(spacing,4.0)
 	if area.intersects(ground.shore_bounds):
 		spacing = minf(spacing,ground.shore_step)
 	var xs := _lines(area.position.x, area.end.x, ground.origin.x, spacing)
 	var zs := _lines(area.position.y, area.end.y, ground.origin.y, spacing)
+	var vertices := PackedVector3Array()
 	var low := INF
+	for z in zs:
+		for x in xs:
+			var y := ground.land_height(x,z)
+			vertices.append(Vector3(x,y,z))
+			low = minf(low,y)
 	for j in range(zs.size()-1):
 		for i in range(xs.size()-1):
 			var cell := Rect2(xs[i],zs[j],xs[i+1]-xs[i],zs[j+1]-zs[j])
-			var corners := _corners(cell)
-			var pts := PackedVector3Array()
-			for p in corners:
-				var y := ground.land_height(p.x,p.y)
-				pts.append(Vector3(p.x,y,p.y))
-				low = minf(low,y)
+			var k := j*xs.size()+i
+			var a := vertices[k]
+			var b := vertices[k+1]
+			var c := vertices[k+xs.size()+1]
+			var d := vertices[k+xs.size()]
 			var center := cell.get_center()
-			var color := Color(0.082,0.146,0.043)
+			# The soil shader uses blue for growth, like the baked starting block.
+			var color := Color(0.5,0.5,0.53)
 			for green: Dictionary in greens:
 				var green_bounds: Rect2 = green.bounds
 				if green_bounds.has_point(center) and Geometry2D.is_point_in_polygon(center,green.outline):
 					if green.kind == "wood" or green.kind == "forest":
-						color = Color(0.053,0.105,0.032)
+						color.b = 0.38
+					elif green.kind in ["pitch","play"]:
+						color.r = 0.0
+						color.b = 0.66
 					else:
-						color = Color(0.093,0.161,0.047)
+						color.b = 0.64
 					break
-			_face(mesh, pts[0],pts[1],pts[2],color,Surface.SOIL)
-			_face(mesh, pts[0],pts[2],pts[3],color,Surface.SOIL)
+			_face(mesh,a,b,c,color,Surface.SOIL)
+			_face(mesh,a,c,d,color,Surface.SOIL)
 			for road: Dictionary in roads:
 				if cell.intersects(road.bounds):
-					_road_on_face(mesh, road, pts[0],pts[1],pts[2])
-					_road_on_face(mesh, road, pts[0],pts[2],pts[3])
+					_road_on_face(mesh,road,a,b,c)
+					_road_on_face(mesh,road,a,c,d)
 	if low < water_y:
 		var water := PackedVector3Array()
 		for p in _corners(area):
@@ -240,7 +251,8 @@ func _house(mesh: SurfaceTool, walls: PackedVector3Array, house: Dictionary) -> 
 		var y := ground.land_height(p.x,p.y)
 		base = minf(base,y-0.45)
 		roof = maxf(roof,y)
-	roof += maxf(2.5,float(house.height))
+	var wall_height := maxf(2.5,float(house.height))
+	roof += wall_height
 	var color: Color = house.color
 	var layer := Surface.WALL
 	if house.kind == "gar":
@@ -250,13 +262,16 @@ func _house(mesh: SurfaceTool, walls: PackedVector3Array, house: Dictionary) -> 
 	for i in outline.size():
 		var a := outline[i]
 		var b := outline[(i+1)%outline.size()]
+		var span := a.distance_to(b)
+		var bay_scale := 3.15*maxf(1.0,roundf(span/3.15))/maxf(span,0.01)
+		color.a = fposmod(float(house.seed)+i*0.381966,1.0)
 		var edge := PackedVector2Array([a,b])
 		var segments: Array[PackedVector2Array] = [edge]
 		if cut:
 			segments = Geometry2D.clip_polyline_with_polygon(edge,core_outline)
 		for section in segments:
 			if section.size() >= 2:
-				_wall(mesh,walls,section[0],section[-1],a,base,roof,color,layer)
+				_wall(mesh,walls,section[0],section[-1],a,base,roof,color,layer,wall_height,bay_scale if layer == Surface.WALL else 1.0,span)
 	var indices := Geometry2D.triangulate_polygon(outline)
 	for j in range(0,indices.size(),3):
 		var face := PackedVector2Array([outline[indices[j]],outline[indices[j+1]],outline[indices[j+2]]])
@@ -274,15 +289,20 @@ func _house(mesh: SurfaceTool, walls: PackedVector3Array, house: Dictionary) -> 
 				_face(mesh,a,b,c,Color(0.101,0.098,0.088),Surface.ROOF)
 				walls.append_array(PackedVector3Array([a,b,c]))
 
+	ENTRANCES.add_to(mesh,ground,house.doors,Surface.TRIM)
+
 
 func _wall(mesh: SurfaceTool, walls: PackedVector3Array, a: Vector2, b: Vector2,
-		start: Vector2, base: float, roof: float, color: Color, layer: int) -> void:
+		start: Vector2, base: float, roof: float, color: Color, layer: int,
+		wall_height: float, bay_scale: float, span: float) -> void:
 	var vertices := PackedVector3Array([Vector3(a.x,base,a.y),Vector3(b.x,base,b.y),
 			Vector3(b.x,roof,b.y),Vector3(a.x,roof,a.y)])
-	var length_a := start.distance_to(a)
-	var length_b := start.distance_to(b)
-	var coords := PackedVector2Array([Vector2(length_a,0),Vector2(length_b,0),
-			Vector2(length_b,roof-base),Vector2(length_a,roof-base)])
+	var length_a := start.distance_to(a)*bay_scale
+	var length_b := start.distance_to(b)*bay_scale
+	var floor_y := base-roof+wall_height
+	var coords := PackedVector2Array([Vector2(length_a,floor_y),Vector2(length_b,floor_y),
+			Vector2(length_b,wall_height),Vector2(length_a,wall_height)])
+	var style := -wall_height if layer == Surface.WALL and span < 2.25 else wall_height
 	for k: int in [0,1,2,0,2,3]:
-		_vertex(mesh,vertices[k],color,layer,coords[k],roof-base)
+		_vertex(mesh,vertices[k],color,layer,coords[k],style)
 		walls.append(vertices[k])

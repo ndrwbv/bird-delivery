@@ -6,6 +6,9 @@ const PAVEMENT := 0
 const GRASS := 1
 const SHORE_PATH := "res://assets/south-beach-height.json"
 const SHORE_BLEND := 12.0
+const RELIEF_PATH := "res://assets/south-outer-relief.bin"
+const RELIEF_STEP := 4.0
+const RELIEF_UNIT := 0.02
 
 var core: Rect2
 var detail: RefCounted
@@ -19,11 +22,13 @@ var shore_step := 4.0
 var shore_columns := 0
 var shore_rows := 0
 var shore_heights := PackedFloat32Array()
+var relief := PackedFloat32Array()
+var relief_size := Vector2i.ZERO
 var road_cells := {}
 var road_sections: Array[Dictionary] = []
 
 
-func setup(data: Dictionary, bounds: Array, detail_ground: RefCounted) -> void:
+func setup(data: Dictionary, bounds: Array, detail_ground: RefCounted, use_relief := true) -> void:
 	detail = detail_ground
 	core = Rect2(Vector2(bounds[0], bounds[1]), Vector2(bounds[2]-bounds[0], bounds[3]-bounds[1]))
 	var spec: Dictionary = data.terrain
@@ -33,6 +38,13 @@ func setup(data: Dictionary, bounds: Array, detail_ground: RefCounted) -> void:
 	rows = int(spec.depth)
 	heights = PackedFloat32Array(spec.heights)
 	_load_shore()
+	relief_size = Vector2i(roundi((columns-1)*step/RELIEF_STEP)+1,roundi((rows-1)*step/RELIEF_STEP)+1)
+	if use_relief:
+		var bytes := FileAccess.get_file_as_bytes(RELIEF_PATH)
+		if bytes.size() == relief_size.x*relief_size.y:
+			relief.resize(bytes.size())
+			for i in bytes.size():
+				relief[i] = (bytes[i]-128)*RELIEF_UNIT
 	for road: Dictionary in data.roads:
 		var half := float(road.width)*0.5
 		for segment in sections(road.points,half,half+sidewalk_width(road),road):
@@ -155,6 +167,9 @@ func land_height(x: float, z: float) -> float:
 	if edge == p:
 		return detail.at(x,z)
 	var y := _raw(x,z)
+	if not relief.is_empty():
+		var grid := (p-origin)/RELIEF_STEP
+		y += _sample_grid(grid.x,grid.y,relief_size.x,relief_size.y,relief)
 	var distance := edge.distance_to(p)
 	if distance >= SEAM_METERS:
 		return y

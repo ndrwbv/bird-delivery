@@ -63,7 +63,8 @@ func configure(vehicle: CharacterBody3D, view: Camera3D, paint: ShaderMaterial, 
 	var district = get_parent()
 	_region_paint = district.region_world.paint
 	season_materials.assign([paint,soil,_region_paint,district.region_world.overview.material_override,
-		district.leaves.near_paint,district.leaves.far_paint,district.leaves.far_only,district.leaves.verge_paint])
+		district.leaves.near_paint,district.leaves.far_paint,district.leaves.far_only,district.leaves.verge_paint,
+		district.outer_trees.paint,district.outer_trees.meadow_paint,district.outer_trees.leaf_paint])
 	for name in ["Grass","Crowns","Understory"]:
 		var layer := district.get_node(name) as Node3D
 		if layer.get_child_count():
@@ -210,6 +211,7 @@ func _apply_sun() -> void:
 		scene_paint.set_shader_parameter(&"road_wetness",maxf(_soil_wet,wet))
 		scene_paint.set_shader_parameter(&"water_film",puddles)
 		_region_paint.set_shader_parameter(&"rain_film",Vector2(maxf(_soil_wet,wet),puddles))
+		_region_paint.set_shader_parameter(&"dusk",night)
 
 func _make_rain() -> void:
 	streaks = MultiMeshInstance3D.new()

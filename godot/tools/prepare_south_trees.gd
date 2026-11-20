@@ -1,18 +1,27 @@
 extends SceneTree
+## Bake the outer district's relief and planting from the same protected sites.
 
 const GROUND := preload("res://south_region_ground.gd")
-const EDGE := preload("res://south_region_edge.gd")
-const SPACING := 13.0
+const PLANTING := preload("res://south_planting_catalog.gd")
+const CELL := 32.0
+const SEARCH := 16.0
+const TREE_GAP := 9.0
 
 var ground := GROUND.new()
-var edge := EDGE.new()
-var roads := preload("res://south_region_routes.gd").new()
 var random := RandomNumberGenerator.new()
+var contours := FastNoiseLite.new()
+var banks := FastNoiseLite.new()
+var habitat := FastNoiseLite.new()
 var region: Dictionary
 var core: Rect2
-var unavailable := {}
-var trees: Array[Array] = []
+var boundary: PackedVector2Array
+var obstacles := {}
+var greens := {}
 var occupied := {}
+var stands := {}
+var tree_count := 0
+var cover_count := 0
+var relief := PackedByteArray()
 
 
 func _initialize() -> void:
@@ -20,113 +29,281 @@ func _initialize() -> void:
 	var center: Dictionary = _read("south")
 	var detail := preload("res://terrain_height.gd").new()
 	detail.setup(_read("south-ground"),FileAccess.get_file_as_bytes("res://assets/south-ground.bin"))
-	ground.setup(region,center.bounds,detail)
-	core = ground.core.grow(4)
-	edge.setup(region.boundary)
-	roads.setup(region,center)
+	ground.setup(region,center.bounds,detail,false)
+	core = ground.core.grow(4.0)
+	boundary = GROUND.outline_of(region.boundary)
 	random.seed = 241107
-	for place: Dictionary in region.stops + region.parking_lots:
-		_reserve(_v(place.at), _v(place.get("entry",place.at)), 11.0)
-	for drive: Dictionary in _read("south-yards").values():
-		_reserve(_v(drive.driveway), _v(drive.stop), 4.5)
-	for key in ["beach","garage"]:
-		var point := _v(region[key])
-		_reserve(point,point,42.0)
-	var shop := _read("south-workshop")
-	_reserve(_v(shop.driveway),_v(shop.at),10.0)
-	for gate: Dictionary in region.gates:
-		_reserve(_v(gate.at),_v(gate.at),26.0)
-
+	_noise(contours,319,0.032)
+	_noise(banks,822,0.091)
+	_noise(habitat,740,0.022)
+	_protect_sites()
+	_bake_relief()
 	for path: Dictionary in region.roads:
 		_street(path)
-	for park: Dictionary in region.greens:
-		if park.kind in ["park","wood","forest"]:
-			_park(park)
-	var output := FileAccess.open("res://assets/south-outer-trees.json",FileAccess.WRITE)
-	if output == null:
+	_plant_open_land()
+	var height_file := FileAccess.open(GROUND.RELIEF_PATH,FileAccess.WRITE)
+	if height_file == null:
 		quit(1)
 		return
-	output.store_string(JSON.stringify(trees)+"\n")
-	print("Prepared ",trees.size()," trees beyond the detailed block")
+	height_file.store_buffer(relief)
+	height_file.close()
+	if not PLANTING.save(stands):
+		quit(1)
+		return
+	print("Godot South scenery: ",tree_count," trees, ",cover_count," understory groups, ",
+		relief.size()," relief samples")
 	quit()
 
 
+func _protect_sites() -> void:
+	for section: Dictionary in ground.road_sections:
+		_reserve(section.walk,0.8)
+	for stream: Dictionary in region.streams:
+		_protect_path(stream.points,float(stream.width)*0.5+3.0)
+	for rail: Dictionary in region.rails:
+		_protect_path(rail.points,3.2)
+	for house: Dictionary in region.buildings:
+		_reserve(GROUND.outline_of(house.outline),1.25)
+		for door: Dictionary in house.get("doors",[]):
+			var at := _v(door.at)
+			_lane(at,at+_v(door.normal)*3.5,1.6)
+		if house.has("door"):
+			_lane(_v(house.door),_v(house.approach),2.0)
+	for yard: Dictionary in _read("south-yards").values():
+		_lane(_v(yard.driveway),_v(yard.stop),3.5)
+		_lane(_v(yard.stop),_v(yard.customer),1.5)
+	for lot: Dictionary in region.parking_lots:
+		_reserve(GROUND.outline_of(lot.outline),1.2)
+		_lane(_v(lot.entry),_v(lot.at),4.5)
+	for stop: Dictionary in region.stops:
+		_lane(_v(stop.at),_v(stop.road),3.2)
+	for green: Dictionary in region.greens:
+		var poly := GROUND.outline_of(green.outline)
+		if poly.size() < 3:
+			continue
+		if green.kind in ["pitch","play"]:
+			_reserve(poly,1.6)
+		else:
+			_bin(greens,GROUND.bounds_of(poly),{"poly":poly,"kind":green.kind})
+	for key in ["beach","garage"]:
+		var point := _v(region[key])
+		_lane(point,point,42.0)
+	var shore := ground.shore_bounds
+	_reserve(PackedVector2Array([shore.position,Vector2(shore.end.x,shore.position.y),
+		shore.end,Vector2(shore.position.x,shore.end.y)]),0.0)
+	var shop: Dictionary = _read("south-workshop")
+	_lane(_v(shop.driveway),_v(shop.at),10.0)
+	var tennis := _v(_read("summer_tennis").at)
+	_lane(tennis,tennis,25.0)
+	var park: Dictionary = _read("summer_park")
+	for key in ["gym","kites"]:
+		for feature: Dictionary in park.get(key,[]):
+			var at := _v(feature.at)
+			_lane(at,at,7.0)
+	for pitch: Dictionary in park.pitches:
+		var at := _v(pitch.at)
+		var lengthwise := _v(pitch.axis)*float(pitch.length)*0.5
+		var across := _v(pitch.axis).orthogonal()*float(pitch.width)*0.5
+		_reserve(PackedVector2Array([at-lengthwise-across,at+lengthwise-across,
+			at+lengthwise+across,at-lengthwise+across]),2.2)
+	for ramp: Dictionary in _read("south-ramps"):
+		var at := _v(ramp.at)
+		_lane(at-_v(ramp.axis)*8.0,at+_v(ramp.axis)*14.0,4.5)
+	for gate: Dictionary in region.gates:
+		var at := _v(gate.at)
+		_lane(at,at,24.0)
+	for bench: Dictionary in _read("summer_yards").spots:
+		var at := _v(bench.at)
+		_lane(at,at,2.3)
+
+
+func _bake_relief() -> void:
+	var count := ground.relief_size
+	relief.resize(count.x*count.y)
+	relief.fill(128)
+	for z in count.y:
+		for x in count.x:
+			var p := ground.origin + Vector2(x,z)*GROUND.RELIEF_STEP
+			if ground.core.has_point(p):
+				continue
+			var height := ground.land_height(p.x,p.y)
+			if height < float(region.water_y)+0.85:
+				continue
+			var room := _clearance(p)
+			if room <= 0.0:
+				continue
+			var seam := smoothstep(3.0,GROUND.SEAM_METERS,p.distance_to(p.clamp(core.position,core.end)))
+			var swell := contours.get_noise_2dv(p)*2.9 + banks.get_noise_2dv(p)*0.92
+			var delta := swell*smoothstep(0.0,14.0,room)*seam*smoothstep(0.85,3.8,height-float(region.water_y))
+			relief[z*count.x+x] = clampi(roundi(delta/GROUND.RELIEF_UNIT)+128,0,255)
+	# Plant transforms follow the exact quantized height sampled in the game.
+	ground.relief.resize(relief.size())
+	for i in relief.size():
+		ground.relief[i] = (relief[i]-128)*GROUND.RELIEF_UNIT
+
+
 func _street(path: Dictionary) -> void:
-	if int(path["class"]) not in [2,3,4] or path.has("deck_y"):
+	if int(path["class"]) not in [2,3,4,5] or path.has("deck_y"):
 		return
-	var along := random.randf_range(8,18)
+	var along := random.randf_range(6.0,14.0)
 	for i in range(1,path.points.size()):
 		var from := _v(path.points[i-1])
 		var to := _v(path.points[i])
 		var span := to.distance_to(from)
 		var axis := from.direction_to(to)
-		var verge := axis.orthogonal()*(float(path.width)*.5+3.8)
+		var verge := axis.orthogonal()*(float(path.width)*0.5+GROUND.sidewalk_width(path)+3.0)
 		while along < span:
-			if along >= 3.5 and span-along >= 3.5:
+			if along >= 2.5 and span-along >= 2.5:
 				var center := from+axis*along
-				_plant(center+verge,false)
-				_plant(center-verge,false)
-			along += SPACING
+				_plant(center+verge,0.12)
+				_plant(center-verge,0.12)
+			along += random.randf_range(11.0,17.0)
 		along -= span
 
 
-func _park(park: Dictionary) -> void:
-	var outline := GROUND.outline_of(park.outline)
-	var bounds := GROUND.bounds_of(outline)
-	var woods: bool = park.kind in ["wood","forest"]
-	var gap := 15.0 if woods else 22.0
-	for j in ceili(bounds.size.y/gap):
-		for i in ceili(bounds.size.x/gap):
-			var point := bounds.position+(Vector2(i,j)+Vector2(random.randf(),random.randf()))*gap
-			if Geometry2D.is_point_in_polygon(point,outline):
-				_plant(point,woods and random.randf()<.46)
+func _plant_open_land() -> void:
+	var bounds := GROUND.bounds_of(boundary)
+	var span := 10.0
+	var size := (bounds.size/span).ceil()
+	for z in int(size.y):
+		for x in int(size.x):
+			var center := bounds.position + (Vector2(x,z)+Vector2(random.randf(),random.randf()))*span
+			if not _inside(center):
+				continue
+			var density := habitat.get_noise_2dv(center)
+			var green := _green_at(center)
+			var woods := green in ["forest","wood"]
+			var chance := 0.38+0.52*smoothstep(-0.42,0.46,density)
+			if green == "park" or woods:
+				chance += 0.20
+			if random.randf() < chance:
+				_plant(center,0.50 if woods else (0.27 if density > 0.12 else 0.07))
+			# Alternate low meadows, bushy edges and sandy patches with exposed stones.
+			for i in 3:
+				var p := center+Vector2(random.randf_range(-5.0,5.0),random.randf_range(-5.0,5.0))
+				if not _inside(p) or _clearance(p) < 0.65:
+					continue
+				var y := ground.land_height(p.x,p.y)
+				if y < float(region.water_y)+0.75:
+					continue
+				var local_growth := density*0.65+banks.get_noise_2dv(p)*0.35
+				var pick := random.randf()
+				if pick < 0.15 and local_growth > -0.16 and _clearance(p) > 2.6 and _tree_room(p,3.0):
+					_record(p,y,random.randf_range(0.65,1.50),PLANTING.SHRUB)
+				elif pick < 0.22 and local_growth < 0.02:
+					_record(p,y,random.randf_range(0.50,1.65),PLANTING.STONE)
+				elif pick < 0.70+local_growth*0.5:
+					_record(p,y,random.randf_range(0.66,1.64),PLANTING.GRASS)
 
 
-func _reserve(from: Vector2,to: Vector2,radius: float) -> void:
-	var area := Rect2(from,Vector2.ZERO).expand(to).grow(radius)
+func _plant(p: Vector2, conifer_chance: float) -> void:
+	if not _inside(p) or _clearance(p) < 1.8 or not _tree_room(p,TREE_GAP):
+		return
+	var y := ground.land_height(p.x,p.y)
+	if y < float(region.water_y)+1.15:
+		return
+	var kind := 5 if random.randf() < conifer_chance else random.randi_range(0,4)
+	_record(p,y,random.randf_range(0.83,1.76),kind)
+	var key := _cell(p)
+	if not occupied.has(key):
+		occupied[key] = []
+	occupied[key].append(p)
+
+
+func _inside(p: Vector2) -> bool:
+	return not core.has_point(p) and Geometry2D.is_point_in_polygon(p,boundary)
+
+
+func _green_at(p: Vector2) -> String:
+	for patch: Dictionary in greens.get(_cell(p),[]):
+		if Geometry2D.is_point_in_polygon(p,patch.poly):
+			return patch.kind
+	return ""
+
+
+func _tree_room(p: Vector2, gap: float) -> bool:
+	var cell := _cell(p)
+	for dz in [-1,0,1]:
+		for dx in [-1,0,1]:
+			for other: Vector2 in occupied.get(cell+Vector2i(dx,dz),[]):
+				if p.distance_squared_to(other) < gap*gap:
+					return false
+	return true
+
+
+func _clearance(p: Vector2) -> float:
+	var distance := SEARCH
+	for entry: Dictionary in obstacles.get(_cell(p),[]):
+		var shape: PackedVector2Array = entry.shape
+		var bounds: Rect2 = entry.bounds
+		if not bounds.has_point(p):
+			continue
+		if shape.size() >= 3 and Geometry2D.is_point_in_polygon(p,shape):
+			return 0.0
+		var closest := p.distance_squared_to(shape[0])
+		for i in range(1,shape.size()+1):
+			var a := shape[i-1]
+			var b := shape[i%shape.size()]
+			if a != b:
+				closest = minf(closest,p.distance_squared_to(Geometry2D.get_closest_point_to_segment(p,a,b)))
+		distance = minf(distance,sqrt(closest)-float(entry.pad))
+		if distance <= 0.0:
+			return 0.0
+	return distance
+
+
+func _protect_path(points: Array, radius: float) -> void:
+	for i in range(1,points.size()):
+		_lane(_v(points[i-1]),_v(points[i]),radius)
+
+
+func _lane(a: Vector2,b: Vector2,radius: float) -> void:
+	_reserve(PackedVector2Array([a,b]),radius)
+
+
+func _reserve(shape: PackedVector2Array, pad: float) -> void:
+	if shape.is_empty():
+		return
+	var area := GROUND.bounds_of(shape).grow(SEARCH+pad)
+	_bin(obstacles,area,{"bounds":area,"shape":shape,"pad":pad})
+
+
+func _bin(index: Dictionary, area: Rect2, entry: Dictionary) -> void:
 	var low := _cell(area.position)
 	var high := _cell(area.end)
 	for z in range(low.y,high.y+1):
 		for x in range(low.x,high.x+1):
 			var key := Vector2i(x,z)
-			if not unavailable.has(key):
-				unavailable[key] = []
-			unavailable[key].append([from,to,radius*radius])
+			if not index.has(key):
+				index[key] = []
+			index[key].append(entry)
 
 
-func _plant(point: Vector2, evergreen: bool) -> void:
-	if core.has_point(point) or not Geometry2D.is_point_in_polygon(point,edge.polygon):
-		return
-	var y := ground.land_height(point.x,point.y)
-	if y < float(region.water_y)+.6 or ground.material_at(point.x,point.y) == GROUND.PAVEMENT:
-		return
-	# Keep space for doors, turns and sidewalks. The trunk must be clear in both axes.
-	if not roads.walk_clear(point-Vector2(3,0),point+Vector2(3,0)) or not roads.walk_clear(point-Vector2(0,3),point+Vector2(0,3)):
-		return
-	var cell := _cell(point)
-	for lane: Array in unavailable.get(cell,[]):
-		var near: Vector2 = lane[0] if lane[0] == lane[1] else Geometry2D.get_closest_point_to_segment(point,lane[0],lane[1])
-		if point.distance_squared_to(near) < float(lane[2]):
-			return
-	for dx in [-1,0,1]:
-		for dz in [-1,0,1]:
-			for neighbor: Vector2 in occupied.get(cell+Vector2i(dx,dz),[]):
-				if point.distance_squared_to(neighbor) < 64:
-					return
-	if not occupied.has(cell):
-		occupied[cell] = []
-	occupied[cell].append(point)
-	trees.append([snappedf(point.x,.01),snappedf(y,.01),snappedf(point.y,.01),snappedf(random.randf_range(0.8,1.65),.01),
-		5 if evergreen else random.randi_range(0,4),snappedf(random.randf()*TAU,.01)])
+func _record(p: Vector2,y: float,scale: float,kind: int) -> void:
+	var key := PLANTING.tile_at(p)
+	if not stands.has(key):
+		stands[key] = []
+	stands[key].append([p.x,y,p.y,scale,kind,random.randf()*TAU])
+	if kind < PLANTING.SHRUB:
+		tree_count += 1
+	else:
+		cover_count += 1
+
+
+func _noise(layer: FastNoiseLite, seed_: int, frequency: float) -> void:
+	layer.seed = seed_
+	layer.frequency = frequency
+	layer.fractal_type = FastNoiseLite.FRACTAL_NONE
 
 
 func _cell(at: Vector2) -> Vector2i:
-	return Vector2i((at/16).floor())
+	return Vector2i((at/CELL).floor())
 
 
 func _v(point: Array) -> Vector2:
 	return Vector2(point[0],point[1])
 
 
-func _read(name_: String) -> Dictionary:
+func _read(name_: String) -> Variant:
 	return JSON.parse_string(FileAccess.get_file_as_string("res://assets/"+name_+".json"))
+

@@ -214,6 +214,8 @@ func _ready() -> void:
 	add_child(furniture)
 	add_child(street_lights)
 	street_lights.setup(furniture)
+	street_lights.bind(region_world.paint)
+	street_lights.bind(outer_trees.meadow_paint)
 	street_lights.bind(paint)
 	furniture.setup(impact_ground,paint,street_lights.scales)
 	car.damage.floor = impact_ground
